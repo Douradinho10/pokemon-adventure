@@ -1,4 +1,7 @@
+"use client"
+
 import { memo } from "react"
+import { motion } from "framer-motion"
 
 interface AnimatedSpriteProps {
   sprite: string
@@ -16,17 +19,28 @@ const sizeClasses = {
 
 export const AnimatedSprite = memo(({ sprite, size = "md", animate = true, className = "" }: AnimatedSpriteProps) => {
   return (
-    <div
+    <motion.div
+      initial={animate ? { y: 0 } : false}
+      animate={animate ? { 
+        y: [0, -10, 0],
+        scale: [1, 1.05, 1],
+        rotate: [0, -2, 2, 0]
+      } : false}
+      transition={{ 
+        duration: 2, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
       className={`
-      ${sizeClasses[size]} 
-      ${animate ? "animate-bounce" : ""} 
-      transition-all duration-300 hover:scale-110 
-      drop-shadow-2xl
-      ${className}
-    `}
+        ${sizeClasses[size]} 
+        transition-all duration-300 hover:scale-125 
+        drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]
+        filter saturate-150
+        ${className}
+      `}
     >
       {sprite}
-    </div>
+    </motion.div>
   )
 })
 
