@@ -7,7 +7,7 @@ import { AnimatedSprite } from "./AnimatedSprite"
 import { AnimatedProgress } from "./AnimatedProgress"
 import { Badge } from "@/components/ui/badge"
 import { wildPokemon, typeColors, POKEMON_RARITY_CONFIG } from "../data/pokemonData"
-import { SwashbuckleIcon as Sword, Zap, Shield, Flame } from "lucide-react"
+import { Sword, Zap, Shield, Flame } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface BattleArenaProps {
