@@ -50,7 +50,7 @@ export const AnimatedSprite = memo(({ sprite, size = "md", animate = true, class
           <img 
             src={sprite} 
             alt="Pokemon Sprite" 
-            className={`w-full h-full object-contain relative z-10 drop-shadow-[0_20px_20px_rgba(0,0,0,0.4)] ${sprite.includes('paw-icon') ? 'invert' : ''}`}
+            className="w-full h-full object-contain relative z-10 drop-shadow-[0_20px_20px_rgba(0,0,0,0.4)]"
             style={{ imageRendering: sprite.endsWith('.gif') ? 'pixelated' : 'auto' }}
           />
         </>
