@@ -46,7 +46,6 @@ export const AnimatedSprite = memo(({ sprite, size = "md", animate = true, class
         <span className="text-6xl drop-shadow-2xl">{sprite}</span>
       ) : (
         <>
-          {/* Shadow effect */}
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-4 bg-black/20 blur-md rounded-[100%] z-0" />
           <img 
             src={sprite} 

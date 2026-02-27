@@ -79,16 +79,8 @@ export default function PokemonAdventure() {
 
   const returnToMenu = useCallback(() => {
     if (currentSlot !== null && gameState.activePokemon) {
-      const newSlots = [...saveSlots]
-      newSlots[currentSlot].gameState = { ...gameState }
-      setSaveSlots(newSlots)
-      localStorage.setItem(GAME_SAVE_KEY, JSON.stringify(newSlots))
-
-      // Try to save to Firebase
-      const userId = localStorage.getItem("pokemon-adventure-user-id") || "default"
-      saveGameToFirebase(userId, gameState, currentSlot).catch((err) => {
-        console.log("[v0] Firebase save failed (expected in preview):", err.message)
-      })
+      // O salvamento já ocorre automaticamente via useLocalGameState
+      // que sincroniza com localStorage e Firebase se configurado
     }
 
     setCurrentScreen("main-menu")
