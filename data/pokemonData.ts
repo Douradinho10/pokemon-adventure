@@ -225,13 +225,7 @@ export const starterPokemon: Record<string, Pokemon> = {
     type: "Normal/Voador",
     speed: 56,
   },
-  Eevee: {
-    HP: 40,
-    maxHP: 40,
-    attacks: { Investida: [8, 15], "Ataque Rápido": [12, 25] },
-    level: 5,
-    xp: 0,
-    sprite: "🐾",
+  Eevee: { HP: 40, maxHP: 40, attacks: { Investida: [8, 15], "Ataque Rápido": [12, 25] }, level: 5, xp: 0, sprite: "/paw-icon.png",
     type: "Normal",
     speed: 55,
   },
@@ -709,8 +703,7 @@ export const wildPokemon: Record<
     speed: 60,
   },
   Ditto: { sprite: "💧", type: "Normal", baseHP: 40, attacks: { Transformação: [15, 28] }, rarity: "raro", speed: 48 },
-  Eevee: {
-    sprite: "🐾",
+  Eevee: { HP: 40, maxHP: 40, attacks: { Investida: [8, 15], "Ataque Rápido": [12, 25] }, level: 5, xp: 0, sprite: "/paw-icon.png",
     type: "Normal",
     baseHP: 40,
     attacks: { Investida: [12, 22], "Ataque Rápido": [15, 28] },
@@ -989,7 +982,7 @@ export const wildPokemon: Record<
   },
   Sneasel: {
     attacks: { "Ice Shard": [18, 30], "Night Slash": [20, 35] },
-    sprite: "🐾",
+    sprite: "/paw-icon.png",
     type: "Sombrio/Gelo",
     rarity: "comum",
     speed: 115,
@@ -1299,7 +1292,7 @@ export const wildPokemon: Record<
   },
   Sneasel: {
     attacks: { "Ice Shard": [18, 30], "Night Slash": [20, 35] },
-    sprite: "🐾",
+    sprite: "/paw-icon.png",
     type: "Sombrio/Gelo",
     rarity: "comum",
     speed: 115,

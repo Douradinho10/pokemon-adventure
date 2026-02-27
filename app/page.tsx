@@ -560,8 +560,9 @@ export default function PokemonAdventure() {
   const renderMainMenu = () => (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
       <div className="text-center space-y-4">
-        <h2 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
-          Pokémon Adventure
+        <h2 className="text-7xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] uppercase">
+          Pokémon
+          <span className="block text-4xl bg-gradient-to-r from-yellow-400 to-orange-600 bg-clip-text text-transparent">Adventure</span>
         </h2>
         <p className="text-white/80 text-lg">Bem-vindo à sua jornada Pokémon!</p>
         <p className="text-white/60 text-sm">
