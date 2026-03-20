@@ -177,6 +177,11 @@ export const BattleArena = memo(
               <span className="text-orange-500 font-black text-sm">Nv.{battle.enemyLevel}</span>
             </div>
             <h4 className="font-black text-slate-800 text-base mb-1 uppercase tracking-wide">{visibleEnemyName}{battle.enemyIsShiny ? " ✨" : ""}</h4>
+            {battle.enemyIsBoss && (
+              <Badge className="mb-1 border-0 bg-gradient-to-r from-rose-500 to-red-700 px-2 py-0.5 text-[9px] text-white">
+                👑 BOSS
+              </Badge>
+            )}
             {battle.enemyIsShiny && (
               <Badge className="mb-1 border-0 bg-gradient-to-r from-amber-300 to-yellow-500 px-2 py-0.5 text-[9px] text-slate-900">
                 SHINY

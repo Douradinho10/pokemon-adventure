@@ -10,6 +10,40 @@ import { starterPokemon, wildPokemon } from "../data/pokemonData"
 import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
 
 const GAME_SAVE_KEY = "pokemon-adventure-saves"
+const ACCOUNT_SAVE_KEY_PREFIX = "pokemon-adventure-account-saves:"
+
+function getAccountSaveKey(userId: string): string {
+  return `${ACCOUNT_SAVE_KEY_PREFIX}${userId}`
+}
+
+function loadSlotsFromAccountLocal(userId: string): SaveSlot[] {
+  if (typeof window === "undefined") {
+    return getDefaultSaveSlots()
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getAccountSaveKey(userId))
+    if (!raw) {
+      return getDefaultSaveSlots()
+    }
+
+    return normalizeSaveSlots(JSON.parse(raw))
+  } catch {
+    return getDefaultSaveSlots()
+  }
+}
+
+function saveSlotsToAccountLocal(userId: string, slots: SaveSlot[]) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(getAccountSaveKey(userId), JSON.stringify(normalizeSaveSlots(slots)))
+  } catch {
+    // Ignore localStorage write failures (quota/private mode)
+  }
+}
 
 function migrateGameStateSprites(gameState: GameState): GameState {
   const migratedTeam = Object.fromEntries(
@@ -130,6 +164,7 @@ export const useLocalGameState = () => {
       }
 
       unsubscribe = onAuthStateChanged(auth, (user) => {
+        setIsLoading(true)
         setAuthenticatedUserId(user?.uid ?? null)
         setAuthResolved(true)
       })
@@ -183,13 +218,30 @@ export const useLocalGameState = () => {
           slot4: loadedStates[4] ? "✓" : "empty",
         })
 
-        const migratedSlots = getDefaultSaveSlots().map((slot, index) => ({
+        const firebaseSlots = getDefaultSaveSlots().map((slot, index) => ({
           ...slot,
           gameState: loadedStates[index] ? migrateGameStateSprites(loadedStates[index] as GameState) : null,
         }))
 
-        setSaveSlots(migratedSlots)
-        setSaveSource("firebase")
+        const hasFirebaseData = firebaseSlots.some((slot) => slot.gameState?.activePokemon)
+        const localMirrorSlots = loadSlotsFromAccountLocal(authenticatedUserId)
+        const hasLocalMirrorData = localMirrorSlots.some((slot) => slot.gameState?.activePokemon)
+        const resolvedSlots = hasFirebaseData ? firebaseSlots : localMirrorSlots
+
+        // Rehydrate cloud slots from local mirror when Firebase returns empty but local has progress.
+        if (!hasFirebaseData && hasLocalMirrorData) {
+          await Promise.all(
+            resolvedSlots.map(async (slot) => {
+              if (!slot.gameState) {
+                return
+              }
+              await saveGameToFirebase(authenticatedUserId, slot.gameState, slot.id)
+            }),
+          )
+        }
+
+        setSaveSlots(resolvedSlots)
+        setSaveSource(hasFirebaseData ? "firebase" : "local")
         setIsLoading(false)
       } catch (error) {
         console.error("[v0] Error loading slots:", error)
@@ -282,6 +334,18 @@ export const useLocalGameState = () => {
   }, [authenticatedUserId, currentSlot, gameState, isLoading, saveRetryTick])
 
   useEffect(() => {
+    if (!authenticatedUserId) {
+      return
+    }
+
+    if (isLoading) {
+      return
+    }
+
+    saveSlotsToAccountLocal(authenticatedUserId, saveSlots)
+  }, [authenticatedUserId, isLoading, saveSlots])
+
+  useEffect(() => {
     return () => {
       if (saveRetryTimeoutRef.current) {
         window.clearTimeout(saveRetryTimeoutRef.current)
@@ -317,8 +381,13 @@ export const useLocalGameState = () => {
       setGameState(newGameState)
       setCurrentSlot(slotId)
       lastSavedSnapshotRef.current = JSON.stringify(newGameState)
+      if (authenticatedUserId) {
+        const nextSlots = [...saveSlots]
+        nextSlots[slotId] = { ...nextSlots[slotId], gameState: newGameState }
+        setSaveSlots(nextSlots)
+      }
     },
-    [setGameState],
+    [authenticatedUserId, saveSlots, setGameState],
   )
 
   const deleteSaveSlot = useCallback(

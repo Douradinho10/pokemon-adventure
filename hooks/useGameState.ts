@@ -33,6 +33,7 @@ export interface Battle {
   enemyName: string
   enemyType: string
   enemyDisplayName?: string
+  enemyIsBoss?: boolean
   enemyDisplayType?: string
   enemyIsDisguised?: boolean
   enemyIsShiny?: boolean

@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, LogOut } from "lucide-react"
-import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth"
+import { User } from "lucide-react"
+import { onAuthStateChanged } from "firebase/auth"
 import { useLocalGameState } from "../hooks/useLocalGameState"
 import {
   starterPokemon,
@@ -91,6 +92,7 @@ type NextEncounterPreview = {
   forActivePokemon: string
   enemyName: string
   enemyDisplayName: string
+  isBoss: boolean
   enemyLevel: number
   enemyType: string
   enemyDisplayType: string
@@ -105,6 +107,10 @@ const XP_SHARE_ITEM = "XP Share"
 const IMPOSTOR_CHANCE = 0.08
 const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
+const BOSS_WAVE_INTERVAL = 10
+const BOSS_MULTIPLIER = 1.5
+const XP_GAIN_MULTIPLIER = 1.8
+const BOSS_XP_MULTIPLIER = 1.35
 const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
   comum: 24,
   raro: 42,
@@ -169,6 +175,16 @@ const getScaledEnemyLevel = (playerLevel: number, battleCount: number, random: (
   const maxLevel = Math.max(minLevel, Math.min(playerLevel + 6, baselineLevel + 2))
 
   return random(minLevel, maxLevel)
+}
+
+const scaleDamageRange = (range: [number, number], multiplier: number): [number, number] => {
+  if (range[0] === 0 && range[1] === 0) {
+    return range
+  }
+
+  const min = Math.max(1, Math.floor(range[0] * multiplier))
+  const max = Math.max(min, Math.floor(range[1] * multiplier))
+  return [min, max]
 }
 
 const getLevelBalanceMultiplier = (
@@ -256,11 +272,7 @@ const normalizeTypeKey = (value: string | undefined | null) =>
 const normalizeMoveNameKey = (moveName: string) =>
   normalizeDisplayText(moveName).replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
 
-const getStarterEnvironment = (starterName: string): BattleEnvironment => {
-  if (starterName === "Charmander") return "vulcanico"
-  if (starterName === "Squirtle") return "costeiro"
-  if (starterName === "Bulbasaur") return "floresta"
-  if (starterName === "Pidgey") return "alturas"
+const getStarterEnvironment = (_starterName: string): BattleEnvironment => {
   return "planicie"
 }
 
@@ -271,6 +283,26 @@ const environmentLabels: Record<BattleEnvironment, string> = {
   floresta: "Floresta",
   caverna: "Caverna",
   alturas: "Alturas",
+}
+
+const allBattleEnvironments: BattleEnvironment[] = ["planicie", "vulcanico", "costeiro", "floresta", "caverna", "alturas"]
+
+const getDestinationChoices = (currentEnvironment: BattleEnvironment, battles: number): [BattleEnvironment, BattleEnvironment] => {
+  const candidates = allBattleEnvironments.filter((environment) => environment !== currentEnvironment)
+
+  if (candidates.length < 2) {
+    return ["floresta", "caverna"]
+  }
+
+  const baseIndex = Math.abs(battles) % candidates.length
+  const firstChoice = candidates[baseIndex]
+  const secondChoice = candidates[(baseIndex + 2) % candidates.length]
+
+  if (firstChoice === secondChoice) {
+    return [firstChoice, candidates[(baseIndex + 1) % candidates.length]]
+  }
+
+  return [firstChoice, secondChoice]
 }
 
 const normalizeTypeToken = (value: string) =>
@@ -289,6 +321,87 @@ const environmentPreferredTypes: Record<BattleEnvironment, string[]> = {
   alturas: ["voador", "dragao", "eletrico"],
 }
 
+const environmentTypeWeights: Record<BattleEnvironment, Record<string, number>> = {
+  planicie: {
+    inseto: 3.2,
+    grama: 3.0,
+    normal: 1.8,
+    voador: 1.6,
+  },
+  vulcanico: {
+    fogo: 3.0,
+    pedra: 2.4,
+    terra: 2.2,
+    dragao: 1.5,
+  },
+  costeiro: {
+    agua: 3.0,
+    gelo: 2.2,
+    voador: 1.5,
+    eletrico: 1.3,
+  },
+  floresta: {
+    grama: 3.2,
+    inseto: 2.8,
+    veneno: 2.0,
+    fada: 1.5,
+  },
+  caverna: {
+    pedra: 2.8,
+    terra: 2.5,
+    veneno: 2.2,
+    fantasma: 2.0,
+  },
+  alturas: {
+    voador: 3.0,
+    dragao: 2.4,
+    eletrico: 2.0,
+    gelo: 1.4,
+  },
+}
+
+const pickWeightedPokemon = (candidates: string[], environment: BattleEnvironment) => {
+  if (candidates.length === 0) {
+    return null
+  }
+
+  const typeWeights = environmentTypeWeights[environment]
+  const weighted = candidates.map((name) => {
+    const typeTokens = normalizeTypeText(wildPokemon[name].type)
+      .split("/")
+      .map(normalizeTypeToken)
+      .filter(Boolean)
+
+    const highestTypeWeight = typeTokens.reduce((best, token) => Math.max(best, typeWeights[token] || 1), 1)
+    return { name, weight: highestTypeWeight }
+  })
+
+  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0)
+  let roll = Math.random() * totalWeight
+
+  for (const entry of weighted) {
+    roll -= entry.weight
+    if (roll <= 0) {
+      return entry.name
+    }
+  }
+
+  return weighted[weighted.length - 1].name
+}
+
+const getEnvironmentWildPool = (environment: BattleEnvironment) => {
+  const preferredTypes = new Set(environmentPreferredTypes[environment])
+
+  return Object.keys(wildPokemon).filter((name) => {
+    const typeTokens = normalizeTypeText(wildPokemon[name].type)
+      .split("/")
+      .map(normalizeTypeToken)
+      .filter(Boolean)
+
+    return typeTokens.some((token) => preferredTypes.has(token))
+  })
+}
+
 const getTargetRarityForBattle = (battleCount: number) => {
   const rarityRoll = Math.random()
 
@@ -305,24 +418,16 @@ const getTargetRarityForBattle = (battleCount: number) => {
 
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
-  const preferredTypes = new Set(environmentPreferredTypes[environment])
+  const environmentPool = getEnvironmentWildPool(environment)
+  const rarityPool = environmentPool.filter((name) => wildPokemon[name].rarity === targetRarity)
+  const selectedPool = rarityPool.length > 0 ? rarityPool : environmentPool
+  const weightedPick = pickWeightedPokemon(selectedPool, environment)
 
-  const rarityPool = Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === targetRarity)
-  const preferredPool = rarityPool.filter((name) => {
-    const typeTokens = normalizeTypeText(wildPokemon[name].type)
-      .split("/")
-      .map(normalizeTypeToken)
-      .filter(Boolean)
-
-    return typeTokens.some((token) => preferredTypes.has(token))
-  })
-
-  const selectedPool = preferredPool.length > 0 ? preferredPool : rarityPool
-  if (selectedPool.length > 0) {
-    return selectedPool[Math.floor(Math.random() * selectedPool.length)]
+  if (weightedPick) {
+    return weightedPick
   }
 
-  return getRandomWildPokemon(battleCount)
+  return environmentPool[0] || getRandomWildPokemon(battleCount)
 }
 
 export default function PokemonAdventure() {
@@ -359,20 +464,19 @@ export default function PokemonAdventure() {
   const [nextEncounterPreview, setNextEncounterPreview] = useState<NextEncounterPreview | null>(null)
   const [inventoryTab, setInventoryTab] = useState<"pokeballs" | "items">("pokeballs")
   const [pendingEnemyTurnAfterSwitch, setPendingEnemyTurnAfterSwitch] = useState(false)
+  const [destinationChoices, setDestinationChoices] = useState<[BattleEnvironment, BattleEnvironment]>(["floresta", "caverna"])
   const [screenNotice, setScreenNotice] = useState<string | null>(null)
   const [defeatAnimationVisible, setDefeatAnimationVisible] = useState(false)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [accountName, setAccountName] = useState("Treinador")
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
-  const [accountDraftName, setAccountDraftName] = useState("")
-  const [isAccountBusy, setIsAccountBusy] = useState(false)
   const screenNoticeTimeoutRef = useRef<number | null>(null)
   const defeatResetTimeoutRef = useRef<number | null>(null)
   const defeatHideTimeoutRef = useRef<number | null>(null)
   const captureThrowTimeoutRef = useRef<number | null>(null)
   const loginRedirectTimeoutRef = useRef<number | null>(null)
   const hasAutoRoutedAfterAuthRef = useRef(false)
+  const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
   const latestGameStateRef = useRef(gameState)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
@@ -399,6 +503,19 @@ export default function PokemonAdventure() {
     }, 250)
   }, [])
 
+  const showScreenNotice = useCallback((message: string, duration = 3200) => {
+    setScreenNotice(message)
+
+    if (screenNoticeTimeoutRef.current) {
+      window.clearTimeout(screenNoticeTimeoutRef.current)
+    }
+
+    screenNoticeTimeoutRef.current = window.setTimeout(() => {
+      setScreenNotice(null)
+      screenNoticeTimeoutRef.current = null
+    }, duration)
+  }, [])
+
   useEffect(() => {
     latestGameStateRef.current = gameState
   }, [gameState])
@@ -411,7 +528,6 @@ export default function PokemonAdventure() {
       hasAutoRoutedAfterAuthRef.current = false
       setAccountEmail(null)
       setAccountName("Treinador")
-      setAccountDraftName("")
       setIsAuthChecking(false)
       return
     }
@@ -421,7 +537,6 @@ export default function PokemonAdventure() {
         hasAutoRoutedAfterAuthRef.current = false
         setAccountEmail(null)
         setAccountName("Treinador")
-        setAccountDraftName("")
         setIsAuthChecking(false)
         return
       }
@@ -429,11 +544,30 @@ export default function PokemonAdventure() {
       const displayName = user.displayName || user.email?.split("@")[0] || "Treinador"
       setAccountEmail(user.email || null)
       setAccountName(displayName)
-      setAccountDraftName(displayName)
       setIsAuthChecking(false)
     })
 
     return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    const fromPerfil = params.get("from") === "perfil"
+
+    if (!fromPerfil) {
+      return
+    }
+
+    forceMainMenuAfterPerfilRef.current = true
+    hasAutoRoutedAfterAuthRef.current = true
+    setCurrentScreen("main-menu")
+
+    const cleanUrl = `${window.location.pathname}${window.location.hash || ""}`
+    window.history.replaceState({}, "", cleanUrl)
   }, [])
 
   useEffect(() => {
@@ -455,6 +589,14 @@ export default function PokemonAdventure() {
       return
     }
 
+    if (forceMainMenuAfterPerfilRef.current) {
+      hasAutoRoutedAfterAuthRef.current = true
+      if (currentScreen !== "main-menu") {
+        setCurrentScreen("main-menu")
+      }
+      return
+    }
+
     if (hasAutoRoutedAfterAuthRef.current) {
       return
     }
@@ -472,7 +614,7 @@ export default function PokemonAdventure() {
     if (hasSavedRun) {
       hasAutoRoutedAfterAuthRef.current = true
       if (currentScreen === "main-menu" || currentScreen === "select-slot" || currentScreen === "game") {
-        setCurrentScreen("select-continue")
+        setCurrentScreen("main-menu")
       }
       return
     }
@@ -484,71 +626,15 @@ export default function PokemonAdventure() {
   }, [accountEmail, currentScreen, gameState.activePokemon, isAuthChecking, isLoading, saveSlots])
 
   useEffect(() => {
+    if (forceMainMenuAfterPerfilRef.current) {
+      return
+    }
+
     if (previousAccountEmailRef.current !== accountEmail) {
       hasAutoRoutedAfterAuthRef.current = false
       previousAccountEmailRef.current = accountEmail
     }
   }, [accountEmail])
-
-  const showScreenNotice = useCallback((message: string, duration = 3200) => {
-    setScreenNotice(message)
-
-    if (screenNoticeTimeoutRef.current) {
-      window.clearTimeout(screenNoticeTimeoutRef.current)
-    }
-
-    screenNoticeTimeoutRef.current = window.setTimeout(() => {
-      setScreenNotice(null)
-      screenNoticeTimeoutRef.current = null
-    }, duration)
-  }, [])
-
-  const handleSaveProfile = useCallback(async () => {
-    const auth = getFirebaseAuth()
-    if (!auth?.currentUser) {
-      showScreenNotice("⚠️ Sessão inválida. Faz login novamente.")
-      redirectToLogin()
-      return
-    }
-
-    const trimmedName = accountDraftName.trim()
-    if (!trimmedName) {
-      showScreenNotice("⚠️ Define um nome válido para o perfil.")
-      return
-    }
-
-    setIsAccountBusy(true)
-    try {
-      await updateProfile(auth.currentUser, { displayName: trimmedName })
-      setAccountName(trimmedName)
-      setAccountMenuOpen(false)
-      showScreenNotice("✅ Perfil atualizado com sucesso.")
-    } catch {
-      showScreenNotice("⚠️ Não foi possível atualizar o perfil.")
-    } finally {
-      setIsAccountBusy(false)
-    }
-  }, [accountDraftName, showScreenNotice, redirectToLogin])
-
-  const handleLogout = useCallback(async () => {
-    const auth = getFirebaseAuth()
-    if (!auth) {
-      redirectToLogin()
-      return
-    }
-
-    setIsAccountBusy(true)
-    try {
-      await signOut(auth)
-      setAccountMenuOpen(false)
-      redirectToLogin()
-    } catch {
-      showScreenNotice("⚠️ Não foi possível terminar sessão.")
-      redirectToLogin()
-    } finally {
-      setIsAccountBusy(false)
-    }
-  }, [redirectToLogin, showScreenNotice])
 
   useEffect(() => {
     return () => {
@@ -637,6 +723,7 @@ export default function PokemonAdventure() {
   const buildNextEncounterPreview = useCallback(
     (activePokemonName: string, activePokemonLevel: number): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
+      const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
       const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment)
       const enemyLevel = getScaledEnemyLevel(activePokemonLevel, gameState.battles, random)
 
@@ -670,6 +757,7 @@ export default function PokemonAdventure() {
         forActivePokemon: activePokemonName,
         enemyName: impostorName,
         enemyDisplayName: displayEnemyName,
+        isBoss: isBossWave,
         enemyLevel,
         enemyType: wildPokemon[impostorName].type,
         enemyDisplayType: wildPokemon[displayEnemyName].type,
@@ -780,6 +868,10 @@ export default function PokemonAdventure() {
     }
 
     const shouldChooseDestination = gameState.battles > 0 && gameState.battles % 10 === 0
+    if (shouldChooseDestination) {
+      setDestinationChoices(getDestinationChoices(gameState.currentEnvironment, gameState.battles))
+      addLog("🧭 Escolhe o próximo ambiente para continuar a jornada.")
+    }
 
     levelUp()
     setTimeout(() => endBattle(shouldChooseDestination), 900)
@@ -1124,11 +1216,20 @@ export default function PokemonAdventure() {
     const enemyName = encounterPreview.enemyName
     const enemyDisplayName = encounterPreview.enemyDisplayName
     const enemyLevel = encounterPreview.enemyLevel
+    const isBossWave = encounterPreview.isBoss
 
     const enemyStats = wildPokemonStats[enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
-    const enemyMaxHP = calculateHP(enemyStats.baseHP, enemyLevel, enemyName)
+    const baseEnemyMaxHP = calculateHP(enemyStats.baseHP, enemyLevel, enemyName)
+    const enemyMaxHP = isBossWave ? Math.max(1, Math.floor(baseEnemyMaxHP * BOSS_MULTIPLIER)) : baseEnemyMaxHP
 
-    const enemyAttacks = encounterPreview.enemyAttacks
+    const enemyAttacks = isBossWave
+      ? Object.fromEntries(
+          Object.entries(encounterPreview.enemyAttacks).map(([attackName, damageRange]) => [
+            attackName,
+            scaleDamageRange(damageRange, BOSS_MULTIPLIER),
+          ]),
+        )
+      : encounterPreview.enemyAttacks
 
     const enemySpeed = wildPokemon[enemyName].speed || 50
     const playerBattleSprite = getPokemonSpriteUrl(
@@ -1148,6 +1249,7 @@ export default function PokemonAdventure() {
       enemyName,
       enemyType: wildPokemon[enemyName].type,
       enemyDisplayName,
+      enemyIsBoss: isBossWave,
       enemyDisplayType: encounterPreview.enemyDisplayType,
       enemyIsDisguised: encounterPreview.isImpostor,
       enemyIsShiny: encounterPreview.isShiny,
@@ -1173,10 +1275,13 @@ export default function PokemonAdventure() {
 
     if (rarity === "lendario") {
       showScreenNotice(`👑 O Chefe Lendário ${enemyName} apareceu na Onda ${nextWave}!`, 3800)
+    } else if (isBossWave) {
+      showScreenNotice(`👑 Boss de Onda ${nextWave}: ${enemyName} entrou em campo!`, 3200)
     }
 
+    const bossTag = isBossWave ? " 👑BOSS" : ""
     const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
-    addLog(`${rarityEmoji}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
+    addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
   }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, buildNextEncounterPreview])
 
   const handleAttack = useCallback(
@@ -1576,7 +1681,14 @@ export default function PokemonAdventure() {
       ? wildPokemon[gameState.currentBattle.enemyName]?.rarity || "comum"
       : "comum"
     const baseYield = CLASSIC_BASE_XP_YIELD[enemyRarity] || CLASSIC_BASE_XP_YIELD.comum
-    const xpGain = Math.max(1, Math.floor((baseYield * enemyLevel) / 7))
+    const levelDelta = enemyLevel - pokemon.level
+    const levelDeltaMultiplier = clamp(1 + levelDelta * 0.05, 0.8, 1.35)
+    const waveProgressMultiplier = 1 + Math.min(0.45, gameState.battles * 0.008)
+    const bossMultiplier = gameState.currentBattle?.enemyIsBoss ? BOSS_XP_MULTIPLIER : 1
+    const xpGain = Math.max(
+      1,
+      Math.floor(((baseYield * enemyLevel) / 6) * XP_GAIN_MULTIPLIER * levelDeltaMultiplier * waveProgressMultiplier * bossMultiplier),
+    )
     const waveLevelCap = getWaveLevelCap(gameState.battles)
     const xpNeededForNextLevel = getXpNeededForNextLevelByWaveCap(pokemon.level, waveLevelCap)
     const newXP = pokemon.xp + xpGain
@@ -1902,7 +2014,7 @@ export default function PokemonAdventure() {
     }
   }, [advanceStatusWaves, updateGameState])
 
-  const chooseDestination = useCallback((destination: "caverna" | "floresta") => {
+  const chooseDestination = useCallback((destination: BattleEnvironment) => {
     updateGameState({ currentEnvironment: destination })
     setShowModal(null)
     showScreenNotice(`🧭 Rota escolhida: ${environmentLabels[destination]}.`)
@@ -2139,7 +2251,7 @@ export default function PokemonAdventure() {
   )
 
   const renderMainMenu = () => (
-    <div className="relative flex min-h-[60vh] flex-col items-center justify-center space-y-8 overflow-hidden py-8">
+    <div className="relative flex min-h-[60vh] flex-col items-center justify-start gap-8 overflow-visible py-8">
       <div className="pointer-events-none absolute inset-0 opacity-70">
         <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
         <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
@@ -2148,47 +2260,17 @@ export default function PokemonAdventure() {
       <div className="relative z-20 w-full max-w-3xl">
         <div className="flex justify-end">
           <Button
-            onClick={() => setAccountMenuOpen((current) => !current)}
+            asChild
             className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-4 text-[10px] leading-relaxed sm:text-xs"
           >
-            <User className="mr-2 h-4 w-4" />
-            {accountName}
+            <Link href="/perfil" aria-label="Abrir perfil">
+              <User className="mr-2 h-4 w-4" />
+              {accountName}
+            </Link>
           </Button>
         </div>
-        {accountMenuOpen && (
-          <div className="mt-3 ml-auto w-full max-w-md rounded-[18px] border-4 border-slate-800 bg-[#f8f4dc] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.75)]">
-            <div className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-600">Conta</div>
-            <div className="mb-3 rounded-lg border-2 border-slate-700 bg-white px-3 py-2 text-sm text-slate-900">
-              {accountEmail || "Sem email"}
-            </div>
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700">Nome do perfil</label>
-            <input
-              value={accountDraftName}
-              onChange={(event) => setAccountDraftName(event.target.value)}
-              placeholder="Nome do treinador"
-              className="w-full rounded-lg border-2 border-slate-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
-            />
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Button
-                onClick={handleSaveProfile}
-                disabled={isAccountBusy}
-                className="pixel-menu-button bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-              >
-                Guardar perfil
-              </Button>
-              <Button
-                onClick={handleLogout}
-                disabled={isAccountBusy}
-                className="pixel-menu-button bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#dc2626_50%,#dc2626_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
-      <div className="pixel-surface relative w-full max-w-3xl bg-[#f8f4dc]/95 p-8 text-center space-y-5">
+      <div className="pixel-surface relative z-10 w-full max-w-3xl bg-[#f8f4dc]/95 p-8 text-center space-y-5">
         <h2 className="font-pixel text-3xl leading-[1.7] text-slate-900 sm:text-5xl">
           Pokémon
           <span className="mt-3 block text-xl text-slate-600 sm:text-3xl">Adventure</span>
@@ -2220,6 +2302,7 @@ export default function PokemonAdventure() {
           <p className="border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Escolhe um espaço para guardar a aventura.</p>
         </div>
       </div>
+
     </div>
   )
 
@@ -2715,7 +2798,7 @@ export default function PokemonAdventure() {
           const previewEnemyTypes = normalizeTypeText(nextEncounterPreview.enemyType)
             .split("/")
             .filter(Boolean)
-          const predictedEnemyName = `${nextEncounterPreview.enemyDisplayName}${nextEncounterPreview.isShiny ? " ✨" : ""}`
+          const predictedEnemyName = `${nextEncounterPreview.enemyDisplayName}${nextEncounterPreview.isBoss ? " 👑" : ""}${nextEncounterPreview.isShiny ? " ✨" : ""}`
           const previewEnemyAttacks = Object.entries(nextEncounterPreview.enemyAttacks)
             .map(([attackName, [minPower, maxPower]]) => {
               const attackType = normalizeTypeText(getAttackType(attackName)).split("/")[0]
@@ -2733,6 +2816,12 @@ export default function PokemonAdventure() {
               <div className="rounded-xl border border-emerald-300/50 bg-emerald-500/15 p-3 text-center text-sm text-emerald-100">
                 Próximo Pokémon previsto: <span className="font-bold uppercase">{predictedEnemyName}</span> (Nv.{nextEncounterPreview.enemyLevel})
               </div>
+
+              {nextEncounterPreview.isBoss && (
+                <div className="rounded-xl border border-rose-300/50 bg-rose-500/15 p-3 text-center text-sm text-rose-100">
+                  👑 O próximo encontro é um BOSS de onda (1.5x HP e 1.5x dano).
+                </div>
+              )}
 
               {nextEncounterPreview.isImpostor && (
                 <div className="rounded-xl border border-cyan-300/50 bg-cyan-500/15 p-3 text-center text-sm text-cyan-100">
@@ -3486,18 +3575,21 @@ export default function PokemonAdventure() {
               <p className="text-white/80">Após 10 ondas, escolhe para onde a jornada continua.</p>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Button
-                  onClick={() => chooseDestination("caverna")}
-                  className="h-14 bg-gradient-to-r from-slate-700 to-slate-800 text-sm"
-                >
-                  ⛰️ Entrar na Caverna
-                </Button>
-                <Button
-                  onClick={() => chooseDestination("floresta")}
-                  className="h-14 bg-gradient-to-r from-emerald-600 to-green-700 text-sm"
-                >
-                  🌲 Seguir para a Floresta
-                </Button>
+                {destinationChoices.map((destination) => (
+                  <Button
+                    key={destination}
+                    onClick={() => chooseDestination(destination)}
+                    className="h-14 bg-gradient-to-r from-slate-700 to-slate-800 text-sm"
+                  >
+                    {destination === "caverna" && "⛰️ "}
+                    {destination === "floresta" && "🌲 "}
+                    {destination === "vulcanico" && "🌋 "}
+                    {destination === "costeiro" && "🌊 "}
+                    {destination === "alturas" && "🕊️ "}
+                    {destination === "planicie" && "🌾 "}
+                    Seguir para {environmentLabels[destination]}
+                  </Button>
+                ))}
               </div>
             </div>
           )

@@ -2290,7 +2290,7 @@ const genericLevelUpMoves: Record<string, LevelUpMove[]> = {
 
 const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   Charmander: [
-    { level: 7, name: "Smog", power: [8, 16] },
+    { level: 7, name: "Giro de Fogo", power: [16, 28] },
     { level: 10, name: "Flame Charge", power: [18, 30] },
     { level: 16, name: "Fire Fang", power: [22, 36] },
     { level: 24, name: "Flamethrower", power: [30, 48] },
