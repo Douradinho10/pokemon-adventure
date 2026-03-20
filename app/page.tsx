@@ -1,31 +1,329 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { User, LogOut } from "lucide-react"
+import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth"
 import { useLocalGameState } from "../hooks/useLocalGameState"
-import { useBattleLog } from "../hooks/useBattleLog"
 import {
   starterPokemon,
   wildPokemon,
   pokeballs,
   calculateHP,
   calculateAttackPower,
+  getEvolutionForPokemon,
+  getPokemonBattleTemplate,
+  getLevelUpMoveForPokemon,
+  getLearnableMovesForPokemon,
+  getMoveStatusEffect,
   wildPokemonStats,
   getRandomWildPokemon,
   getDamageMultiplier,
+  getAttackType,
+  getMovePriority,
+  getMoveAccuracy,
   initializePP, // Import new helper
+  MAX_TEAM_SIZE,
+  scaleAttackSetForLevel,
+  typeChart,
+  typeColors,
 } from "../data/pokemonData"
 import { BattleArena } from "../components/BattleArena"
 import { PokemonCard } from "../components/PokemonCard"
+import { AnimatedSprite } from "../components/AnimatedSprite"
+import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { saveGameToFirebase } from "../lib/firebaseRtdbService"
+import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
+import type { StatusCondition } from "../hooks/useGameState"
 
 type Screen = "main-menu" | "menu" | "battle" | "shop" | "select-slot" | "select-continue" | "game" // Added 'game' screen
-type Modal = "starter" | "attacks" | "capture" | "switch" | "team" | "heal" | "inventory" | "evolution-attacks" | null
+type Modal =
+  | "starter"
+  | "attacks"
+  | "battle-sim"
+  | "capture"
+  | "capture-success"
+  | "switch"
+  | "team"
+  | "heal"
+  | "inventory"
+  | "evolution"
+  | "evolution-attacks"
+  | "destination"
+  | "type-chart"
+  | "move-vendor"
+  | null
+
+type BattleEnvironment = "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas"
+
+type AttackAnimationState = {
+  id: number
+  attacker: "player" | "enemy"
+  target: "player" | "enemy"
+  moveName: string
+  attackType: string
+}
+
+type MoveVendorOffer = {
+  pokemonName: string
+  moveName: string
+  power: [number, number]
+  requiredLevel: number
+  price: number
+}
+
+type CaptureCelebration = {
+  pokemonName: string
+  sprite: string
+  rarity: string
+  isShiny?: boolean
+}
+
+type CaptureThrowAnimation = {
+  ballType: string
+  throwId: number
+}
+
+type NextEncounterPreview = {
+  forBattles: number
+  forActivePokemon: string
+  enemyName: string
+  enemyDisplayName: string
+  enemyLevel: number
+  enemyType: string
+  enemyDisplayType: string
+  enemyAttacks: Record<string, [number, number]>
+  isImpostor: boolean
+  isShiny: boolean
+}
+
+const BATTLE_SIM_ITEM = "Scanner Tático"
+const LEGACY_BATTLE_SIM_ITEM = "Simulador Tático"
+const XP_SHARE_ITEM = "XP Share"
+const IMPOSTOR_CHANCE = 0.08
+const ZOROARK_MIN_LEVEL = 28
+const SHINY_CHANCE = 1 / 256
+const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
+  comum: 24,
+  raro: 42,
+  lendario: 80,
+}
+
+const getClassicTotalXpForLevel = (level: number) => {
+  const safeLevel = Math.max(1, level)
+  return Math.floor((4 * Math.pow(safeLevel, 3)) / 5)
+}
+
+const getXpNeededForNextLevel = (level: number) => {
+  const safeLevel = Math.max(1, level)
+  const currentTotal = getClassicTotalXpForLevel(safeLevel)
+  const nextTotal = getClassicTotalXpForLevel(safeLevel + 1)
+  return clamp(nextTotal - currentTotal, 50, 400)
+}
+
+const getWaveLevelCap = (battleCount: number) => {
+  const wave = Math.max(1, battleCount)
+  const tier = Math.floor((wave - 1) / 10)
+  return clamp(10 + tier * 7, 10, 100)
+}
+
+const getXpNeededForNextLevelByWaveCap = (level: number, waveLevelCap: number) => {
+  const baseXpNeeded = getXpNeededForNextLevel(level)
+  const levelDelta = level - waveLevelCap
+
+  const multiplier =
+    levelDelta <= -8
+      ? 0.68
+      : levelDelta <= -4
+        ? 0.78
+        : levelDelta <= 0
+          ? 0.9
+          : levelDelta <= 3
+            ? 1
+            : levelDelta <= 7
+              ? 1.15
+              : 1.35
+
+  return clamp(Math.round(baseXpNeeded * multiplier), 40, 720)
+}
 
 const GAME_SAVE_KEY = "pokemon-adventure-save-slots"
 
 const saveSource = "firebase"
+
+const getStabMultiplier = (attackType: string, pokemonType?: string) => {
+  const normalizedAttackType = normalizeTypeText(attackType)
+  const pokemonTypes = normalizeTypeText(pokemonType).split("/").filter(Boolean)
+
+  return pokemonTypes.includes(normalizedAttackType) ? 1.25 : 1
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+const getScaledEnemyLevel = (playerLevel: number, battleCount: number, random: (min: number, max: number) => number) => {
+  const progressBonus = Math.floor(battleCount / 20)
+  const baselineLevel = Math.max(3, Math.round(playerLevel * 0.95 + progressBonus))
+  const minLevel = Math.max(1, baselineLevel - 2)
+  const maxLevel = Math.max(minLevel, Math.min(playerLevel + 6, baselineLevel + 2))
+
+  return random(minLevel, maxLevel)
+}
+
+const getLevelBalanceMultiplier = (
+  attackerLevel: number,
+  defenderLevel: number,
+  minMultiplier = 0.88,
+  maxMultiplier = 1.12,
+) => {
+  const levelDelta = attackerLevel - defenderLevel
+  return clamp(1 + levelDelta * 0.025, minMultiplier, maxMultiplier)
+}
+
+const statusLabels: Record<StatusCondition, string> = {
+  poisoned: "Envenenado",
+  burned: "Queimado",
+  paralyzed: "Paralisado",
+  asleep: "Adormecido",
+  frozen: "Congelado",
+  confused: "Confuso",
+}
+
+const getEffectiveSpeed = (speed = 50, statusCondition?: StatusCondition | null) => {
+  if (statusCondition === "paralyzed") {
+    return Math.max(1, Math.floor(speed * 0.5))
+  }
+
+  return speed
+}
+
+const persistentStatusWaveDuration: Partial<Record<StatusCondition, number>> = {
+  poisoned: 3,
+  burned: 3,
+  paralyzed: 4,
+  asleep: 2,
+  frozen: 2,
+  confused: 2,
+}
+
+const trainerBarTypeColors: Record<string, string> = {
+  normal: "#d7cec2",
+  fogo: "#f0ba96",
+  fire: "#f0ba96",
+  agua: "#9fcaea",
+  water: "#9fcaea",
+  grama: "#b7d99a",
+  grass: "#b7d99a",
+  eletrico: "#f2df7d",
+  electric: "#f2df7d",
+  gelo: "#bfe7ef",
+  ice: "#bfe7ef",
+  lutador: "#d8b0a4",
+  fighting: "#d8b0a4",
+  veneno: "#c4b0db",
+  poison: "#c4b0db",
+  terra: "#d8c095",
+  ground: "#d8c095",
+  voador: "#ccd7ee",
+  flying: "#ccd7ee",
+  psiquico: "#efb2c2",
+  psychic: "#efb2c2",
+  inseto: "#cad78c",
+  bug: "#cad78c",
+  pedra: "#cdbb9b",
+  rock: "#cdbb9b",
+  fantasma: "#b5b0d3",
+  ghost: "#b5b0d3",
+  dragao: "#b7bee7",
+  dragon: "#b7bee7",
+  sombrio: "#bfc4c9",
+  dark: "#bfc4c9",
+  aco: "#c8d2da",
+  steel: "#c8d2da",
+  fada: "#efc5d6",
+  fairy: "#efc5d6",
+}
+
+const normalizeTypeKey = (value: string | undefined | null) =>
+  normalizeTypeText(value)
+    .split("/")[0]
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+
+const normalizeMoveNameKey = (moveName: string) =>
+  normalizeDisplayText(moveName).replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
+
+const getStarterEnvironment = (starterName: string): BattleEnvironment => {
+  if (starterName === "Charmander") return "vulcanico"
+  if (starterName === "Squirtle") return "costeiro"
+  if (starterName === "Bulbasaur") return "floresta"
+  if (starterName === "Pidgey") return "alturas"
+  return "planicie"
+}
+
+const environmentLabels: Record<BattleEnvironment, string> = {
+  planicie: "Planicie",
+  vulcanico: "Terras Vulcanicas",
+  costeiro: "Costa",
+  floresta: "Floresta",
+  caverna: "Caverna",
+  alturas: "Alturas",
+}
+
+const normalizeTypeToken = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+
+const environmentPreferredTypes: Record<BattleEnvironment, string[]> = {
+  planicie: ["normal", "grama", "inseto", "voador"],
+  vulcanico: ["fogo", "pedra", "terra"],
+  costeiro: ["agua", "gelo"],
+  floresta: ["grama", "inseto", "veneno"],
+  caverna: ["pedra", "terra", "veneno", "fantasma"],
+  alturas: ["voador", "dragao", "eletrico"],
+}
+
+const getTargetRarityForBattle = (battleCount: number) => {
+  const rarityRoll = Math.random()
+
+  if (battleCount > 0 && battleCount % 100 === 0) {
+    return "lendario" as const
+  }
+
+  if (rarityRoll < 0.2) {
+    return "raro" as const
+  }
+
+  return "comum" as const
+}
+
+const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment) => {
+  const targetRarity = getTargetRarityForBattle(battleCount)
+  const preferredTypes = new Set(environmentPreferredTypes[environment])
+
+  const rarityPool = Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === targetRarity)
+  const preferredPool = rarityPool.filter((name) => {
+    const typeTokens = normalizeTypeText(wildPokemon[name].type)
+      .split("/")
+      .map(normalizeTypeToken)
+      .filter(Boolean)
+
+    return typeTokens.some((token) => preferredTypes.has(token))
+  })
+
+  const selectedPool = preferredPool.length > 0 ? preferredPool : rarityPool
+  if (selectedPool.length > 0) {
+    return selectedPool[Math.floor(Math.random() * selectedPool.length)]
+  }
+
+  return getRandomWildPokemon(battleCount)
+}
 
 export default function PokemonAdventure() {
   const {
@@ -43,14 +341,604 @@ export default function PokemonAdventure() {
     deleteSaveSlot,
   } = useLocalGameState()
 
-  const { battleLog, addLog, clearLog } = useBattleLog()
+  const addLog = useCallback((_message: string) => {}, [])
+  const clearLog = useCallback(() => {}, [])
 
   const [currentScreen, setCurrentScreen] = useState<Screen>("main-menu")
   const [showModal, setShowModal] = useState<Modal>(null)
   const [isAnimating, setIsAnimating] = useState(false)
-  const [selectedAttacks, setSelectedAttacks] = useState<string[]>([])
-
+  const [attackToReplace, setAttackToReplace] = useState<string | null>(null)
+  const [recentEvolution, setRecentEvolution] = useState<{ from: string; to: string } | null>(null)
+  const [attackAnimation, setAttackAnimation] = useState<AttackAnimationState | null>(null)
+  const [attackAnimationCounter, setAttackAnimationCounter] = useState(0)
+  const [moveVendorOffer, setMoveVendorOffer] = useState<MoveVendorOffer | null>(null)
+  const [moveVendorReplaceAttack, setMoveVendorReplaceAttack] = useState<string | null>(null)
+  const [vendorLastBattleRoll, setVendorLastBattleRoll] = useState<number>(-1)
+  const [captureCelebration, setCaptureCelebration] = useState<CaptureCelebration | null>(null)
+  const [captureThrowAnimation, setCaptureThrowAnimation] = useState<CaptureThrowAnimation | null>(null)
+  const [nextEncounterPreview, setNextEncounterPreview] = useState<NextEncounterPreview | null>(null)
+  const [inventoryTab, setInventoryTab] = useState<"pokeballs" | "items">("pokeballs")
+  const [pendingEnemyTurnAfterSwitch, setPendingEnemyTurnAfterSwitch] = useState(false)
+  const [screenNotice, setScreenNotice] = useState<string | null>(null)
+  const [defeatAnimationVisible, setDefeatAnimationVisible] = useState(false)
+  const [isAuthChecking, setIsAuthChecking] = useState(true)
+  const [accountName, setAccountName] = useState("Treinador")
+  const [accountEmail, setAccountEmail] = useState<string | null>(null)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [accountDraftName, setAccountDraftName] = useState("")
+  const [isAccountBusy, setIsAccountBusy] = useState(false)
+  const screenNoticeTimeoutRef = useRef<number | null>(null)
+  const defeatResetTimeoutRef = useRef<number | null>(null)
+  const defeatHideTimeoutRef = useRef<number | null>(null)
+  const captureThrowTimeoutRef = useRef<number | null>(null)
+  const loginRedirectTimeoutRef = useRef<number | null>(null)
+  const hasAutoRoutedAfterAuthRef = useRef(false)
+  const previousAccountEmailRef = useRef<string | null>(null)
+  const latestGameStateRef = useRef(gameState)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
+
+  const redirectToLogin = useCallback(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    if (window.location.pathname === "/login") {
+      return
+    }
+
+    window.location.replace("/login")
+
+    if (loginRedirectTimeoutRef.current) {
+      window.clearTimeout(loginRedirectTimeoutRef.current)
+    }
+
+    loginRedirectTimeoutRef.current = window.setTimeout(() => {
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login")
+      }
+    }, 250)
+  }, [])
+
+  useEffect(() => {
+    latestGameStateRef.current = gameState
+  }, [gameState])
+
+  useEffect(() => {
+    initializeFirebase()
+    const auth = getFirebaseAuth()
+
+    if (!auth) {
+      hasAutoRoutedAfterAuthRef.current = false
+      setAccountEmail(null)
+      setAccountName("Treinador")
+      setAccountDraftName("")
+      setIsAuthChecking(false)
+      return
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        hasAutoRoutedAfterAuthRef.current = false
+        setAccountEmail(null)
+        setAccountName("Treinador")
+        setAccountDraftName("")
+        setIsAuthChecking(false)
+        return
+      }
+
+      const displayName = user.displayName || user.email?.split("@")[0] || "Treinador"
+      setAccountEmail(user.email || null)
+      setAccountName(displayName)
+      setAccountDraftName(displayName)
+      setIsAuthChecking(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (isAuthChecking) {
+      return
+    }
+
+    if (!accountEmail) {
+      redirectToLogin()
+    }
+  }, [accountEmail, isAuthChecking, redirectToLogin])
+
+  useEffect(() => {
+    if (isAuthChecking || isLoading) {
+      return
+    }
+
+    if (!accountEmail) {
+      return
+    }
+
+    if (hasAutoRoutedAfterAuthRef.current) {
+      return
+    }
+
+    const hasSavedRun = saveSlots.some((slot) => slot.gameState?.activePokemon)
+
+    if (gameState.activePokemon) {
+      hasAutoRoutedAfterAuthRef.current = true
+      if (currentScreen !== "menu" && currentScreen !== "battle" && currentScreen !== "shop" && currentScreen !== "game") {
+        setCurrentScreen("menu")
+      }
+      return
+    }
+
+    if (hasSavedRun) {
+      hasAutoRoutedAfterAuthRef.current = true
+      if (currentScreen === "main-menu" || currentScreen === "select-slot" || currentScreen === "game") {
+        setCurrentScreen("select-continue")
+      }
+      return
+    }
+
+    hasAutoRoutedAfterAuthRef.current = true
+    if (currentScreen === "select-slot" || currentScreen === "select-continue" || currentScreen === "game") {
+      setCurrentScreen("main-menu")
+    }
+  }, [accountEmail, currentScreen, gameState.activePokemon, isAuthChecking, isLoading, saveSlots])
+
+  useEffect(() => {
+    if (previousAccountEmailRef.current !== accountEmail) {
+      hasAutoRoutedAfterAuthRef.current = false
+      previousAccountEmailRef.current = accountEmail
+    }
+  }, [accountEmail])
+
+  const showScreenNotice = useCallback((message: string, duration = 3200) => {
+    setScreenNotice(message)
+
+    if (screenNoticeTimeoutRef.current) {
+      window.clearTimeout(screenNoticeTimeoutRef.current)
+    }
+
+    screenNoticeTimeoutRef.current = window.setTimeout(() => {
+      setScreenNotice(null)
+      screenNoticeTimeoutRef.current = null
+    }, duration)
+  }, [])
+
+  const handleSaveProfile = useCallback(async () => {
+    const auth = getFirebaseAuth()
+    if (!auth?.currentUser) {
+      showScreenNotice("⚠️ Sessão inválida. Faz login novamente.")
+      redirectToLogin()
+      return
+    }
+
+    const trimmedName = accountDraftName.trim()
+    if (!trimmedName) {
+      showScreenNotice("⚠️ Define um nome válido para o perfil.")
+      return
+    }
+
+    setIsAccountBusy(true)
+    try {
+      await updateProfile(auth.currentUser, { displayName: trimmedName })
+      setAccountName(trimmedName)
+      setAccountMenuOpen(false)
+      showScreenNotice("✅ Perfil atualizado com sucesso.")
+    } catch {
+      showScreenNotice("⚠️ Não foi possível atualizar o perfil.")
+    } finally {
+      setIsAccountBusy(false)
+    }
+  }, [accountDraftName, showScreenNotice, redirectToLogin])
+
+  const handleLogout = useCallback(async () => {
+    const auth = getFirebaseAuth()
+    if (!auth) {
+      redirectToLogin()
+      return
+    }
+
+    setIsAccountBusy(true)
+    try {
+      await signOut(auth)
+      setAccountMenuOpen(false)
+      redirectToLogin()
+    } catch {
+      showScreenNotice("⚠️ Não foi possível terminar sessão.")
+      redirectToLogin()
+    } finally {
+      setIsAccountBusy(false)
+    }
+  }, [redirectToLogin, showScreenNotice])
+
+  useEffect(() => {
+    return () => {
+      if (screenNoticeTimeoutRef.current) {
+        window.clearTimeout(screenNoticeTimeoutRef.current)
+      }
+      if (defeatResetTimeoutRef.current) {
+        window.clearTimeout(defeatResetTimeoutRef.current)
+      }
+      if (defeatHideTimeoutRef.current) {
+        window.clearTimeout(defeatHideTimeoutRef.current)
+      }
+      if (captureThrowTimeoutRef.current) {
+        window.clearTimeout(captureThrowTimeoutRef.current)
+      }
+      if (loginRedirectTimeoutRef.current) {
+        window.clearTimeout(loginRedirectTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const legacyCharges = Number(gameState.inventory[LEGACY_BATTLE_SIM_ITEM] || 0)
+    if (legacyCharges <= 0) {
+      return
+    }
+
+    const newInventory = { ...gameState.inventory }
+    newInventory[BATTLE_SIM_ITEM] = Number(newInventory[BATTLE_SIM_ITEM] || 0) + legacyCharges
+    delete newInventory[LEGACY_BATTLE_SIM_ITEM]
+
+    updateGameState({ inventory: newInventory })
+  }, [gameState.inventory, updateGameState])
+
+  const closeModal = useCallback(() => {
+    if (showModal === "move-vendor") {
+      setMoveVendorOffer(null)
+      setMoveVendorReplaceAttack(null)
+    }
+
+    if (showModal === "capture-success") {
+      setCaptureCelebration(null)
+    }
+
+    setShowModal(null)
+    setAttackToReplace(null)
+    setRecentEvolution(null)
+  }, [showModal])
+
+  const playAttackAnimation = useCallback((nextAnimation: AttackAnimationState, duration = 900) => {
+    setAttackAnimation(nextAnimation)
+    setIsAnimating(true)
+
+    return new Promise<void>((resolve) => {
+      window.setTimeout(() => {
+        setAttackAnimation(null)
+        setIsAnimating(false)
+        resolve()
+      }, duration)
+    })
+  }, [])
+
+  const syncAttackPP = (
+    existingPP: Record<string, { current: number; max: number }> | undefined,
+    attacks: Record<string, [number, number]>,
+  ) => {
+    const nextPP = initializePP(attacks)
+
+    if (!existingPP) {
+      return nextPP
+    }
+
+    Object.keys(nextPP).forEach((moveName) => {
+      const existingMovePP = existingPP[moveName]
+      if (existingMovePP) {
+        nextPP[moveName] = {
+          current: Math.min(existingMovePP.current, existingMovePP.max),
+          max: existingMovePP.max,
+        }
+      }
+    })
+
+    return nextPP
+  }
+
+  const buildNextEncounterPreview = useCallback(
+    (activePokemonName: string, activePokemonLevel: number): NextEncounterPreview => {
+      const nextWave = gameState.battles + 1
+      const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment)
+      const enemyLevel = getScaledEnemyLevel(activePokemonLevel, gameState.battles, random)
+
+      let enemyName = baseEnemyName
+      for (let i = 0; i < 4; i++) {
+        const evolution = getEvolutionForPokemon(enemyName, enemyLevel - 1)
+        if (!evolution || !wildPokemon[evolution.evolvesTo]) {
+          break
+        }
+        enemyName = evolution.evolvesTo
+      }
+
+      const canRollImpostor = enemyName !== "Ditto" && enemyName !== "Zoroark" && wildPokemon[enemyName]?.rarity !== "lendario"
+      const impostorRoll = random(1, 1000) / 1000
+      const shouldUseImpostor = canRollImpostor && impostorRoll < IMPOSTOR_CHANCE
+
+      const canUseZoroark = enemyLevel >= ZOROARK_MIN_LEVEL && Boolean(wildPokemon.Zoroark)
+      const impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
+      const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
+      const isShiny = Math.random() < SHINY_CHANCE
+
+      const enemyAttacks = Object.fromEntries(
+        Object.entries(wildPokemon[impostorName].attacks).map(([name, power]) => [
+          name,
+          calculateAttackPower(power, enemyLevel),
+        ]),
+      )
+
+      return {
+        forBattles: gameState.battles,
+        forActivePokemon: activePokemonName,
+        enemyName: impostorName,
+        enemyDisplayName: displayEnemyName,
+        enemyLevel,
+        enemyType: wildPokemon[impostorName].type,
+        enemyDisplayType: wildPokemon[displayEnemyName].type,
+        enemyAttacks,
+        isImpostor: shouldUseImpostor,
+        isShiny,
+      }
+    },
+    [gameState.battles, gameState.currentEnvironment, random],
+  )
+
+  const clearPokemonStatus = useCallback(
+    (pokemonName: string) => {
+      updatePokemon(pokemonName, {
+        statusCondition: null,
+        statusTurns: undefined,
+        statusWavesRemaining: undefined,
+      })
+    },
+    [updatePokemon],
+  )
+
+  const advanceStatusWaves = useCallback(() => {
+    Object.entries(gameState.playerTeam).forEach(([pokemonName, pokemon]) => {
+      if (!pokemon.statusCondition || !pokemon.statusWavesRemaining) {
+        return
+      }
+
+      const nextRemaining = pokemon.statusWavesRemaining - 1
+
+      if (nextRemaining <= 0) {
+        clearPokemonStatus(pokemonName)
+        addLog(`✨ ${pokemonName} recuperou de ${statusLabels[pokemon.statusCondition].toLowerCase()}!`)
+        return
+      }
+
+      updatePokemon(pokemonName, { statusWavesRemaining: nextRemaining })
+    })
+  }, [gameState.playerTeam, updatePokemon, clearPokemonStatus, addLog])
+
+  const handleGameOver = () => {
+    setDefeatAnimationVisible(true)
+    setScreenNotice(null)
+
+    if (screenNoticeTimeoutRef.current) {
+      window.clearTimeout(screenNoticeTimeoutRef.current)
+      screenNoticeTimeoutRef.current = null
+    }
+
+    if (defeatResetTimeoutRef.current) {
+      window.clearTimeout(defeatResetTimeoutRef.current)
+    }
+    if (defeatHideTimeoutRef.current) {
+      window.clearTimeout(defeatHideTimeoutRef.current)
+    }
+
+    defeatResetTimeoutRef.current = window.setTimeout(() => {
+      deleteSaveSlot(currentSlot ?? undefined)
+
+      setGameState({
+        playerTeam: {},
+        activePokemon: null,
+        currentEnvironment: "planicie",
+        money: 50,
+        battles: 0,
+        inventory: { Pokébola: 5, "Scanner Tático": 3 },
+        capturedPokemon: [],
+        currentBattle: null,
+      })
+      clearLog()
+      setCurrentScreen("main-menu")
+      setShowModal(null)
+      defeatResetTimeoutRef.current = null
+    }, 2300)
+
+    defeatHideTimeoutRef.current = window.setTimeout(() => {
+      setDefeatAnimationVisible(false)
+      defeatHideTimeoutRef.current = null
+    }, 3200)
+  }
+
+  const handlePlayerKnockout = (pokemonName: string, nextHP = 0) => {
+    const alivePokemon = Object.keys(gameState.playerTeam).filter((name) => {
+      if (name === pokemonName) {
+        return nextHP > 0
+      }
+      return gameState.playerTeam[name].HP > 0
+    })
+
+    if (alivePokemon.length > 0) {
+      setShowModal("switch")
+      return
+    }
+
+    handleGameOver()
+  }
+
+  const handleEnemyDefeat = (enemyName: string) => {
+    const rarity = wildPokemon[enemyName].rarity
+    const reward = rarity === "lendario" ? 100 : rarity === "raro" ? 50 : 15
+
+    addLog(`🎉 ${enemyName} derrotado! +${reward} moedas`)
+    updateGameState({ money: gameState.money + reward })
+
+    if ((gameState.battles + 1) % 10 === 0) {
+      restoreAllPP()
+      addLog(`✨ PP de todos os ataques restaurado! (10 batalhas completadas)`)
+    }
+
+    const shouldChooseDestination = gameState.battles > 0 && gameState.battles % 10 === 0
+
+    levelUp()
+    setTimeout(() => endBattle(shouldChooseDestination), 900)
+  }
+
+  const applyStatusEffect = (moveName: string, target: "player" | "enemy") => {
+    const effect = getMoveStatusEffect(moveName)
+    if (!effect) return
+
+    if (Math.random() > effect.chance) return
+
+    const turns = effect.turns ? random(effect.turns[0], effect.turns[1]) : undefined
+
+    if (target === "player") {
+      if (!gameState.activePokemon) return
+      const currentPokemon = gameState.playerTeam[gameState.activePokemon]
+      if (!currentPokemon || currentPokemon.statusCondition) return
+
+      updatePokemon(gameState.activePokemon, {
+        statusCondition: effect.status,
+        statusTurns: turns,
+        statusWavesRemaining: persistentStatusWaveDuration[effect.status],
+      })
+      addLog(`⚠️ ${gameState.activePokemon} ficou ${statusLabels[effect.status].toLowerCase()}!`)
+      return
+    }
+
+    if (gameState.currentBattle?.enemyStatusCondition) return
+
+    updateBattle({
+      enemyStatusCondition: effect.status,
+      enemyStatusTurns: turns,
+    })
+    addLog(`⚠️ ${gameState.currentBattle?.enemyName} ficou ${statusLabels[effect.status].toLowerCase()}!`)
+  }
+
+  const processStatusAtTurnStart = (target: "player" | "enemy") => {
+    if (target === "player") {
+      if (!gameState.activePokemon) return { canAct: true, fainted: false }
+      const pokemon = gameState.playerTeam[gameState.activePokemon]
+      if (!pokemon?.statusCondition) return { canAct: true, fainted: false }
+
+      const currentStatus = pokemon.statusCondition
+      const currentTurns = pokemon.statusTurns ?? 0
+
+      if (currentStatus === "poisoned" || currentStatus === "burned") {
+        const chipDamage = Math.max(1, Math.floor(pokemon.maxHP * (currentStatus === "poisoned" ? 0.08 : 0.06)))
+        const nextHP = Math.max(0, pokemon.HP - chipDamage)
+        updatePokemon(gameState.activePokemon, { HP: nextHP })
+        addLog(`☠️ ${gameState.activePokemon} sofreu ${chipDamage} de dano por ${statusLabels[currentStatus].toLowerCase()}!`)
+        if (nextHP <= 0) {
+          handlePlayerKnockout(gameState.activePokemon, nextHP)
+          return { canAct: false, fainted: true }
+        }
+      }
+
+      if (currentStatus === "asleep") {
+        if (currentTurns > 1) {
+          updatePokemon(gameState.activePokemon, { statusTurns: currentTurns - 1 })
+          return { canAct: false, fainted: false }
+        }
+
+        updatePokemon(gameState.activePokemon, { statusCondition: null, statusTurns: undefined, statusWavesRemaining: undefined })
+      }
+
+      if (currentStatus === "frozen") {
+        if (Math.random() < 0.25) {
+          updatePokemon(gameState.activePokemon, { statusCondition: null, statusTurns: undefined, statusWavesRemaining: undefined })
+        } else {
+          return { canAct: false, fainted: false }
+        }
+      }
+
+      if (currentStatus === "paralyzed" && Math.random() < 0.25) {
+        return { canAct: false, fainted: false }
+      }
+
+      if (currentStatus === "confused") {
+        if (currentTurns > 1) {
+          updatePokemon(gameState.activePokemon, { statusTurns: currentTurns - 1 })
+        } else {
+          updatePokemon(gameState.activePokemon, { statusCondition: null, statusTurns: undefined, statusWavesRemaining: undefined })
+        }
+
+        if (Math.random() < 0.33) {
+          const selfDamage = Math.max(1, Math.floor(pokemon.maxHP * 0.08))
+          const nextHP = Math.max(0, pokemon.HP - selfDamage)
+          updatePokemon(gameState.activePokemon, { HP: nextHP })
+          if (nextHP <= 0) {
+            handlePlayerKnockout(gameState.activePokemon, nextHP)
+            return { canAct: false, fainted: true }
+          }
+          return { canAct: false, fainted: false }
+        }
+      }
+
+      return { canAct: true, fainted: false }
+    }
+
+    if (!gameState.currentBattle?.enemyStatusCondition) return { canAct: true, fainted: false }
+
+    const currentStatus = gameState.currentBattle.enemyStatusCondition
+    const currentTurns = gameState.currentBattle.enemyStatusTurns ?? 0
+
+    if (currentStatus === "poisoned" || currentStatus === "burned") {
+      const chipDamage = Math.max(
+        1,
+        Math.floor(gameState.currentBattle.enemyMaxHP * (currentStatus === "poisoned" ? 0.08 : 0.06)),
+      )
+      const nextHP = Math.max(0, gameState.currentBattle.enemyHP - chipDamage)
+      updateBattle({ enemyHP: nextHP })
+      if (nextHP <= 0) {
+        handleEnemyDefeat(gameState.currentBattle.enemyName)
+        return { canAct: false, fainted: true }
+      }
+    }
+
+    if (currentStatus === "asleep") {
+      if (currentTurns > 1) {
+        updateBattle({ enemyStatusTurns: currentTurns - 1 })
+        return { canAct: false, fainted: false }
+      }
+
+      updateBattle({ enemyStatusCondition: null, enemyStatusTurns: undefined })
+    }
+
+    if (currentStatus === "frozen") {
+      if (Math.random() < 0.25) {
+        updateBattle({ enemyStatusCondition: null, enemyStatusTurns: undefined })
+      } else {
+        return { canAct: false, fainted: false }
+      }
+    }
+
+    if (currentStatus === "paralyzed" && Math.random() < 0.25) {
+      return { canAct: false, fainted: false }
+    }
+
+    if (currentStatus === "confused") {
+      if (currentTurns > 1) {
+        updateBattle({ enemyStatusTurns: currentTurns - 1 })
+      } else {
+        updateBattle({ enemyStatusCondition: null, enemyStatusTurns: undefined })
+      }
+
+      if (Math.random() < 0.33) {
+        const selfDamage = Math.max(1, Math.floor(gameState.currentBattle.enemyMaxHP * 0.08))
+        const nextHP = Math.max(0, gameState.currentBattle.enemyHP - selfDamage)
+        updateBattle({ enemyHP: nextHP })
+        if (nextHP <= 0) {
+          handleEnemyDefeat(gameState.currentBattle.enemyName)
+          return { canAct: false, fainted: true }
+        }
+        return { canAct: false, fainted: false }
+      }
+    }
+
+    return { canAct: true, fainted: false }
+  }
 
   useEffect(() => {
     Object.keys(gameState.playerTeam).forEach((pokemonName) => {
@@ -61,6 +949,37 @@ export default function PokemonAdventure() {
       }
     })
   }, [gameState.playerTeam, updatePokemon])
+
+  useEffect(() => {
+    if (!gameState.currentBattle || !gameState.activePokemon) return
+
+    const activePokemon = gameState.playerTeam[gameState.activePokemon]
+    if (!activePokemon) return
+
+    const expectedPlayerSprite = getPokemonSpriteUrl(
+      gameState.activePokemon,
+      activePokemon.sprite,
+      "back",
+      Boolean(activePokemon.isShiny),
+    )
+    const visibleEnemyName = gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName
+    const expectedEnemySprite = getPokemonSpriteUrl(
+      visibleEnemyName,
+      wildPokemon[visibleEnemyName]?.sprite,
+      "front",
+      Boolean(gameState.currentBattle.enemyIsShiny),
+    )
+
+    if (
+      gameState.currentBattle.playerSprite !== expectedPlayerSprite ||
+      gameState.currentBattle.enemySprite !== expectedEnemySprite
+    ) {
+      updateBattle({
+        playerSprite: expectedPlayerSprite,
+        enemySprite: expectedEnemySprite,
+      })
+    }
+  }, [gameState.activePokemon, gameState.currentBattle, gameState.playerTeam, updateBattle])
 
   const withAnimation = useCallback(async (callback: () => void) => {
     setIsAnimating(true)
@@ -87,45 +1006,65 @@ export default function PokemonAdventure() {
     addLog("🏠 Voltou ao menu principal!")
   }, [currentSlot, gameState, saveSlots, setSaveSlots, GAME_SAVE_KEY, addLog])
 
+  const trainerBarColor = useMemo(() => {
+    if (!gameState.activePokemon) return "#b7d99a"
+
+    const activeType = gameState.playerTeam[gameState.activePokemon]?.type
+    return trainerBarTypeColors[normalizeTypeKey(activeType)] || "#b7d99a"
+  }, [gameState.activePokemon, gameState.playerTeam])
+
+  const activePokemonLabel = useMemo(() => {
+    if (!gameState.activePokemon) {
+      return "Nenhum"
+    }
+
+    const isShiny = Boolean(gameState.playerTeam[gameState.activePokemon]?.isShiny)
+    return `${gameState.activePokemon}${isShiny ? " ✨" : ""}`
+  }, [gameState.activePokemon, gameState.playerTeam])
+
   const statusBar = useMemo(
     () =>
       currentScreen !== "main-menu" && gameState.activePokemon ? (
-        <div className="flex flex-wrap justify-between items-center gap-2 mb-4 p-3 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
-          <Badge className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-1">
+        <div className="pixel-window mb-5 px-4 py-3">
+          <div className="pixel-band mb-3 flex items-center justify-between px-4 py-2" style={{ backgroundColor: trainerBarColor }}>
+            <span className="pixel-text text-[10px] leading-relaxed text-slate-900 sm:text-xs">Treinador</span>
+            <span className="pixel-text text-[10px] leading-relaxed text-slate-900 sm:text-xs">{activePokemonLabel}</span>
+          </div>
+          <div className="flex flex-wrap justify-between items-center gap-2">
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#fde047_0%,#fde047_50%,#eab308_50%,#eab308_100%)] px-3 py-1 text-slate-900">
             💰 {gameState.money}
           </Badge>
-          <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1">⚔️ {gameState.battles}</Badge>
-          <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1">
-            🎯 {gameState.activePokemon || "Nenhum"}
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#f87171_0%,#f87171_50%,#ef4444_50%,#ef4444_100%)] px-3 py-1 text-white">⚔️ {gameState.battles}</Badge>
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#60a5fa_0%,#60a5fa_50%,#2563eb_50%,#2563eb_100%)] px-3 py-1 text-white">
+            🎯 {activePokemonLabel}
+          </Badge>
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#4ade80_0%,#4ade80_50%,#16a34a_50%,#16a34a_100%)] px-3 py-1 text-white">
+            👥 {Object.keys(gameState.playerTeam).length}/{MAX_TEAM_SIZE}
           </Badge>
           {gameState.activePokemon && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-green-400">
-                ❤️ {gameState.playerTeam[gameState.activePokemon].HP}/
-                {gameState.playerTeam[gameState.activePokemon].maxHP}
+            <div className="pixel-band flex items-center gap-3 bg-white px-3 py-1 text-sm">
+              {(() => {
+                const activePokemon = gameState.playerTeam[gameState.activePokemon]
+                const waveLevelCap = getWaveLevelCap(gameState.battles)
+                const xpNeeded = getXpNeededForNextLevelByWaveCap(activePokemon.level, waveLevelCap)
+
+                return (
+                  <>
+              <span className="pixel-text text-[10px] leading-relaxed text-green-600 sm:text-xs">
+                ❤️ {activePokemon.HP}/
+                {activePokemon.maxHP}
               </span>
-              <span className="text-blue-400">⭐ {gameState.playerTeam[gameState.activePokemon].xp}/100</span>
+              <span className="pixel-text text-[10px] leading-relaxed text-blue-600 sm:text-xs">⭐ {activePokemon.xp}/{xpNeeded}</span>
+              <span className="pixel-text text-[10px] leading-relaxed text-amber-600 sm:text-xs">🧭 Cap Nv.{waveLevelCap}</span>
+                  </>
+                )
+              })()}
             </div>
           )}
+          </div>
         </div>
       ) : null,
-    [gameState, currentScreen],
-  )
-
-  const battleLogComponent = useMemo(
-    () => (
-      <div className="mt-4 p-3 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
-        <h3 className="font-bold text-white mb-2 text-sm">📜 Log</h3>
-        <div className="h-32 overflow-y-auto space-y-1 text-xs">
-          {battleLog.slice(-10).map((entry, index) => (
-            <div key={index} className="p-2 bg-white/5 rounded border border-white/10">
-              {entry}
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-    [battleLog],
+    [gameState, currentScreen, trainerBarColor, activePokemonLabel],
   )
 
   const chooseStarter = useCallback(
@@ -137,6 +1076,7 @@ export default function PokemonAdventure() {
         ...basePokemon,
         HP: calculatedHP,
         maxHP: calculatedHP,
+        spriteSet: basePokemon.spriteSet || getPokemonSpriteSet(starterName, basePokemon.sprite),
         attacks: Object.fromEntries(
           Object.entries(basePokemon.attacks).map(([name, power]) => [
             name,
@@ -149,6 +1089,7 @@ export default function PokemonAdventure() {
       updateGameState({
         playerTeam: { [starterName]: newPokemon },
         activePokemon: starterName,
+        currentEnvironment: getStarterEnvironment(starterName),
       })
 
       setShowModal(null)
@@ -164,102 +1105,206 @@ export default function PokemonAdventure() {
       return
     }
 
-    const enemyName = getRandomWildPokemon(gameState.battles)
-    const maxLevel = Math.floor(gameState.battles / 10) * 10 + 10
-    const minLevel = Math.max(1, maxLevel - 9)
-    const enemyLevel = random(minLevel, maxLevel)
+    const activePokemon = gameState.playerTeam[gameState.activePokemon]
+    if (!activePokemon) {
+      addLog("⚠️ Erro: Pokémon ativo inválido!")
+      return
+    }
+
+    const nextWave = gameState.battles + 1
+    const hasValidPreview =
+      nextEncounterPreview &&
+      nextEncounterPreview.forBattles === gameState.battles &&
+      nextEncounterPreview.forActivePokemon === gameState.activePokemon
+
+    const encounterPreview = hasValidPreview
+      ? nextEncounterPreview
+      : buildNextEncounterPreview(gameState.activePokemon, activePokemon.level)
+
+    const enemyName = encounterPreview.enemyName
+    const enemyDisplayName = encounterPreview.enemyDisplayName
+    const enemyLevel = encounterPreview.enemyLevel
 
     const enemyStats = wildPokemonStats[enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
     const enemyMaxHP = calculateHP(enemyStats.baseHP, enemyLevel, enemyName)
 
-    const enemyAttacks = Object.fromEntries(
-      Object.entries(wildPokemon[enemyName].attacks).map(([name, power]) => [
-        name,
-        calculateAttackPower(power, enemyLevel),
-      ]),
-    )
+    const enemyAttacks = encounterPreview.enemyAttacks
 
     const enemySpeed = wildPokemon[enemyName].speed || 50
+    const playerBattleSprite = getPokemonSpriteUrl(
+      gameState.activePokemon,
+      activePokemon.sprite,
+      "back",
+      Boolean(activePokemon.isShiny),
+    )
+    const enemyBattleSprite = getPokemonSpriteUrl(
+      enemyDisplayName,
+      wildPokemon[enemyDisplayName].sprite,
+      "front",
+      encounterPreview.isShiny,
+    )
 
     const newBattle = {
       enemyName,
       enemyType: wildPokemon[enemyName].type,
+      enemyDisplayName,
+      enemyDisplayType: encounterPreview.enemyDisplayType,
+      enemyIsDisguised: encounterPreview.isImpostor,
+      enemyIsShiny: encounterPreview.isShiny,
       enemyHP: enemyMaxHP,
       enemyMaxHP: enemyMaxHP,
       enemyLevel,
       enemyAttacks,
       enemySpeed,
+      enemySprite: enemyBattleSprite,
+      playerSprite: playerBattleSprite,
     }
 
     updateGameState({
       battles: gameState.battles + 1,
       currentBattle: newBattle,
     })
+    setNextEncounterPreview(null)
 
     setCurrentScreen("battle")
 
     const rarity = wildPokemon[enemyName].rarity
     const rarityEmoji = rarity === "lendario" ? "🌟" : rarity === "raro" ? "💎" : "🌿"
 
-    addLog(`${rarityEmoji} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
-  }, [gameState, updateGameState, addLog, random])
+    if (rarity === "lendario") {
+      showScreenNotice(`👑 O Chefe Lendário ${enemyName} apareceu na Onda ${nextWave}!`, 3800)
+    }
+
+    const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
+    addLog(`${rarityEmoji}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
+  }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, buildNextEncounterPreview])
 
   const handleAttack = useCallback(
     async (attackName: string) => {
       if (!gameState.activePokemon || !gameState.currentBattle) return
 
-      const pokemon = gameState.playerTeam[gameState.activePokemon!]
+      const activePokemonName = gameState.activePokemon
+      const currentBattle = gameState.currentBattle
+      const pokemon = gameState.playerTeam[activePokemonName]
+      setShowModal(null)
 
-      if (!pokemon.attackPP?.[attackName] || pokemon.attackPP[attackName].current <= 0) {
-        addLog(`⚠️ ${attackName} não tem PP restante!`)
+      const executePlayerAttack = async () => {
+        const playerTurnState = processStatusAtTurnStart("player")
+        if (!playerTurnState.canAct) {
+          return { shouldEnemyAttack: !playerTurnState.fainted, enemyDefeated: false }
+        }
+
+        if (!pokemon.attackPP?.[attackName] || pokemon.attackPP[attackName].current <= 0) {
+          addLog(`⚠️ ${attackName} não tem PP restante!`)
+          return { shouldEnemyAttack: false, enemyDefeated: false }
+        }
+
+        const [minDamage, maxDamage] = pokemon.attacks[attackName]
+        const baseDamage = random(minDamage, maxDamage)
+
+        const attackType = getAttackType(attackName)
+        const typeMultiplier = getDamageMultiplier(attackType, currentBattle.enemyType || "Normal")
+        const stabMultiplier = getStabMultiplier(attackType, pokemon.type)
+        const burnMultiplier = pokemon.statusCondition === "burned" ? 0.8 : 1
+        const levelMultiplier = getLevelBalanceMultiplier(pokemon.level, currentBattle.enemyLevel, 0.92, 1.18)
+        const finalDamage = Math.max(
+          0,
+          Math.floor(baseDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier),
+        )
+
+        const newPP = { ...pokemon.attackPP }
+        newPP[attackName] = {
+          ...newPP[attackName],
+          current: newPP[attackName].current - 1,
+        }
+        updatePokemon(activePokemonName, { attackPP: newPP })
+
+        await playAttackAnimation({
+          id: attackAnimationCounter + 1,
+          attacker: "player",
+          target: "enemy",
+          moveName: attackName,
+          attackType,
+        })
+        setAttackAnimationCounter((current) => current + 1)
+
+        const latestEnemyHP = latestGameStateRef.current.currentBattle?.enemyHP ?? currentBattle.enemyHP
+        const newEnemyHP = Math.max(0, latestEnemyHP - finalDamage)
+        updateBattle({ enemyHP: newEnemyHP })
+
+        const damageTags = []
+        if (stabMultiplier > 1) damageTags.push("STAB")
+        if (typeMultiplier > 1) damageTags.push("super efetivo")
+        if (typeMultiplier > 0 && typeMultiplier < 1) damageTags.push("resistido")
+        if (typeMultiplier === 0) damageTags.push("sem efeito")
+        if (burnMultiplier < 1) damageTags.push("queimado")
+        if (levelMultiplier > 1.06) damageTags.push("vantagem de nível")
+
+        addLog(
+          `⚔️ ${normalizeDisplayText(attackName)} [${attackType}]${damageTags.length ? ` ${damageTags.join(" • ")}` : ""}: ${finalDamage} dano!`,
+        )
+
+        applyStatusEffect(attackName, "enemy")
+
+        if (newEnemyHP <= 0) {
+          handleEnemyDefeat(currentBattle.enemyName)
+          return { shouldEnemyAttack: false, enemyDefeated: true }
+        }
+
+        return { shouldEnemyAttack: true, enemyDefeated: false }
+      }
+
+      const playerSpeed = getEffectiveSpeed(pokemon.speed || 50, pokemon.statusCondition)
+      const enemySpeed = getEffectiveSpeed(
+        currentBattle.enemySpeed || 50,
+        currentBattle.enemyStatusCondition,
+      )
+      const enemyAttackNames = Object.keys(currentBattle.enemyAttacks)
+      const enemySelectedAttack = enemyAttackNames[Math.floor(Math.random() * enemyAttackNames.length)]
+      const playerMovePriority = getMovePriority(attackName)
+      const enemyMovePriority = getMovePriority(enemySelectedAttack)
+
+      const enemyMovesFirst =
+        enemyMovePriority > playerMovePriority ||
+        (enemyMovePriority === playerMovePriority &&
+          (enemySpeed > playerSpeed || (enemySpeed === playerSpeed && Math.random() < 0.5)))
+
+      if (enemyMovesFirst) {
+        if (enemyMovePriority > playerMovePriority) {
+          addLog(`⚡ ${normalizeDisplayText(enemySelectedAttack)} tem prioridade e atacou primeiro!`)
+        } else {
+          const speedHint =
+            enemySpeed > playerSpeed
+              ? `🐌 ${currentBattle.enemyName} é mais rápido! (${enemySpeed} vs ${playerSpeed})`
+              : `⚖️ Velocidade empatada! ${currentBattle.enemyName} atacou primeiro.`
+          addLog(speedHint)
+        }
+
+        const enemyTurnResult = await enemyAttack(enemySelectedAttack)
+        if (enemyTurnResult.playerFainted || enemyTurnResult.enemyFainted) {
+          return
+        }
+
+        await executePlayerAttack()
         return
       }
 
-      const [minDamage, maxDamage] = pokemon.attacks[attackName]
-      const baseDamage = random(minDamage, maxDamage)
-
-      const typeMultiplier = getDamageMultiplier(
-        pokemon.type || "Normal",
-        gameState.currentBattle.enemyType || "Normal",
-      )
-      const finalDamage = Math.floor(baseDamage * typeMultiplier)
-
-      const newPP = { ...pokemon.attackPP }
-      newPP[attackName] = {
-        ...newPP[attackName],
-        current: newPP[attackName].current - 1,
-      }
-      updatePokemon(gameState.activePokemon, { attackPP: newPP })
-
-      const newEnemyHP = Math.max(0, gameState.currentBattle!.enemyHP - finalDamage)
-      updateBattle({ enemyHP: newEnemyHP })
-
-      if (typeMultiplier > 1) {
-        addLog(`🔥 Super efetivo! ${attackName}: ${finalDamage} dano! (+${Math.floor((typeMultiplier - 1) * 100)}%)`)
+      if (playerMovePriority > enemyMovePriority) {
+        addLog(`⚡ ${normalizeDisplayText(attackName)} tem prioridade e atacou primeiro!`)
       } else {
-        addLog(`⚔️ ${attackName}: ${finalDamage} dano!`)
+        const speedHint =
+          playerSpeed > enemySpeed
+            ? `💨 ${activePokemonName} é mais rápido! (${playerSpeed} vs ${enemySpeed})`
+            : `⚖️ Velocidade empatada! ${activePokemonName} atacou primeiro.`
+        addLog(speedHint)
       }
-      setShowModal(null)
 
-      if (newEnemyHP <= 0) {
-        const rarity = wildPokemon[gameState.currentBattle!.enemyName].rarity
-        const reward = rarity === "lendario" ? 100 : rarity === "raro" ? 50 : 15
-
-        addLog(`🎉 ${gameState.currentBattle!.enemyName} derrotado! +${reward} moedas`)
-        updateGameState({ money: gameState.money + reward })
-
-        if ((gameState.battles + 1) % 10 === 0) {
-          restoreAllPP()
-          addLog(`✨ PP de todos os ataques restaurado! (10 batalhas completadas)`)
-        }
-
-        levelUp()
-        setTimeout(() => endBattle(), 1500)
-      } else {
-        setTimeout(() => enemyAttack(), 1000)
+      const playerResult = await executePlayerAttack()
+      if (playerResult.shouldEnemyAttack && !playerResult.enemyDefeated) {
+        setTimeout(() => enemyAttack(enemySelectedAttack), 1000)
       }
     },
-    [gameState, updateBattle, updatePokemon, addLog, random, updateGameState],
+    [gameState, updateBattle, updatePokemon, addLog, random, playAttackAnimation, attackAnimationCounter],
   )
 
   const restoreAllPP = useCallback(() => {
@@ -292,136 +1337,471 @@ export default function PokemonAdventure() {
     setShowModal(null)
   }, [gameState, updateGameState, addLog, restoreAllPP])
 
-  const enemyAttack = useCallback(() => {
-    if (!gameState.currentBattle || !gameState.activePokemon || gameState.currentBattle.enemyHP <= 0) return
+  const useFullHeal = useCallback(() => {
+    if (!gameState.inventory["Cura Total"] || gameState.inventory["Cura Total"] <= 0) {
+      addLog("⚠️ Você não tem Cura Total!")
+      return
+    }
+
+    const affectedPokemon = Object.entries(gameState.playerTeam).filter(([, pokemon]) => pokemon.statusCondition)
+
+    if (affectedPokemon.length === 0) {
+      addLog("✨ Nenhum Pokémon tem efeitos negativos.")
+      return
+    }
+
+    affectedPokemon.forEach(([pokemonName]) => clearPokemonStatus(pokemonName))
+
+    const newInventory = { ...gameState.inventory }
+    newInventory["Cura Total"]--
+    updateGameState({ inventory: newInventory })
+
+    addLog("🧴 Cura Total usada! Todos os efeitos negativos foram removidos.")
+    setShowModal(null)
+  }, [gameState.inventory, gameState.playerTeam, updateGameState, addLog, clearPokemonStatus])
+
+  const openBattleSimulation = useCallback(() => {
+    if (!gameState.activePokemon) {
+      showScreenNotice("🛰️ Inicia uma jornada para usar o scanner.")
+      return
+    }
+
+    if (gameState.currentBattle) {
+      showScreenNotice("🛰️ O scanner só pode ser usado fora da batalha.")
+      return
+    }
+
+    const charges = gameState.inventory[BATTLE_SIM_ITEM] || 0
+    if (charges <= 0) {
+      showScreenNotice("🛰️ Sem cargas do Scanner Tático. Reabastece na loja.")
+      return
+    }
+
+    const newInventory = { ...gameState.inventory }
+    newInventory[BATTLE_SIM_ITEM] = Math.max(0, charges - 1)
+
+    updateGameState({ inventory: newInventory })
+    const activePokemon = gameState.playerTeam[gameState.activePokemon]
+    if (!activePokemon) {
+      showScreenNotice("🛰️ Pokémon ativo inválido para o scanner.")
+      return
+    }
+
+    const hasValidPreview =
+      nextEncounterPreview &&
+      nextEncounterPreview.forBattles === gameState.battles &&
+      nextEncounterPreview.forActivePokemon === gameState.activePokemon
+
+    const preview = hasValidPreview
+      ? nextEncounterPreview
+      : buildNextEncounterPreview(gameState.activePokemon, activePokemon.level)
+
+    setNextEncounterPreview(preview)
+    showScreenNotice(
+      preview.isImpostor
+        ? `🛰️ Próximo encontro previsto: ${preview.enemyDisplayName} (disfarce de ${preview.enemyName})${preview.isShiny ? " ✨" : ""}.`
+        : preview.isShiny
+          ? `🛰️ Próximo encontro previsto: ${preview.enemyDisplayName} ✨.`
+          : `🛰️ Próximo encontro previsto: ${preview.enemyDisplayName}.`,
+    )
+    setShowModal("battle-sim")
+  }, [gameState, updateGameState, showScreenNotice, nextEncounterPreview, buildNextEncounterPreview])
+
+  const enemyAttack = useCallback(async (forcedAttackName?: string) => {
+    if (!gameState.currentBattle || !gameState.activePokemon || gameState.currentBattle.enemyHP <= 0) {
+      return { playerFainted: false, enemyFainted: false }
+    }
+
+    const enemyTurnState = processStatusAtTurnStart("enemy")
+    if (!enemyTurnState.canAct) {
+      return { playerFainted: false, enemyFainted: enemyTurnState.fainted }
+    }
 
     const attacks = Object.keys(gameState.currentBattle.enemyAttacks)
-    const attackName = attacks[Math.floor(Math.random() * attacks.length)]
-    const [minDamage, maxDamage] = gameState.currentBattle.enemyAttacks[attackName]
-    const baseDamage = Math.floor(random(minDamage, maxDamage) / 2)
-
     const playerPokemon = gameState.playerTeam[gameState.activePokemon]
-    const typeMultiplier = getDamageMultiplier(
-      gameState.currentBattle.enemyType || "Normal",
-      playerPokemon.type || "Normal",
+
+    const attackName = (() => {
+      if (forcedAttackName && attacks.includes(forcedAttackName)) {
+        return forcedAttackName
+      }
+
+      if (attacks.length <= 1) {
+        return attacks[0]
+      }
+
+      const battle = gameState.currentBattle!
+      const moveInsights = attacks.map((moveName) => {
+        const [minDamage, maxDamage] = battle.enemyAttacks[moveName]
+        const avgDamage = (minDamage + maxDamage) / 2
+        const moveType = getAttackType(moveName)
+        const typeMultiplier = getDamageMultiplier(moveType, playerPokemon.type || "Normal")
+        const stabMultiplier = getStabMultiplier(moveType, battle.enemyType)
+        const burnMultiplier = battle.enemyStatusCondition === "burned" ? 0.8 : 1
+        const levelMultiplier = getLevelBalanceMultiplier(battle.enemyLevel, playerPokemon.level, 0.85, 1.55)
+        const overpowerMultiplier = battle.enemyLevel >= playerPokemon.level * 2 ? 1.35 : 1
+        const expectedDamage = Math.max(
+          1,
+          Math.floor(avgDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier * overpowerMultiplier),
+        )
+
+        return {
+          moveName,
+          typeMultiplier,
+          expectedDamage,
+        }
+      })
+
+      const finishingMove = moveInsights
+        .filter((insight) => insight.typeMultiplier > 0 && insight.expectedDamage >= playerPokemon.HP)
+        .sort((insightA, insightB) => insightB.expectedDamage - insightA.expectedDamage)[0]
+
+      if (finishingMove && Math.random() < 0.88) {
+        return finishingMove.moveName
+      }
+
+      const superEffectiveMove = moveInsights
+        .filter((insight) => insight.typeMultiplier > 1)
+        .sort((insightA, insightB) => insightB.expectedDamage - insightA.expectedDamage)[0]
+
+      if (superEffectiveMove && Math.random() < 0.72) {
+        return superEffectiveMove.moveName
+      }
+
+      const weightedMoves = moveInsights.map((insight) => {
+        let weight = Math.max(1, insight.expectedDamage)
+
+        if (insight.typeMultiplier > 1) {
+          weight *= 1.3
+        } else if (insight.typeMultiplier === 0) {
+          weight *= 0.2
+        } else if (insight.typeMultiplier < 1) {
+          weight *= 0.75
+        }
+
+        return {
+          moveName: insight.moveName,
+          weight,
+        }
+      })
+
+      const totalWeight = weightedMoves.reduce((sum, move) => sum + move.weight, 0)
+      let randomPick = Math.random() * totalWeight
+
+      for (const move of weightedMoves) {
+        randomPick -= move.weight
+        if (randomPick <= 0) {
+          return move.moveName
+        }
+      }
+
+      return attacks[Math.floor(Math.random() * attacks.length)]
+    })()
+
+    const [minDamage, maxDamage] = gameState.currentBattle.enemyAttacks[attackName]
+    const baseDamage = random(minDamage, maxDamage)
+
+    const attackType = getAttackType(attackName)
+    const typeMultiplier = getDamageMultiplier(attackType, playerPokemon.type || "Normal")
+    const stabMultiplier = getStabMultiplier(attackType, gameState.currentBattle.enemyType)
+    const burnMultiplier = gameState.currentBattle.enemyStatusCondition === "burned" ? 0.8 : 1
+    const levelMultiplier = getLevelBalanceMultiplier(gameState.currentBattle.enemyLevel, playerPokemon.level, 0.85, 1.55)
+    const overpowerMultiplier = gameState.currentBattle.enemyLevel >= playerPokemon.level * 2 ? 1.35 : 1
+    const damage = Math.max(
+      0,
+      Math.floor(baseDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier * overpowerMultiplier),
     )
-    const damage = Math.floor(baseDamage * typeMultiplier)
+
+    await playAttackAnimation({
+      id: attackAnimationCounter + 1,
+      attacker: "enemy",
+      target: "player",
+      moveName: attackName,
+      attackType,
+    })
+    setAttackAnimationCounter((current) => current + 1)
 
     const newHP = Math.max(0, playerPokemon.HP - damage)
     updatePokemon(gameState.activePokemon, { HP: newHP })
 
-    if (typeMultiplier > 1) {
-      addLog(`💥 Super efetivo! ${attackName}: ${damage} dano em você! (+${Math.floor((typeMultiplier - 1) * 100)}%)`)
-    } else {
-      addLog(`💥 ${attackName}: ${damage} dano em você!`)
-    }
+    const enemyDamageTags = []
+    if (stabMultiplier > 1) enemyDamageTags.push("STAB")
+    if (typeMultiplier > 1) enemyDamageTags.push("super efetivo")
+    if (typeMultiplier > 0 && typeMultiplier < 1) enemyDamageTags.push("resistido")
+    if (typeMultiplier === 0) enemyDamageTags.push("sem efeito")
+    if (burnMultiplier < 1) enemyDamageTags.push("queimado")
+    if (levelMultiplier > 1.06) enemyDamageTags.push("vantagem de nível")
+
+    addLog(
+      `💥 ${normalizeDisplayText(attackName)} [${attackType}]${enemyDamageTags.length ? ` ${enemyDamageTags.join(" • ")}` : ""}: ${damage} dano em você!`,
+    )
+
+    applyStatusEffect(attackName, "player")
 
     if (newHP <= 0) {
       addLog(`😵 ${gameState.activePokemon} desmaiou!`)
-
-      const alivePokemon = Object.keys(gameState.playerTeam).filter((name) => {
-        if (name === gameState.activePokemon) {
-          return newHP > 0
-        }
-        return gameState.playerTeam[name].HP > 0
-      })
-
-      if (alivePokemon.length > 0) {
-        addLog("⚠️ Você deve escolher outro Pokémon!")
-        setShowModal("switch")
-      } else {
-        addLog("💀 Game Over! Todos os Pokémon desmaiaram!")
-
-        setTimeout(() => {
-          deleteSaveSlot(currentSlot ?? undefined)
-
-          setGameState({
-            playerTeam: {},
-            activePokemon: null,
-            money: 50,
-            battles: 0,
-            inventory: { Pokébola: 5 },
-            capturedPokemon: [],
-            currentBattle: null,
-          })
-          clearLog()
-          setCurrentScreen("main-menu")
-          setShowModal(null)
-        }, 1500)
-      }
+      handlePlayerKnockout(gameState.activePokemon, newHP)
+      return { playerFainted: true, enemyFainted: false }
     }
-  }, [gameState, updatePokemon, addLog, random, setGameState, clearLog, deleteSaveSlot, currentSlot])
+
+    return { playerFainted: false, enemyFainted: false }
+  }, [gameState, updatePokemon, addLog, random, playAttackAnimation, attackAnimationCounter])
+
+  useEffect(() => {
+    if (!pendingEnemyTurnAfterSwitch) {
+      return
+    }
+
+    if (!gameState.currentBattle || !gameState.activePokemon || gameState.currentBattle.enemyHP <= 0) {
+      setPendingEnemyTurnAfterSwitch(false)
+      return
+    }
+
+    setPendingEnemyTurnAfterSwitch(false)
+    const timeoutId = window.setTimeout(() => {
+      enemyAttack()
+    }, 700)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [pendingEnemyTurnAfterSwitch, gameState.currentBattle, gameState.activePokemon, enemyAttack])
 
   const levelUp = useCallback(() => {
     if (!gameState.activePokemon) return
 
     const enemyLevel = gameState.currentBattle?.enemyLevel || 1
-    const baseXP = 10
-    const xpGain = baseXP + Math.floor(enemyLevel * 2.5) + random(0, 10)
-
-    const pokemon = gameState.playerTeam[gameState.activePokemon]
+    const activePokemonName = gameState.activePokemon
+    const pokemon = gameState.playerTeam[activePokemonName]
+    const enemyRarity = gameState.currentBattle
+      ? wildPokemon[gameState.currentBattle.enemyName]?.rarity || "comum"
+      : "comum"
+    const baseYield = CLASSIC_BASE_XP_YIELD[enemyRarity] || CLASSIC_BASE_XP_YIELD.comum
+    const xpGain = Math.max(1, Math.floor((baseYield * enemyLevel) / 7))
+    const waveLevelCap = getWaveLevelCap(gameState.battles)
+    const xpNeededForNextLevel = getXpNeededForNextLevelByWaveCap(pokemon.level, waveLevelCap)
     const newXP = pokemon.xp + xpGain
 
-    if (newXP >= 100) {
+    const hasXpShare = Number(gameState.inventory[XP_SHARE_ITEM] || 0) > 0
+    if (hasXpShare) {
+      const sharedXp = Math.max(1, Math.floor(xpGain * 0.2))
+
+      Object.entries(gameState.playerTeam).forEach(([teamPokemonName, teamPokemon]) => {
+        if (teamPokemonName === activePokemonName) {
+          return
+        }
+
+        let leveledXp = teamPokemon.xp + sharedXp
+        let leveledLevel = teamPokemon.level
+        let leveledMaxHP = teamPokemon.maxHP
+        let leveledHP = teamPokemon.HP
+
+        while (leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
+          const requiredXp = getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)
+          leveledXp -= requiredXp
+          leveledLevel += 1
+
+          const template = getPokemonBattleTemplate(teamPokemonName)
+          const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, teamPokemonName)
+          const hpIncrease = recalculatedMaxHP - leveledMaxHP
+          leveledMaxHP = recalculatedMaxHP
+          leveledHP = Math.min(leveledMaxHP, leveledHP + hpIncrease)
+        }
+
+        updatePokemon(teamPokemonName, {
+          xp: leveledXp,
+          level: leveledLevel,
+          maxHP: leveledMaxHP,
+          HP: leveledHP,
+        })
+
+        addLog(`🤝 ${teamPokemonName} recebeu +${sharedXp} XP pelo XP Share.`)
+      })
+    }
+
+    if (newXP >= xpNeededForNextLevel) {
       const newLevel = pokemon.level + 1
+      const xpCarryOver = newXP - xpNeededForNextLevel
       const oldMaxHP = pokemon.maxHP
+      const currentTemplate = getPokemonBattleTemplate(activePokemonName)
 
-      const newMaxHP = calculateHP(starterPokemon[gameState.activePokemon]?.HP || 40, newLevel, gameState.activePokemon)
+      const newMaxHP = calculateHP(currentTemplate?.baseHP || oldMaxHP, newLevel, activePokemonName)
       const hpIncrease = newMaxHP - oldMaxHP
-      const newCurrentHP = pokemon.HP + hpIncrease
+      const newCurrentHP = Math.min(newMaxHP, pokemon.HP + hpIncrease)
 
-      const baseAttacks = starterPokemon[gameState.activePokemon]?.attacks || pokemon.attacks
-      const newAttacks = Object.fromEntries(
-        Object.entries(baseAttacks).map(([name, power]) => [name, calculateAttackPower(power, newLevel)]),
-      )
+      const scaledAttacks = scaleAttackSetForLevel(pokemon.attacks)
+      const learnedMove = getLevelUpMoveForPokemon(activePokemonName, pokemon.type, newLevel, Object.keys(scaledAttacks))
+      const evolution = getEvolutionForPokemon(activePokemonName, newLevel)
+      const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
-      const attackCount = Object.keys(newAttacks).length
-      if (attackCount > 4) {
-        updatePokemon(gameState.activePokemon, {
+      if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
+        const evolvedName = evolution.evolvesTo
+        const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, newLevel, evolvedName)
+        const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, newMaxHP - newCurrentHP))
+        const upgradedAttacks = learnedMove && Object.keys(scaledAttacks).length < 4
+          ? { ...scaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, newLevel) }
+          : scaledAttacks
+        const evolvedPokemon = {
+          ...pokemon,
           level: newLevel,
-          xp: 0,
+          xp: xpCarryOver,
+          HP: evolvedHP,
+          maxHP: evolvedMaxHP,
+          attacks: upgradedAttacks,
+          attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+          sprite: evolutionTemplate.sprite,
+          spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
+          type: evolutionTemplate.type,
+          speed: evolutionTemplate.speed,
+          isShiny: pokemon.isShiny,
+          pendingMove:
+            learnedMove && Object.keys(scaledAttacks).length >= 4
+              ? { name: learnedMove.name, power: learnedMove.power }
+              : undefined,
+        }
+
+        const nextTeam = Object.fromEntries(
+          Object.entries(gameState.playerTeam).map(([name, teamPokemon]) =>
+            name === activePokemonName ? [evolvedName, evolvedPokemon] : [name, teamPokemon],
+          ),
+        )
+
+        const nextCapturedPokemon = gameState.capturedPokemon.includes(activePokemonName)
+          ? gameState.capturedPokemon.map((name) => (name === activePokemonName ? evolvedName : name))
+          : gameState.capturedPokemon
+
+        setGameState({
+          ...gameState,
+          activePokemon: evolvedName,
+          capturedPokemon: nextCapturedPokemon,
+          playerTeam: nextTeam,
+          currentBattle: gameState.currentBattle
+            ? {
+                ...gameState.currentBattle,
+                playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
+              }
+            : null,
+        })
+
+        setRecentEvolution({ from: activePokemonName, to: evolvedName })
+
+        if (learnedMove) {
+          if (Object.keys(scaledAttacks).length >= 4) {
+            showScreenNotice(`📚 ${evolvedName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
+          } else {
+            showScreenNotice(`📚 ${evolvedName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
+          }
+        }
+
+        if (learnedMove && Object.keys(scaledAttacks).length >= 4) {
+          setAttackToReplace(null)
+          setShowModal("evolution-attacks")
+        } else {
+          setShowModal("evolution")
+        }
+      } else if (learnedMove && Object.keys(scaledAttacks).length >= 4) {
+        updatePokemon(activePokemonName, {
+          level: newLevel,
+          xp: xpCarryOver,
           maxHP: newMaxHP,
           HP: newCurrentHP,
-          pendingAttacks: newAttacks,
+          attacks: scaledAttacks,
+          attackPP: syncAttackPP(pokemon.attackPP, scaledAttacks),
+          pendingMove: { name: learnedMove.name, power: learnedMove.power },
         })
-        setSelectedAttacks(Object.keys(pokemon.attacks).slice(0, 4))
-        addLog(`🌟 Nível ${newLevel}! +${hpIncrease} HP máximo!`)
-        addLog(`⚠️ Escolha 4 ataques para manter!`)
+        showScreenNotice(`📚 ${activePokemonName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
+        setAttackToReplace(null)
         setShowModal("evolution-attacks")
       } else {
-        updatePokemon(gameState.activePokemon, {
+        const upgradedAttacks = learnedMove
+          ? { ...scaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, newLevel) }
+          : scaledAttacks
+
+        updatePokemon(activePokemonName, {
           level: newLevel,
-          xp: 0,
+          xp: xpCarryOver,
           maxHP: newMaxHP,
           HP: newCurrentHP,
-          attacks: newAttacks,
+          attacks: upgradedAttacks,
+          attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+          pendingMove: undefined,
         })
-        addLog(`🌟 Nível ${newLevel}! +${hpIncrease} HP máximo!`)
+
+        if (learnedMove) {
+          showScreenNotice(`📚 ${activePokemonName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
+        }
       }
     } else {
-      updatePokemon(gameState.activePokemon, { xp: newXP })
+      updatePokemon(activePokemonName, { xp: newXP })
     }
 
     addLog(`✨ +${xpGain} XP`)
-  }, [gameState, updatePokemon, addLog, random])
+  }, [gameState, updatePokemon, addLog, showScreenNotice, setGameState])
 
   const handlePokeball = useCallback(
     (ballType: string) => {
       if (!gameState.currentBattle || gameState.currentBattle.enemyHP <= 0) return
 
+      const ballConfig = pokeballs[ballType]
+      const ownedBallCount = gameState.inventory[ballType] || 0
+
+      if (!ballConfig) {
+        addLog(`⚠️ ${ballType} não é uma Pokébola válida.`)
+        return
+      }
+
+      if (ownedBallCount <= 0) {
+        addLog(`⚠️ Você não tem ${ballType}.`)
+        return
+      }
+
+      const currentTeamSize = Object.keys(gameState.playerTeam).length
+      const enemyName = gameState.currentBattle.enemyName
+
+      if (currentTeamSize >= MAX_TEAM_SIZE) {
+        addLog(`🚫 Equipe cheia! O máximo é ${MAX_TEAM_SIZE} Pokémon.`)
+        setShowModal(null)
+        return
+      }
+
+      if (gameState.playerTeam[enemyName]) {
+        addLog(`🚫 ${enemyName} já está na sua equipe.`)
+        setShowModal(null)
+        return
+      }
+
       const newInventory = { ...gameState.inventory }
-      newInventory[ballType]--
+      newInventory[ballType] = Math.max(0, ownedBallCount - 1)
 
-      const baseChance = pokeballs[ballType].chance
-      const rarity = wildPokemon[gameState.currentBattle.enemyName].rarity
+      const enemyData = wildPokemon[gameState.currentBattle.enemyName]
+      const rarity = enemyData.rarity
+      const isLegendaryBoss = rarity === "lendario"
+      const belowHalfHP = gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
 
-      const rarityModifier = rarity === "lendario" ? 0.3 : rarity === "raro" ? 0.7 : 1.0
-      const finalChance = baseChance * rarityModifier
+      if (isLegendaryBoss && !belowHalfHP) {
+        showScreenNotice("👑 Chefes lendários só podem ser capturados após ficarem com metade da vida.")
+        return
+      }
+
+      const catchRate = isLegendaryBoss ? 0.15 : rarity === "raro" ? 0.7 : 1
+      const ballMultiplier = ballConfig.chance
+      const statusCondition = gameState.currentBattle.enemyStatusCondition
+      const statusMultiplier = statusCondition === "asleep" || statusCondition === "frozen"
+        ? 2
+        : statusCondition === "paralyzed" || statusCondition === "burned" || statusCondition === "poisoned"
+          ? 1.5
+          : 1
+
+      const maxHP = Math.max(1, gameState.currentBattle.enemyMaxHP)
+      const currentHP = Math.max(1, gameState.currentBattle.enemyHP)
+      const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP)
+
+      const computedChance = hpFactor * catchRate * ballMultiplier * statusMultiplier
+      const finalChance = ballType === "Master Ball" ? 1 : clamp(computedChance, 0, 1)
 
       setShowModal(null)
 
       if (Math.random() < finalChance) {
-        addLog(`🎉 ${gameState.currentBattle.enemyName} capturado!`)
+        addLog(`🎉 ${gameState.currentBattle.enemyName} capturado! (${currentTeamSize + 1}/${MAX_TEAM_SIZE})`)
 
         const enemyStats = wildPokemonStats[gameState.currentBattle.enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
         const maxHP = calculateHP(
@@ -430,15 +1810,39 @@ export default function PokemonAdventure() {
           gameState.currentBattle.enemyName,
         )
 
+        const reducedMaxHP = isLegendaryBoss ? Math.max(1, Math.floor(maxHP * 0.85)) : maxHP
+        const capturedAttacks = isLegendaryBoss
+          ? Object.fromEntries(
+              Object.entries(gameState.currentBattle.enemyAttacks).map(([name, [min, max]]) => {
+                if (min === 0 && max === 0) {
+                  return [name, [0, 0] as [number, number]]
+                }
+
+                const reducedMin = Math.max(1, Math.floor(min * 0.85))
+                const reducedMax = Math.max(reducedMin, Math.floor(max * 0.85))
+                return [name, [reducedMin, reducedMax] as [number, number]]
+              }),
+            )
+          : gameState.currentBattle.enemyAttacks
+
+        const capturedSpeed = Math.max(1, Math.floor((enemyData.speed || 50) * (isLegendaryBoss ? 0.85 : 1)))
+
         const newPokemon = {
-          HP: maxHP,
-          maxHP: maxHP,
-          attacks: gameState.currentBattle.enemyAttacks,
+          HP: reducedMaxHP,
+          maxHP: reducedMaxHP,
+          attacks: capturedAttacks,
           level: gameState.currentBattle.enemyLevel,
           xp: 0,
-          sprite: wildPokemon[gameState.currentBattle.enemyName].sprite,
-          type: wildPokemon[gameState.currentBattle.enemyName].type,
-          attackPP: initializePP(gameState.currentBattle.enemyAttacks), // Initialize PP for captured Pokemon
+          sprite: enemyData.sprite,
+          spriteSet: getPokemonSpriteSet(
+            gameState.currentBattle.enemyName,
+            enemyData.sprite,
+            Boolean(gameState.currentBattle.enemyIsShiny),
+          ),
+          type: enemyData.type,
+          speed: capturedSpeed,
+          attackPP: initializePP(capturedAttacks),
+          isShiny: Boolean(gameState.currentBattle.enemyIsShiny),
         }
 
         updateGameState({
@@ -447,7 +1851,17 @@ export default function PokemonAdventure() {
           playerTeam: { ...gameState.playerTeam, [gameState.currentBattle.enemyName]: newPokemon },
         })
 
-        setTimeout(() => endBattle(), 1500)
+        setCaptureCelebration({
+          pokemonName: gameState.currentBattle.enemyName,
+          sprite: getPokemonSpriteSet(
+            gameState.currentBattle.enemyName,
+            enemyData.sprite,
+            Boolean(gameState.currentBattle.enemyIsShiny),
+          ).front,
+          rarity,
+          isShiny: Boolean(gameState.currentBattle.enemyIsShiny),
+        })
+        setShowModal("capture-success")
       } else {
         addLog(`😤 ${gameState.currentBattle.enemyName} escapou!`)
         updateGameState({ inventory: newInventory })
@@ -456,17 +1870,180 @@ export default function PokemonAdventure() {
         }
       }
     },
-    [gameState, updateGameState, addLog, enemyAttack],
+    [gameState, updateGameState, addLog, enemyAttack, showScreenNotice],
   )
 
-  const endBattle = useCallback(() => {
+  const startCaptureThrow = useCallback((ballType: string) => {
+    if (captureThrowAnimation) {
+      return
+    }
+
+    setShowModal(null)
+    setCaptureThrowAnimation({ ballType, throwId: Date.now() })
+
+    if (captureThrowTimeoutRef.current) {
+      window.clearTimeout(captureThrowTimeoutRef.current)
+    }
+
+    captureThrowTimeoutRef.current = window.setTimeout(() => {
+      setCaptureThrowAnimation(null)
+      captureThrowTimeoutRef.current = null
+      handlePokeball(ballType)
+    }, 1200)
+  }, [captureThrowAnimation, handlePokeball])
+
+  const endBattle = useCallback((openDestinationChoice = false) => {
+    advanceStatusWaves()
     updateGameState({ currentBattle: null })
     setCurrentScreen("menu")
-  }, [updateGameState])
+
+    if (openDestinationChoice) {
+      setShowModal("destination")
+    }
+  }, [advanceStatusWaves, updateGameState])
+
+  const chooseDestination = useCallback((destination: "caverna" | "floresta") => {
+    updateGameState({ currentEnvironment: destination })
+    setShowModal(null)
+    showScreenNotice(`🧭 Rota escolhida: ${environmentLabels[destination]}.`)
+  }, [showScreenNotice, updateGameState])
+
+  const handleMoveVendorPurchase = useCallback(() => {
+    if (!moveVendorOffer) {
+      return
+    }
+
+    const pokemon = gameState.playerTeam[moveVendorOffer.pokemonName]
+    if (!pokemon) {
+      addLog("⚠️ O Pokémon da oferta já não está na equipa.")
+      setMoveVendorOffer(null)
+      setMoveVendorReplaceAttack(null)
+      setShowModal(null)
+      return
+    }
+
+    const currentAttackNames = Object.keys(pokemon.attacks)
+    const hasFreeSlot = currentAttackNames.length < 4
+
+    if (!hasFreeSlot && !moveVendorReplaceAttack) {
+      addLog("⚠️ Escolhe um ataque para trocar.")
+      return
+    }
+
+    if (!hasFreeSlot && moveVendorReplaceAttack && !pokemon.attacks[moveVendorReplaceAttack]) {
+      addLog("⚠️ Esse ataque já não está disponível para troca.")
+      return
+    }
+
+    if (gameState.money < moveVendorOffer.price) {
+      addLog("💸 Moedas insuficientes para fechar negócio.")
+      return
+    }
+
+    const learnableMoves = getLearnableMovesForPokemon(
+      moveVendorOffer.pokemonName,
+      pokemon.type,
+      pokemon.level,
+      Object.keys(pokemon.attacks),
+    )
+    const offeredMoveStillValid = learnableMoves.some(
+      (move) => normalizeMoveNameKey(move.name) === normalizeMoveNameKey(moveVendorOffer.moveName),
+    )
+
+    if (!offeredMoveStillValid) {
+      addLog("⚠️ Oferta expirada. Esse Pokémon já não pode aprender este golpe agora.")
+      setMoveVendorOffer(null)
+      setMoveVendorReplaceAttack(null)
+      setShowModal(null)
+      return
+    }
+
+    const nextAttacks = hasFreeSlot
+      ? { ...pokemon.attacks, [moveVendorOffer.moveName]: moveVendorOffer.power }
+      : Object.fromEntries(
+          Object.entries(pokemon.attacks).map(([attackName, power]) =>
+            attackName === moveVendorReplaceAttack ? [moveVendorOffer.moveName, moveVendorOffer.power] : [attackName, power],
+          ),
+        )
+
+    updatePokemon(moveVendorOffer.pokemonName, {
+      attacks: nextAttacks,
+      attackPP: syncAttackPP(pokemon.attackPP, nextAttacks),
+    })
+    updateGameState({ money: gameState.money - moveVendorOffer.price })
+
+    if (hasFreeSlot) {
+      showScreenNotice(
+        `🧑‍🏫 ${moveVendorOffer.pokemonName} aprendeu ${normalizeDisplayText(moveVendorOffer.moveName)} por ${moveVendorOffer.price} moedas!`,
+      )
+    } else {
+      showScreenNotice(
+        `🧑‍🏫 ${moveVendorOffer.pokemonName} trocou ${normalizeDisplayText(moveVendorReplaceAttack!)} por ${normalizeDisplayText(moveVendorOffer.moveName)} por ${moveVendorOffer.price} moedas!`,
+      )
+    }
+
+    setMoveVendorOffer(null)
+    setMoveVendorReplaceAttack(null)
+    setShowModal(null)
+  }, [moveVendorOffer, moveVendorReplaceAttack, gameState, updatePokemon, updateGameState, addLog, showScreenNotice])
+
+  useEffect(() => {
+    if (currentScreen !== "menu" || !gameState.activePokemon || gameState.currentBattle) {
+      return
+    }
+
+    if (vendorLastBattleRoll === gameState.battles || moveVendorOffer || showModal === "move-vendor") {
+      return
+    }
+
+    setVendorLastBattleRoll(gameState.battles)
+
+    const vendorChance = 0.08
+    if (Math.random() > vendorChance) {
+      return
+    }
+
+    const possibleOffers = Object.entries(gameState.playerTeam).flatMap(([pokemonName, pokemon]) => {
+      const learnable = getLearnableMovesForPokemon(
+        pokemonName,
+        pokemon.type,
+        pokemon.level,
+        Object.keys(pokemon.attacks),
+      )
+
+      return learnable.map((move) => {
+        const averagePower = Math.floor((move.power[0] + move.power[1]) / 2)
+        const price = clamp(25 + move.level * 2 + Math.floor(averagePower * 0.7), 30, 220)
+
+        return {
+          pokemonName,
+          moveName: move.name,
+          power: move.power,
+          requiredLevel: move.level,
+          price,
+        }
+      })
+    })
+
+    if (possibleOffers.length === 0) {
+      return
+    }
+
+    const selectedOffer = possibleOffers[random(0, possibleOffers.length - 1)]
+    const selectedPokemonAttackNames = Object.keys(gameState.playerTeam[selectedOffer.pokemonName].attacks)
+    const defaultReplace = selectedPokemonAttackNames.length >= 4 ? selectedPokemonAttackNames[0] || null : null
+
+    setMoveVendorOffer(selectedOffer)
+    setMoveVendorReplaceAttack(defaultReplace)
+    setShowModal("move-vendor")
+    addLog("🧑‍🏫 Um vendedor de técnicas raras apareceu no centro!")
+  }, [currentScreen, gameState, vendorLastBattleRoll, moveVendorOffer, showModal, random, addLog])
 
   const renderStarterModal = () => (
     <div>
-      <h3 className="font-bold text-white mb-6 text-center text-2xl">🌟 Escolha seu Pokémon inicial!</h3>
+      <div className="pixel-band mb-6 bg-[linear-gradient(90deg,#6b7280_0%,#6b7280_30%,#94a3b8_30%,#94a3b8_60%,#7c8b73_60%,#7c8b73_100%)] px-4 py-3 text-center">
+        <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">Escolhe O Pokémon Inicial</h3>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {Object.entries(starterPokemon).map(([name, pokemon]) => (
           <div
@@ -485,17 +2062,19 @@ export default function PokemonAdventure() {
         ))}
       </div>
       <div className="mt-6 text-center">
-        <p className="text-white/80 text-sm">
-          ✨ Escolha sabiamente! Este será seu companheiro inicial na jornada Pokémon!
+        <p className="border-4 border-slate-800 bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">
+          Escolhe sabiamente. Este será o teu companheiro inicial.
         </p>
-        <p className="text-white/60 text-xs mt-2">🎯 Clique no card do Pokémon que deseja escolher</p>
+        <p className="mt-3 pixel-text text-[10px] leading-relaxed text-white/90">Clica num cartão para escolher</p>
       </div>
     </div>
   )
 
   const renderSelectSlotModal = () => (
-    <div>
-      <h3 className="font-bold text-white mb-6 text-center text-2xl">💾 Escolha um espaço para guardar a run</h3>
+    <div className="w-full max-w-xl rounded-[24px] border-4 border-slate-800 bg-[#f3efe2] p-6 shadow-[8px_8px_0_rgba(15,23,42,0.85)]">
+      <div className="mb-5 rounded-[14px] border-4 border-slate-800 bg-[#e7e2d2] px-4 py-3 text-center">
+        <h2 className="font-pixel text-sm text-slate-900">Escolhe Um Slot</h2>
+      </div>
       <div className="grid grid-cols-1 gap-3">
         {saveSlots.map((slot) => (
           <div
@@ -504,17 +2083,17 @@ export default function PokemonAdventure() {
               startNewGameInSlot(slot.id)
               setShowModal("starter")
             }}
-            className="p-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg cursor-pointer hover:scale-105 transform transition-all border-2 border-white/20 hover:border-white/50"
+            className="cursor-pointer rounded-[16px] border-4 border-slate-800 bg-[linear-gradient(180deg,#f5f5f4_0%,#f5f5f4_55%,#e7e5e4_55%,#e7e5e4_100%)] p-4 text-slate-900 shadow-[5px_5px_0_rgba(15,23,42,0.3)] transition-all hover:-translate-x-[1px] hover:-translate-y-[1px]"
           >
-            <div className="text-white font-bold text-lg">Espaço {slot.id + 1}</div>
+            <div className="font-pixel text-xs leading-relaxed text-slate-900">Espaço {slot.id + 1}</div>
             {slot.gameState?.activePokemon ? (
-              <div className="text-white/80 text-sm mt-2">
+              <div className="mt-2 text-sm text-slate-900">
                 <p>🎯 Pokémon: {slot.gameState.activePokemon}</p>
                 <p>⚔️ Batalhas: {slot.gameState.battles}</p>
                 <p>💰 Moedas: {slot.gameState.money}</p>
               </div>
             ) : (
-              <div className="text-white/60 text-sm mt-2">Vazio - Clique para começar</div>
+              <div className="mt-2 text-sm text-slate-700">Vazio - Clique para começar</div>
             )}
           </div>
         ))}
@@ -523,8 +2102,10 @@ export default function PokemonAdventure() {
   )
 
   const renderSelectContinueModal = () => (
-    <div>
-      <h3 className="font-bold text-white mb-6 text-center text-2xl">📂 Escolha uma run para continuar</h3>
+    <div className="w-full max-w-xl rounded-[24px] border-4 border-slate-800 bg-[#f3efe2] p-6 shadow-[8px_8px_0_rgba(15,23,42,0.85)]">
+      <div className="mb-5 rounded-[14px] border-4 border-slate-800 bg-[#e7e2d2] px-4 py-3 text-center">
+        <h2 className="font-pixel text-sm text-slate-900">Continuar Jornada</h2>
+      </div>
       <div className="grid grid-cols-1 gap-3">
         {saveSlots
           .filter((slot) => slot.gameState?.activePokemon)
@@ -537,10 +2118,10 @@ export default function PokemonAdventure() {
                 addLog("🎮 Jogo carregado! Bem-vindo de volta!")
                 setShowModal(null)
               }}
-              className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg cursor-pointer hover:scale-105 transform transition-all border-2 border-white/20 hover:border-white/50"
+              className="cursor-pointer rounded-[16px] border-4 border-slate-800 bg-[linear-gradient(180deg,#f5f5f4_0%,#f5f5f4_55%,#e7e5e4_55%,#e7e5e4_100%)] p-4 text-slate-900 shadow-[5px_5px_0_rgba(15,23,42,0.3)] transition-all hover:-translate-x-[1px] hover:-translate-y-[1px]"
             >
-              <div className="text-white font-bold text-lg">Espaço {slot.id + 1}</div>
-              <div className="text-white/80 text-sm mt-2">
+              <div className="font-pixel text-xs leading-relaxed text-slate-900">Espaço {slot.id + 1}</div>
+              <div className="mt-2 text-sm text-slate-900">
                 <p>🎯 Pokémon: {slot.gameState?.activePokemon}</p>
                 <p>⚔️ Batalhas: {slot.gameState?.battles}</p>
                 <p>💰 Moedas: {slot.gameState?.money}</p>
@@ -550,7 +2131,7 @@ export default function PokemonAdventure() {
           ))}
       </div>
       {saveSlots.every((slot) => !slot.gameState?.activePokemon) && (
-        <div className="text-center text-white/60 mt-4">
+        <div className="mt-4 text-center text-slate-500">
           <p>Nenhuma run salva. Comece um novo jogo!</p>
         </div>
       )}
@@ -558,23 +2139,71 @@ export default function PokemonAdventure() {
   )
 
   const renderMainMenu = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
-      <div className="text-center space-y-4">
-        <h2 className="text-7xl font-black italic tracking-tighter text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] uppercase">
+    <div className="relative flex min-h-[60vh] flex-col items-center justify-center space-y-8 overflow-hidden py-8">
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
+        <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
+        <div className="absolute bottom-10 left-12 h-12 w-12 border-4 border-slate-800 bg-sky-300" />
+      </div>
+      <div className="relative z-20 w-full max-w-3xl">
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setAccountMenuOpen((current) => !current)}
+            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-4 text-[10px] leading-relaxed sm:text-xs"
+          >
+            <User className="mr-2 h-4 w-4" />
+            {accountName}
+          </Button>
+        </div>
+        {accountMenuOpen && (
+          <div className="mt-3 ml-auto w-full max-w-md rounded-[18px] border-4 border-slate-800 bg-[#f8f4dc] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.75)]">
+            <div className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-600">Conta</div>
+            <div className="mb-3 rounded-lg border-2 border-slate-700 bg-white px-3 py-2 text-sm text-slate-900">
+              {accountEmail || "Sem email"}
+            </div>
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700">Nome do perfil</label>
+            <input
+              value={accountDraftName}
+              onChange={(event) => setAccountDraftName(event.target.value)}
+              placeholder="Nome do treinador"
+              className="w-full rounded-lg border-2 border-slate-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+            />
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                onClick={handleSaveProfile}
+                disabled={isAccountBusy}
+                className="pixel-menu-button bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+              >
+                Guardar perfil
+              </Button>
+              <Button
+                onClick={handleLogout}
+                disabled={isAccountBusy}
+                className="pixel-menu-button bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#dc2626_50%,#dc2626_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="pixel-surface relative w-full max-w-3xl bg-[#f8f4dc]/95 p-8 text-center space-y-5">
+        <h2 className="font-pixel text-3xl leading-[1.7] text-slate-900 sm:text-5xl">
           Pokémon
-          <span className="block text-4xl bg-gradient-to-r from-yellow-400 to-orange-600 bg-clip-text text-transparent">Adventure</span>
+          <span className="mt-3 block text-xl text-slate-600 sm:text-3xl">Adventure</span>
         </h2>
-        <p className="text-white/80 text-lg">Bem-vindo à sua jornada Pokémon!</p>
-        <p className="text-white/60 text-sm">
+        <p className="mx-auto max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Bem-vindo à tua jornada Pokémon.</p>
+        <p className="text-slate-500 text-sm pixel-text leading-relaxed">
           📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 w-full max-w-md">
+      <div className="flex w-full max-w-md flex-col gap-4">
         {saveSlots.some((slot) => slot.gameState?.activePokemon) && (
           <Button
             onClick={() => setCurrentScreen("select-continue")}
-            className="h-16 text-xl bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 transform hover:scale-105 transition-all"
+            className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#0891b2_50%,#0891b2_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
           >
             Continuar
           </Button>
@@ -582,13 +2211,13 @@ export default function PokemonAdventure() {
 
         <Button
           onClick={() => setCurrentScreen("select-slot")}
-          className="h-16 text-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transform hover:scale-105 transition-all"
+          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
         >
           🎮 Novo Jogo
         </Button>
 
-        <div className="text-center text-white/60 text-sm mt-4">
-          <p>Escolha um espaço para guardar sua aventura!</p>
+        <div className="mt-4 text-center text-sm text-white/60">
+          <p className="border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Escolhe um espaço para guardar a aventura.</p>
         </div>
       </div>
     </div>
@@ -596,31 +2225,70 @@ export default function PokemonAdventure() {
 
   const renderGameMenu = () => (
     <div className="space-y-4">
+      {gameState.activePokemon && statusBar}
+      <div className="pixel-window bg-[#f8f4dc] p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="mb-3 font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Centro Do Treinador</h2>
+            <p className="pixel-band bg-white/80 px-3 py-2 text-sm text-slate-600">Escolhe a tua próxima ação como num menu de aventura Pokémon.</p>
+            <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-600">
+              Ambiente atual: {environmentLabels[(gameState.currentEnvironment as BattleEnvironment) || "planicie"]}
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              onClick={() => setShowModal("type-chart")}
+              className="pixel-menu-button h-11 w-11 bg-[linear-gradient(180deg,#38bdf8_0%,#38bdf8_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] p-0 text-2xl font-black text-white"
+              disabled={isAnimating}
+              title="Guia de tipos"
+              aria-label="Abrir guia de tipos"
+            >
+              ?
+            </Button>
+            <div className="relative">
+              <Button
+                onClick={openBattleSimulation}
+                className="pixel-menu-button h-11 w-11 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] p-0 text-base font-black text-white"
+                disabled={isAnimating}
+                title={`Scanner (${gameState.inventory[BATTLE_SIM_ITEM] || 0})`}
+              >
+                🛰️
+              </Button>
+              <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded-full border-2 border-slate-900 bg-white px-1 text-center text-[10px] font-black leading-4 text-slate-900">
+                {gameState.inventory[BATTLE_SIM_ITEM] || 0}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <Button
           onClick={startBattle}
-          className="h-16 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#dc2626_50%,#dc2626_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
           disabled={isAnimating}
         >
           ⚔️ Batalhar
         </Button>
         <Button
           onClick={() => setCurrentScreen("shop")}
-          className="h-16 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
           disabled={isAnimating}
         >
           🏪 Loja
         </Button>
         <Button
           onClick={() => setShowModal("team")}
-          className="h-16 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
           disabled={isAnimating}
         >
           👥 Equipe
         </Button>
         <Button
-          onClick={() => setShowModal("inventory")}
-          className="h-16 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+          onClick={() => {
+            setInventoryTab("pokeballs")
+            setShowModal("inventory")
+          }}
+          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#c026d3_50%,#c026d3_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
           disabled={isAnimating}
         >
           🎒 Inventário
@@ -628,7 +2296,7 @@ export default function PokemonAdventure() {
       </div>
       <Button
         onClick={returnToMenu}
-        className="w-full h-12 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800"
+        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
       >
         🏠 Voltar ao Menu
       </Button>
@@ -638,41 +2306,85 @@ export default function PokemonAdventure() {
   const renderBattleScreen = () => {
     if (!gameState.currentBattle || !gameState.activePokemon) return null
 
+    const overlayGradient = attackAnimation
+      ? typeColors[normalizeTypeText(attackAnimation.attackType).split("/")[0]] || "from-white to-slate-300"
+      : "from-white to-slate-300"
+
     return (
-      <div className="space-y-4">
+      <div className="relative flex min-h-[calc(100dvh-10rem)] max-h-[calc(100dvh-8.5rem)] flex-col gap-2 overflow-hidden">
+        {attackAnimation && (
+          <div key={attackAnimation.id} className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
+            <div className={`battle-attack-flash absolute inset-0 bg-gradient-to-r ${overlayGradient} opacity-35`} />
+            <div className="battle-attack-banner absolute left-1/2 top-5 -translate-x-1/2 rounded-full border-4 border-slate-900 bg-white px-5 py-2 text-sm font-black uppercase tracking-[0.25em] text-slate-900 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
+              {normalizeDisplayText(attackAnimation.moveName)}
+            </div>
+            <div
+              className={`absolute top-1/2 h-4 w-[44%] -translate-y-1/2 rounded-full bg-gradient-to-r ${overlayGradient} shadow-[0_0_30px_rgba(255,255,255,0.95)] ${
+                attackAnimation.attacker === "player"
+                  ? "left-[20%] battle-attack-projectile-player"
+                  : "right-[20%] battle-attack-projectile-enemy"
+              }`}
+            />
+            <div
+              className={`absolute ${attackAnimation.target === "enemy" ? "right-[8%] top-[16%]" : "left-[8%] bottom-[10%]"} text-5xl font-black uppercase tracking-[0.3em] text-white drop-shadow-[0_6px_0_rgba(0,0,0,0.4)] animate-pulse`}
+            >
+              HIT
+            </div>
+            <div
+              className={`absolute ${attackAnimation.target === "enemy" ? "right-[11%] top-[28%] battle-impact-enemy" : "left-[11%] bottom-[20%] battle-impact-player"} h-28 w-28 rounded-full border-[10px] border-white bg-white/25`}
+            />
+          </div>
+        )}
+
         <BattleArena
           playerName={gameState.activePokemon}
           playerPokemon={gameState.playerTeam[gameState.activePokemon]}
           battle={gameState.currentBattle}
+          environment={(gameState.currentEnvironment as BattleEnvironment) || "planicie"}
+          attackAnimation={attackAnimation}
+          className="flex-1 min-h-0"
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 shrink-0 sm:grid-cols-2">
           <Button
             onClick={() => setShowModal("attacks")}
-            className="h-10 bg-gradient-to-r from-red-500 to-red-600 text-xs font-semibold"
+            className="h-10 sm:h-11 bg-gradient-to-r from-red-500 to-red-600 text-xs font-semibold"
             disabled={isAnimating}
           >
             ⚔️ Atacar
           </Button>
           <Button
             onClick={() => setShowModal("capture")}
-            className="h-10 bg-gradient-to-r from-blue-500 to-blue-600 text-xs font-semibold"
+            className="h-10 sm:h-11 bg-gradient-to-r from-blue-500 to-blue-600 text-xs font-semibold"
             disabled={isAnimating}
           >
             🎯 Capturar
           </Button>
           <Button
             onClick={() => setShowModal("switch")}
-            className="h-10 bg-gradient-to-r from-green-500 to-green-600 text-xs font-semibold"
+            className="h-10 sm:h-11 bg-gradient-to-r from-green-500 to-green-600 text-xs font-semibold"
             disabled={isAnimating}
           >
             🔄 Trocar
           </Button>
           <Button
             onClick={() => {
-              const playerPokemon = gameState.playerTeam[gameState.activePokemon!]
-              const playerSpeed = playerPokemon.speed || 50
-              const enemySpeed = gameState.currentBattle?.enemySpeed || 50
+              if (!gameState.activePokemon || !gameState.currentBattle) {
+                showScreenNotice("⚠️ Batalha indisponível. Tenta novamente.")
+                return
+              }
+
+              const playerPokemon = gameState.playerTeam[gameState.activePokemon]
+              if (!playerPokemon) {
+                showScreenNotice("⚠️ Pokémon ativo inválido.")
+                return
+              }
+
+              const playerSpeed = getEffectiveSpeed(playerPokemon.speed || 50, playerPokemon.statusCondition)
+              const enemySpeed = getEffectiveSpeed(
+                gameState.currentBattle.enemySpeed || 50,
+                gameState.currentBattle.enemyStatusCondition,
+              )
 
               let fleeChance = 0.5 // Base 50% chance
 
@@ -690,6 +2402,7 @@ export default function PokemonAdventure() {
 
               if (success) {
                 addLog(`✅ Fugiu da batalha com sucesso! (${Math.floor(fleeChance * 100)}% chance)`)
+                updateGameState({ battles: Math.max(0, gameState.battles - 1) })
                 endBattle()
               } else {
                 addLog(`❌ Não conseguiu fugir! (${Math.floor(fleeChance * 100)}% chance)`)
@@ -697,7 +2410,7 @@ export default function PokemonAdventure() {
                 enemyAttack()
               }
             }}
-            className="h-10 bg-gradient-to-r from-gray-500 to-gray-600 text-xs font-semibold"
+            className="h-10 sm:h-11 bg-gradient-to-r from-gray-500 to-gray-600 text-xs font-semibold"
             disabled={isAnimating}
           >
             🏃 Fugir
@@ -709,84 +2422,136 @@ export default function PokemonAdventure() {
 
   const renderShop = () => (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-white">🏪 Loja</h2>
-        <Badge className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 py-2">
+      {gameState.activePokemon && statusBar}
+      <div className="pixel-window mb-6 flex items-center justify-between bg-[#f8f4dc] px-5 py-4">
+        <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Poké Mart</h2>
+        <Badge className="pixel-badge bg-[linear-gradient(180deg,#78716c_0%,#78716c_50%,#57534e_50%,#57534e_100%)] px-4 py-2 text-white">
           💰 {gameState.money}
         </Badge>
       </div>
 
       <div className="grid gap-4">
-        <div className="p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-white font-bold text-lg">💊 Potion</h3>
-              <p className="text-white/60 text-sm">Restaura HP de todos os Pokemon</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-yellow-400 font-bold">25 💰</span>
-              <Button
-                onClick={() => {
-                  if (gameState.money >= 25) {
-                    // Heal all Pokemon in the team
-                    Object.keys(gameState.playerTeam).forEach((pokemonName) => {
-                      const pokemon = gameState.playerTeam[pokemonName]
-                      updatePokemon(pokemonName, { HP: pokemon.maxHP })
-                    })
-                    updateGameState({
-                      money: gameState.money - 25,
-                    })
-                    addLog("💊 Potion usada! Todos os Pokemon foram curados!")
-                  } else {
-                    addLog("⚠️ Dinheiro insuficiente!")
-                  }
-                }}
-                disabled={gameState.money < 25}
-                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-              >
-                Comprar
-              </Button>
-            </div>
-          </div>
-        </div>
+        {[
+          {
+            name: "Cura Total",
+            description: "Remove efeitos negativos da tua equipa",
+            price: 35,
+            buttonClassName: "bg-[linear-gradient(180deg,#06b6d4_0%,#06b6d4_50%,#0284c7_50%,#0284c7_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]",
+            buy: () => {
+              const newInventory = { ...gameState.inventory }
+              newInventory["Cura Total"] = (newInventory["Cura Total"] || 0) + 1
+              updateGameState({
+                money: gameState.money - 35,
+                inventory: newInventory,
+              })
+              addLog("🧴 Cura Total comprada!")
+            },
+          },
+          {
+            name: "Pokeheal",
+            description: "Restaura HP de todos os Pokemon",
+            price: 25,
+            buttonClassName: "bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]",
+            buy: () => {
+              Object.keys(gameState.playerTeam).forEach((pokemonName) => {
+                const pokemon = gameState.playerTeam[pokemonName]
+                updatePokemon(pokemonName, { HP: pokemon.maxHP })
+              })
+              updateGameState({ money: gameState.money - 25 })
+              addLog("💊 Pokeheal usada! Todos os Pokemon foram curados!")
+            },
+          },
+          {
+            name: "Elixir",
+            description: "Restaura PP de todos os ataques",
+            price: 50,
+            buttonClassName: "bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#c026d3_50%,#c026d3_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]",
+            buy: () => {
+              const newInventory = { ...gameState.inventory }
+              newInventory["Elixir"] = (newInventory["Elixir"] || 0) + 1
+              updateGameState({
+                money: gameState.money - 50,
+                inventory: newInventory,
+              })
+              addLog("✨ Elixir comprado!")
+            },
+          },
+          {
+            name: XP_SHARE_ITEM,
+            description: "Compra única: aliados recebem 20% do XP ganho em cada vitória",
+            price: 100,
+            buttonClassName: "bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]",
+            isUnique: true,
+            owned: Number(gameState.inventory[XP_SHARE_ITEM] || 0) > 0,
+            buy: () => {
+              if (Number(gameState.inventory[XP_SHARE_ITEM] || 0) > 0) {
+                addLog("⚠️ XP Share já foi comprado.")
+                return
+              }
 
-        <div className="p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-white font-bold text-lg">✨ Elixir</h3>
-              <p className="text-white/60 text-sm">Restaura PP de todos os ataques</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-yellow-400 font-bold">50 💰</span>
-              <Button
-                onClick={() => {
-                  if (gameState.money >= 50) {
-                    const newInventory = { ...gameState.inventory }
-                    newInventory["Elixir"] = (newInventory["Elixir"] || 0) + 1
-                    updateGameState({
-                      money: gameState.money - 50,
-                      inventory: newInventory,
-                    })
-                    addLog("✨ Elixir comprado!")
-                  } else {
-                    addLog("⚠️ Dinheiro insuficiente!")
-                  }
-                }}
-                disabled={gameState.money < 50}
-                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
-              >
-                Comprar
-              </Button>
-            </div>
-          </div>
-        </div>
+              const newInventory = { ...gameState.inventory }
+              newInventory[XP_SHARE_ITEM] = 1
 
-        {Object.entries(pokeballs).map(([name, ball]) => (
-          <div key={name} className="p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
+              updateGameState({
+                money: gameState.money - 100,
+                inventory: newInventory,
+              })
+              addLog("📡 XP Share adquirido! A equipa agora recebe 20% do XP das vitórias.")
+            },
+          },
+          {
+            name: BATTLE_SIM_ITEM,
+            description: "Scanner do próximo confronto que detecta disfarces (recurso limitado)",
+            price: 350,
+            buttonClassName: "bg-[linear-gradient(180deg,#4338ca_0%,#4338ca_50%,#312e81_50%,#312e81_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]",
+            buy: () => {
+              const newInventory = { ...gameState.inventory }
+              newInventory[BATTLE_SIM_ITEM] = (newInventory[BATTLE_SIM_ITEM] || 0) + 1
+              updateGameState({
+                money: gameState.money - 350,
+                inventory: newInventory,
+              })
+              showScreenNotice("🛰️ Carga do Scanner Tático comprada.")
+            },
+          },
+        ].map((item) => (
+          <div key={item.name} className="pixel-window bg-[#f8f4dc] p-4">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-white font-bold text-lg">{name}</h3>
-                <p className="text-white/60 text-sm">Taxa de captura: {Math.floor(ball.chance * 100)}%</p>
+                <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">{item.name}</h3>
+                <p className="text-slate-600 text-sm">{item.description}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-yellow-400 font-bold">{item.price} 💰</span>
+                <Button
+                  onClick={() => {
+                    if (item.isUnique && item.owned) {
+                      addLog("⚠️ Esse item já foi comprado.")
+                      return
+                    }
+
+                    if (gameState.money >= item.price) {
+                      item.buy()
+                    } else {
+                      addLog("⚠️ Dinheiro insuficiente!")
+                    }
+                  }}
+                  disabled={gameState.money < item.price || (Boolean(item.isUnique) && Boolean(item.owned))}
+                  className={`pixel-menu-button ${item.buttonClassName}`}
+                >
+                  {item.isUnique && item.owned ? "Comprado" : "Comprar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {Object.entries(pokeballs).map(([name, ball]) => (
+          <div key={name} className="pixel-window bg-[#f8f4dc] p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">{name}</h3>
+                <p className="text-slate-600 text-sm">Taxa de captura: {Math.floor(ball.chance * 100)}%</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-yellow-400 font-bold">{ball.price} 💰</span>
@@ -805,7 +2570,7 @@ export default function PokemonAdventure() {
                     }
                   }}
                   disabled={gameState.money < ball.price}
-                  className={`bg-gradient-to-r ${ball.color}`}
+                  className={`pixel-menu-button bg-gradient-to-r ${ball.color}`}
                 >
                   Comprar
                 </Button>
@@ -815,18 +2580,18 @@ export default function PokemonAdventure() {
         ))}
       </div>
 
-      <Button onClick={() => setCurrentScreen("game")} className="w-full bg-gray-600 hover:bg-gray-700 mt-4">
+      <Button onClick={() => setCurrentScreen("game")} className="pixel-menu-button mt-4 w-full bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs">
         Voltar
       </Button>
     </div>
   )
 
   const renderSelectSlotScreen = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+    <div className="flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center py-4">
       {renderSelectSlotModal()}
       <Button
         onClick={() => setCurrentScreen("main-menu")}
-        className="mt-6 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800"
+        className="pixel-menu-button mt-5 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
       >
         🏠 Voltar ao Menu
       </Button>
@@ -834,11 +2599,11 @@ export default function PokemonAdventure() {
   )
 
   const renderSelectContinueScreen = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+    <div className="flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center py-4">
       {renderSelectContinueModal()}
       <Button
         onClick={() => setCurrentScreen("main-menu")}
-        className="mt-6 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800"
+        className="pixel-menu-button mt-5 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
       >
         🏠 Voltar ao Menu
       </Button>
@@ -847,6 +2612,8 @@ export default function PokemonAdventure() {
 
   const renderModal = () => {
     if (!showModal) return null
+
+    const isAttackModal = showModal === "attacks"
 
     const modalContent = () => {
       switch (showModal) {
@@ -860,6 +2627,13 @@ export default function PokemonAdventure() {
             <div className="space-y-3">
               <h3 className="text-white font-bold text-xl mb-4">Escolha seu ataque:</h3>
               {Object.entries(pokemon.attacks).map(([attackName, [minDmg, maxDmg]]) => {
+                const attackType = normalizeTypeText(getAttackType(attackName))
+                const attackAccuracy = getMoveAccuracy(attackName)
+                const attackTypeGradient = typeColors[attackType] || "from-gray-500 to-gray-600"
+                const statusEffect = getMoveStatusEffect(attackName)
+                const effectiveness = gameState.currentBattle
+                  ? getDamageMultiplier(attackType, gameState.currentBattle.enemyType)
+                  : 1
                 const pp = pokemon.attackPP?.[attackName]
                 const hasPP = pp && pp.current > 0
                 const ppColor = !pp
@@ -875,18 +2649,33 @@ export default function PokemonAdventure() {
                     key={attackName}
                     onClick={() => handleAttack(attackName)}
                     disabled={!hasPP}
-                    className={`w-full h-16 text-lg ${
+                    className={`w-full min-h-[5.5rem] text-lg ${
                       !hasPP
                         ? "opacity-50 cursor-not-allowed bg-gray-500"
                         : "bg-gradient-to-r from-red-500 to-orange-500"
                     }`}
                   >
                     <div className="flex justify-between items-center w-full">
-                      <span>{attackName}</span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span>{normalizeDisplayText(attackName)}</span>
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <Badge className={`bg-gradient-to-r ${attackTypeGradient} text-white border-0 px-2 py-0`}>
+                            {attackType}
+                          </Badge>
+                          {effectiveness !== 1 && <span className="text-yellow-200">x{effectiveness}</span>}
+                          {statusEffect && (
+                            <span className="rounded-full border border-cyan-300/70 bg-cyan-400/15 px-2 py-0 text-cyan-100">
+                              {statusLabels[statusEffect.status]}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-white/80">
+                          <span>Accuracy: {attackAccuracy}%</span>
+                          <span>Power: {minDmg}-{maxDmg}</span>
+                        </div>
+                      </div>
                       <div className="flex flex-col items-end text-xs">
-                        <span className="text-white/80">
-                          {minDmg}-{maxDmg} dano
-                        </span>
+                        <span className="text-white/80">Tipo: {attackType}</span>
                         <span className={ppColor}>
                           PP: {pp?.current ?? 0}/{pp?.max ?? 0}
                         </span>
@@ -898,8 +2687,148 @@ export default function PokemonAdventure() {
             </div>
           )
 
+        case "battle-sim":
+          if (!gameState.activePokemon) {
+            return (
+              <div className="text-center">
+                <p className="text-white">Sem Pokémon ativo para simular.</p>
+              </div>
+            )
+          }
+
+          if (gameState.currentBattle) {
+            return (
+              <div className="text-center">
+                <p className="text-white">O scanner só pode ser usado fora da batalha.</p>
+              </div>
+            )
+          }
+
+          if (!nextEncounterPreview) {
+            return (
+              <div className="text-center">
+                <p className="text-white">Sem previsão disponível. Usa o scanner novamente.</p>
+              </div>
+            )
+          }
+
+          const previewEnemyTypes = normalizeTypeText(nextEncounterPreview.enemyType)
+            .split("/")
+            .filter(Boolean)
+          const predictedEnemyName = `${nextEncounterPreview.enemyDisplayName}${nextEncounterPreview.isShiny ? " ✨" : ""}`
+          const previewEnemyAttacks = Object.entries(nextEncounterPreview.enemyAttacks)
+            .map(([attackName, [minPower, maxPower]]) => {
+              const attackType = normalizeTypeText(getAttackType(attackName)).split("/")[0]
+              return { attackName, attackType, minPower, maxPower }
+            })
+            .sort((attackA, attackB) => attackA.attackName.localeCompare(attackB.attackName))
+
+          return (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="font-bold text-white text-xl">🛰️ Scanner Tático</h3>
+                <p className="mt-1 text-sm text-white/70">Previsão do próximo encontro.</p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-300/50 bg-emerald-500/15 p-3 text-center text-sm text-emerald-100">
+                Próximo Pokémon previsto: <span className="font-bold uppercase">{predictedEnemyName}</span> (Nv.{nextEncounterPreview.enemyLevel})
+              </div>
+
+              {nextEncounterPreview.isImpostor && (
+                <div className="rounded-xl border border-cyan-300/50 bg-cyan-500/15 p-3 text-center text-sm text-cyan-100">
+                  Scanner detectou disfarce ativo: assinatura real de {nextEncounterPreview.enemyName}.
+                </div>
+              )}
+
+              {nextEncounterPreview.isShiny && (
+                <div className="rounded-xl border border-amber-300/50 bg-amber-500/15 p-3 text-center text-sm text-amber-100">
+                  ✨ Scanner detectou brilho cromático no próximo alvo.
+                </div>
+              )}
+
+              <div className="rounded-xl border border-white/20 bg-white/10 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-white/60">Tipagem do próximo adversário</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {previewEnemyTypes.map((enemyType) => (
+                    <Badge key={enemyType} className={`bg-gradient-to-r ${typeColors[enemyType] || "from-gray-500 to-gray-600"} border-0 text-white`}>
+                      {enemyType}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/20 bg-white/10 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-white/60">Ataques previstos do próximo adversário</div>
+                <div className="mt-2 space-y-2">
+                  {previewEnemyAttacks.map(({ attackName, attackType, minPower, maxPower }) => (
+                    <div key={attackName} className="flex items-center justify-between rounded-lg bg-slate-900/30 px-3 py-2 text-sm text-white">
+                      <span>{normalizeDisplayText(attackName)}</span>
+                      <span className="font-semibold">{attackType} • {minPower}-{maxPower}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+
         case "capture":
-          const availableBalls = Object.keys(gameState.inventory).filter((ball) => gameState.inventory[ball] > 0)
+          if (captureThrowAnimation) {
+            return (
+              <div className="space-y-4 text-center">
+                <h3 className="font-bold text-white text-xl">🎯 Captura em andamento</h3>
+                <p className="text-sm text-white/75">Lançaste {captureThrowAnimation.ballType}!</p>
+                <div className="relative mx-auto h-40 w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-slate-950/35">
+                  <motion.div
+                    initial={{ x: "-36%", y: "72%", rotate: 0, scale: 0.9 }}
+                    animate={{
+                      x: ["-36%", "-4%", "32%"],
+                      y: ["72%", "16%", "6%"],
+                      rotate: [0, 260, 620],
+                      scale: [0.9, 1.04, 0.92],
+                    }}
+                    transition={{ duration: 1.05, ease: "easeInOut" }}
+                    className="absolute left-1/2 top-1/2"
+                  >
+                    <div className="relative h-16 w-16">
+                      <div
+                        className={`absolute inset-0 rounded-full border-4 border-slate-900 bg-gradient-to-r ${pokeballs[captureThrowAnimation.ballType]?.color || "from-rose-500 to-red-600"}`}
+                      />
+                      <div className="absolute left-[2px] right-[2px] top-1/2 h-[24px] -translate-y-[2px] rounded-b-full bg-white" />
+                      <div className="absolute left-0 right-0 top-1/2 h-[4px] -translate-y-1/2 bg-slate-900" />
+                      <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white" />
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.2 }}
+                    animate={{ opacity: [0, 0.9, 0], scale: [0.2, 1.3, 1.9] }}
+                    transition={{ duration: 0.45, delay: 0.72, ease: "easeOut" }}
+                    className="absolute right-[20%] top-[26%] h-16 w-16 rounded-full border-4 border-white/90 bg-white/25"
+                  />
+                </div>
+              </div>
+            )
+          }
+
+          const teamSize = Object.keys(gameState.playerTeam).length
+          const teamIsFull = teamSize >= MAX_TEAM_SIZE
+          const isLegendaryBoss = gameState.currentBattle
+            ? wildPokemon[gameState.currentBattle.enemyName]?.rarity === "lendario"
+            : false
+          const legendaryCanCapture = gameState.currentBattle
+            ? gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
+            : true
+          const availableBalls = Object.keys(gameState.inventory).filter(
+            (ball) => Boolean(pokeballs[ball]) && (gameState.inventory[ball] || 0) > 0,
+          )
+          if (teamIsFull) {
+            return (
+              <div className="text-center space-y-3">
+                <div className="text-4xl">🚫</div>
+                <p className="text-white font-bold">Equipe cheia</p>
+                <p className="text-white/70">Você já tem {MAX_TEAM_SIZE} Pokémon na equipe.</p>
+              </div>
+            )
+          }
           if (availableBalls.length === 0) {
             return (
               <div className="text-center">
@@ -911,24 +2840,84 @@ export default function PokemonAdventure() {
           return (
             <div>
               <h3 className="font-bold text-white mb-4 text-center">🎯 Capturar</h3>
+              <p className="text-center text-white/70 text-sm mb-4">Equipe: {teamSize}/{MAX_TEAM_SIZE}</p>
+              {isLegendaryBoss && (
+                <div className="mb-3 rounded-lg border border-amber-300/50 bg-amber-500/20 px-3 py-2 text-center text-xs text-amber-100">
+                  👑 Chefe lendário: só pode capturar com HP em metade ou menos.
+                </div>
+              )}
               <div className="space-y-2">
                 {availableBalls.map((ball) => (
+                  (() => {
+                    if (!gameState.currentBattle) {
+                      return null
+                    }
+
+                    const isMasterBall = ball === "Master Ball"
+                    const enemyRarity = wildPokemon[gameState.currentBattle.enemyName]?.rarity
+                    const catchRate = isLegendaryBoss ? 0.15 : enemyRarity === "raro" ? 0.7 : 1
+                    const statusCondition = gameState.currentBattle?.enemyStatusCondition
+                    const statusMultiplier = statusCondition === "asleep" || statusCondition === "frozen"
+                      ? 2
+                      : statusCondition === "paralyzed" || statusCondition === "burned" || statusCondition === "poisoned"
+                        ? 1.5
+                        : 1
+                    const maxHP = Math.max(1, gameState.currentBattle?.enemyMaxHP || 1)
+                    const currentHP = Math.max(1, gameState.currentBattle?.enemyHP || 1)
+                    const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP)
+
+                    const computedChance = hpFactor * catchRate * pokeballs[ball].chance * statusMultiplier
+                    const ballChance = isMasterBall ? 1 : clamp(computedChance, 0, 1)
+
+                    return (
                   <Button
                     key={ball}
-                    onClick={() => handlePokeball(ball)}
-                    className={`w-full h-12 bg-gradient-to-r ${pokeballs[ball].color} text-sm`}
-                    disabled={isAnimating}
+                    onClick={() => startCaptureThrow(ball)}
+                    className={`w-full h-12 bg-gradient-to-r ${pokeballs[ball]?.color || "from-slate-500 to-slate-600"} text-sm`}
+                    disabled={Boolean(captureThrowAnimation) || (isLegendaryBoss && !legendaryCanCapture)}
                   >
                     <div className="flex justify-between items-center w-full">
                       <span>{ball}</span>
                       <div className="text-right text-xs">
-                        <div>{Math.floor(pokeballs[ball].chance * 100)}%</div>
+                        <div>{Math.floor(ballChance * 100)}%</div>
                         <div>x{gameState.inventory[ball]}</div>
                       </div>
                     </div>
                   </Button>
+                    )
+                  })()
                 ))}
               </div>
+            </div>
+          )
+
+        case "capture-success":
+          if (!captureCelebration) return null
+
+          return (
+            <div className="space-y-5 text-center">
+              <div className="text-5xl">🎉</div>
+              <h3 className="font-bold text-white text-2xl">Parabéns!</h3>
+              <p className="text-white/80">
+                {captureCelebration.pokemonName} foi capturado com sucesso.
+              </p>
+              <div className="mx-auto flex w-full max-w-md items-center justify-center rounded-2xl border border-white/20 bg-white/10 p-6">
+                <AnimatedSprite sprite={captureCelebration.sprite} size="lg" />
+              </div>
+              <div className="text-sm text-white/70 uppercase tracking-[0.2em]">
+                {captureCelebration.rarity === "lendario" ? "Chefe Lendário" : "Novo Companheiro"}
+                {captureCelebration.isShiny ? " • Shiny" : ""}
+              </div>
+              <Button
+                onClick={() => {
+                  setCaptureCelebration(null)
+                  setShowModal(null)
+                  endBattle()
+                }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-600"
+              >
+                Continuar jornada
+              </Button>
             </div>
           )
 
@@ -967,13 +2956,36 @@ export default function PokemonAdventure() {
                     className="cursor-pointer p-3 bg-white/10 rounded border border-white/20 hover:bg-white/20 transition-all text-center"
                     onClick={() => {
                       updateGameState({ activePokemon: name })
+                      if (gameState.currentBattle) {
+                        updateBattle({
+                          playerSprite: getPokemonSpriteUrl(
+                            name,
+                            gameState.playerTeam[name].sprite,
+                            "back",
+                            Boolean(gameState.playerTeam[name].isShiny),
+                          ),
+                        })
+                      }
                       addLog(`🔄 Trocou para ${name}!`)
                       setShowModal(null)
+
+                      if (gameState.currentBattle && !isForced && gameState.currentBattle.enemyHP > 0) {
+                        addLog("🕒 A troca consumiu o turno. O adversário ataca!")
+                        setPendingEnemyTurnAfterSwitch(true)
+                      }
                     }}
                   >
-                    <div className="text-2xl mb-1">{gameState.playerTeam[name].sprite}</div>
-                    <div className="text-white font-semibold text-sm">{name}</div>
-                    <div className="text-white/70 text-xs">{gameState.playerTeam[name].type}</div>
+                    <div className="mb-1 flex justify-center">
+                      <AnimatedSprite
+                        sprite={
+                          gameState.playerTeam[name].spriteSet?.front ||
+                          getPokemonSpriteSet(name, gameState.playerTeam[name].sprite, Boolean(gameState.playerTeam[name].isShiny)).front
+                        }
+                        size="sm"
+                      />
+                    </div>
+                    <div className="text-white font-semibold text-sm">{name}{gameState.playerTeam[name].isShiny ? " ✨" : ""}</div>
+                    <div className="text-white/70 text-xs">{normalizeTypeText(gameState.playerTeam[name].type)}</div>
                     <div className="text-xs mt-1">
                       <div className="text-green-400">
                         ❤️ {gameState.playerTeam[name].HP}/{gameState.playerTeam[name].maxHP}
@@ -994,7 +3006,8 @@ export default function PokemonAdventure() {
         case "team":
           return (
             <div>
-              <h3 className="font-bold text-white mb-4 text-center">👥 Equipe</h3>
+              <h3 className="font-bold text-white mb-2 text-center">👥 Equipe</h3>
+              <p className="text-center text-white/70 text-sm mb-4">{Object.keys(gameState.playerTeam).length}/{MAX_TEAM_SIZE} Pokémon</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
                 {Object.entries(gameState.playerTeam).map(([name, pokemon]) => (
                   <div
@@ -1007,14 +3020,22 @@ export default function PokemonAdventure() {
                     onClick={() => {
                       if (pokemon.HP > 0) {
                         updateGameState({ activePokemon: name })
+                        if (gameState.currentBattle) {
+                          updateBattle({ playerSprite: getPokemonSpriteUrl(name, pokemon.sprite, "back", Boolean(pokemon.isShiny)) })
+                        }
                         addLog(`✨ ${name} ativo!`)
                         setShowModal(null)
                       }
                     }}
                   >
-                    <div className="text-2xl mb-1">{pokemon.sprite}</div>
-                    <div className="text-white font-semibold text-sm">{name}</div>
-                    <div className="text-white/70 text-xs">{pokemon.type}</div>
+                    <div className="mb-1 flex justify-center">
+                      <AnimatedSprite
+                        sprite={pokemon.spriteSet?.front || getPokemonSpriteSet(name, pokemon.sprite, Boolean(pokemon.isShiny)).front}
+                        size="sm"
+                      />
+                    </div>
+                    <div className="text-white font-semibold text-sm">{name}{pokemon.isShiny ? " ✨" : ""}</div>
+                    <div className="text-white/70 text-xs">{normalizeTypeText(pokemon.type)}</div>
                     <div className="text-xs mt-1">
                       <div className="text-green-400">
                         ❤️ {pokemon.HP}/{pokemon.maxHP}
@@ -1059,7 +3080,15 @@ export default function PokemonAdventure() {
                       }
                     }}
                   >
-                    <div className="text-2xl mb-1">{gameState.playerTeam[name].sprite}</div>
+                    <div className="mb-1 flex justify-center">
+                      <AnimatedSprite
+                        sprite={
+                          gameState.playerTeam[name].spriteSet?.front ||
+                          getPokemonSpriteSet(name, gameState.playerTeam[name].sprite, Boolean(gameState.playerTeam[name].isShiny)).front
+                        }
+                        size="sm"
+                      />
+                    </div>
                     <div className="text-white font-semibold text-sm">{name}</div>
                     <div className="text-red-400 text-xs">
                       ❤️ {gameState.playerTeam[name].HP}/{gameState.playerTeam[name].maxHP}
@@ -1071,88 +3100,405 @@ export default function PokemonAdventure() {
           )
 
         case "inventory":
+          const pokeballEntries = Object.entries(gameState.inventory).filter(
+            ([item, count]) => Boolean(pokeballs[item]) && Number(count) > 0,
+          )
+          const itemEntries = Object.entries(gameState.inventory).filter(
+            ([item, count]) => !pokeballs[item] && Number(count) > 0,
+          )
+          const hasPokeballs = pokeballEntries.length > 0
+          const hasItems = itemEntries.length > 0
+          const resolvedTab =
+            inventoryTab === "pokeballs"
+              ? hasPokeballs
+                ? "pokeballs"
+                : "items"
+              : hasItems
+                ? "items"
+                : "pokeballs"
+          const activeEntries = resolvedTab === "pokeballs" ? pokeballEntries : itemEntries
+
           return (
             <div className="space-y-3">
               <h3 className="text-white font-bold text-xl mb-4">Inventário:</h3>
-              {Object.entries(gameState.inventory).map(([item, count]) => (
-                <div key={item} className="flex justify-between items-center p-3 bg-white/10 rounded-lg">
-                  <span className="text-white">{item}</span>
-                  <div className="flex items-center gap-3">
-                    <Badge className="bg-blue-500">{count}x</Badge>
-                    {item === "Elixir" && count > 0 && (
-                      <Button
-                        onClick={useElixir}
-                        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
-                        size="sm"
-                      >
-                        Usar
-                      </Button>
-                    )}
+              {(hasPokeballs || hasItems) && (
+                <div className={`grid gap-2 ${hasPokeballs && hasItems ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {hasPokeballs && (
+                    <Button
+                      onClick={() => setInventoryTab("pokeballs")}
+                      className={`h-10 text-sm ${resolvedTab === "pokeballs" ? "bg-blue-600 hover:bg-blue-500" : "bg-slate-700/80 hover:bg-slate-600/80"}`}
+                    >
+                      Pokébolas
+                    </Button>
+                  )}
+                  {hasItems && (
+                    <Button
+                      onClick={() => setInventoryTab("items")}
+                      className={`h-10 text-sm ${resolvedTab === "items" ? "bg-blue-600 hover:bg-blue-500" : "bg-slate-700/80 hover:bg-slate-600/80"}`}
+                    >
+                      Itens
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2">
+                {activeEntries.length === 0 ? (
+                  <div className="rounded-lg bg-white/10 p-3 text-sm text-white/70">
+                    {hasPokeballs || hasItems ? "Sem itens no momento." : "Inventário vazio no momento."}
+                  </div>
+                ) : (
+                  activeEntries.map(([item, count]) => (
+                    <div key={item} className="flex justify-between items-center p-3 bg-white/10 rounded-lg">
+                      <span className="text-white">{item}</span>
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-blue-500">{count}x</Badge>
+                        {resolvedTab === "items" && item === "Elixir" && Number(count) > 0 && (
+                          <Button
+                            onClick={useElixir}
+                            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
+                            size="sm"
+                          >
+                            Usar
+                          </Button>
+                        )}
+                        {resolvedTab === "items" && item === "Cura Total" && Number(count) > 0 && (
+                          <Button
+                            onClick={useFullHeal}
+                            className="bg-gradient-to-r from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700"
+                            size="sm"
+                          >
+                            Usar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )
+
+        case "type-chart":
+          return (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-white font-bold text-xl">Tabela de Super Eficazes</h3>
+                <p className="mt-1 text-sm text-white/70">Consulta rápida com super eficazes, resistências e imunidades.</p>
+              </div>
+              <div className="grid max-h-[60vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                {Object.entries(typeChart)
+                  .sort(([typeA], [typeB]) => normalizeTypeText(typeA).localeCompare(normalizeTypeText(typeB)))
+                  .map(([attackType, matchups]) => {
+                    const normalizedType = normalizeTypeText(attackType)
+                    const gradient = typeColors[normalizedType] || "from-gray-500 to-gray-600"
+                    const superEffective = Object.entries(matchups)
+                      .filter(([, multiplier]) => multiplier > 1)
+                      .map(([defenderType]) => normalizeTypeText(defenderType))
+                    const resisted = Object.entries(matchups)
+                      .filter(([, multiplier]) => multiplier > 0 && multiplier < 1)
+                      .map(([defenderType]) => normalizeTypeText(defenderType))
+                    const immune = Object.entries(matchups)
+                      .filter(([, multiplier]) => multiplier === 0)
+                      .map(([defenderType]) => normalizeTypeText(defenderType))
+
+                    return (
+                      <div key={attackType} className="rounded-2xl border border-white/20 bg-white/10 p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Badge className={`bg-gradient-to-r ${gradient} border-0 px-3 py-1 text-white`}>
+                            {normalizedType}
+                          </Badge>
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">vantagens</span>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">2x</div>
+                            <div className="flex flex-wrap gap-2">
+                              {superEffective.length > 0 ? (
+                                superEffective.map((defenderType) => (
+                                  <span
+                                    key={`${attackType}-2x-${defenderType}`}
+                                    className="rounded-full border border-emerald-300/30 bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-white"
+                                  >
+                                    {defenderType}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-white/45">Nenhum</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-300">0.5x</div>
+                            <div className="flex flex-wrap gap-2">
+                              {resisted.length > 0 ? (
+                                resisted.map((defenderType) => (
+                                  <span
+                                    key={`${attackType}-05x-${defenderType}`}
+                                    className="rounded-full border border-amber-300/30 bg-amber-500/20 px-2 py-1 text-xs font-semibold text-white"
+                                  >
+                                    {defenderType}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-white/45">Nenhum</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1 text-[11px] font-black uppercase tracking-[0.18em] text-rose-300">0x</div>
+                            <div className="flex flex-wrap gap-2">
+                              {immune.length > 0 ? (
+                                immune.map((defenderType) => (
+                                  <span
+                                    key={`${attackType}-0x-${defenderType}`}
+                                    className="rounded-full border border-rose-300/30 bg-rose-500/20 px-2 py-1 text-xs font-semibold text-white"
+                                  >
+                                    {defenderType}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-white/45">Nenhum</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )
+
+        case "move-vendor":
+          if (!moveVendorOffer) return null
+
+          const vendorPokemon = gameState.playerTeam[moveVendorOffer.pokemonName]
+          if (!vendorPokemon) {
+            return (
+              <div className="text-center">
+                <p className="text-white">Oferta indisponível.</p>
+              </div>
+            )
+          }
+
+          return (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="font-bold text-white text-xl">🧑‍🏫 Vendedor de Técnicas</h3>
+                <p className="mt-1 text-sm text-yellow-200">Aparece raramente e vende um golpe para troca.</p>
+              </div>
+
+              <div className="rounded-xl border border-amber-300/40 bg-amber-500/15 p-4 text-white">
+                <div className="text-sm text-white/80">Pokémon alvo</div>
+                <div className="text-lg font-black">{moveVendorOffer.pokemonName}</div>
+                <div className="mt-1 text-sm">
+                  Golpe oferecido: <span className="font-bold">{normalizeDisplayText(moveVendorOffer.moveName)}</span>
+                </div>
+                <div className="text-sm">Poder: {moveVendorOffer.power[0]}-{moveVendorOffer.power[1]}</div>
+                <div className="text-sm">Nível mínimo: {moveVendorOffer.requiredLevel}</div>
+                <div className="mt-2 text-base font-black text-amber-200">💰 Preço: {moveVendorOffer.price} moedas</div>
+              </div>
+
+              {Object.keys(vendorPokemon.attacks).length >= 4 ? (
+                <div>
+                  <p className="mb-2 text-sm text-white/80">Escolhe qual ataque será trocado:</p>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {Object.entries(vendorPokemon.attacks).map(([attackName, [minPower, maxPower]]) => {
+                      const isSelected = moveVendorReplaceAttack === attackName
+
+                      return (
+                        <Button
+                          key={attackName}
+                          onClick={() => setMoveVendorReplaceAttack(attackName)}
+                          className={`h-14 text-sm ${
+                            isSelected
+                              ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                              : "bg-gradient-to-r from-slate-500 to-slate-600"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold">{isSelected ? "✓ " : ""}{normalizeDisplayText(attackName)}</div>
+                            <div className="text-xs opacity-80">{minPower}-{maxPower} dano</div>
+                          </div>
+                        </Button>
+                      )
+                    })}
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div className="rounded-xl border border-emerald-300/40 bg-emerald-500/15 p-3 text-sm text-emerald-100">
+                  ✅ {moveVendorOffer.pokemonName} tem espaço livre ({Object.keys(vendorPokemon.attacks).length}/4). O golpe será aprendido sem substituir outro.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button
+                  onClick={handleMoveVendorPurchase}
+                  disabled={
+                    (Object.keys(vendorPokemon.attacks).length >= 4 && !moveVendorReplaceAttack) ||
+                    gameState.money < moveVendorOffer.price
+                  }
+                  className="bg-gradient-to-r from-amber-500 to-orange-600"
+                >
+                  {Object.keys(vendorPokemon.attacks).length >= 4 ? "Comprar e trocar" : "Comprar e aprender"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    addLog("🫡 Negócio recusado. O vendedor foi embora.")
+                    setMoveVendorOffer(null)
+                    setMoveVendorReplaceAttack(null)
+                    setShowModal(null)
+                  }}
+                  className="bg-gradient-to-r from-slate-500 to-slate-600"
+                >
+                  Recusar
+                </Button>
+              </div>
             </div>
           )
 
         case "evolution-attacks":
           if (!gameState.activePokemon) return null
           const pokemonForEvolution = gameState.playerTeam[gameState.activePokemon]
-          const pendingAttacks = pokemonForEvolution.pendingAttacks || pokemonForEvolution.attacks
+          const pendingMove = pokemonForEvolution.pendingMove
+
+          if (!pendingMove) return null
 
           return (
-            <div>
-              <h3 className="font-bold text-white mb-4 text-center">🌟 Escolha 4 Ataques</h3>
-              <p className="text-white/80 text-center mb-4 text-sm">
-                Selecione os ataques que deseja manter (máximo 4)
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                {Object.entries(pendingAttacks).map(([attack, [min, max]]) => {
-                  const isSelected = selectedAttacks.includes(attack)
-                  return (
-                    <Button
-                      key={attack}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedAttacks(selectedAttacks.filter((a) => a !== attack))
-                        } else if (selectedAttacks.length < 4) {
-                          setSelectedAttacks([...selectedAttacks, attack])
-                        }
-                      }}
-                      className={`h-12 text-sm ${
-                        isSelected
-                          ? "bg-gradient-to-r from-green-500 to-emerald-500"
-                          : "bg-gradient-to-r from-gray-500 to-gray-600"
-                      }`}
-                    >
-                      <div>
-                        <div className="font-bold">
-                          {isSelected && "✓ "}
-                          {attack}
-                        </div>
-                        <div className="text-xs opacity-80">
-                          {min}-{max}
-                        </div>
-                      </div>
-                    </Button>
-                  )
-                })}
+            <div className="space-y-4">
+              <h3 className="font-bold text-white text-center text-xl">🌟 Novo Ataque Disponível</h3>
+              {recentEvolution && (
+                <div className="rounded-xl border border-yellow-300 bg-yellow-500/20 p-3 text-center text-sm font-semibold text-yellow-100">
+                  {recentEvolution.from} evoluiu para {recentEvolution.to}!
+                </div>
+              )}
+              <div
+                className="cursor-pointer rounded-xl border-2 border-cyan-300 bg-cyan-500/20 p-4 text-center text-white transition-all hover:bg-cyan-500/30"
+                onClick={() => {
+                  updatePokemon(gameState.activePokemon!, { pendingMove: undefined })
+                  setAttackToReplace(null)
+                  closeModal()
+                }}
+              >
+                <div className="text-xs uppercase tracking-[0.2em] text-cyan-200">Clique para manter os ataques atuais</div>
+                <div className="mt-1 text-lg font-black">{normalizeDisplayText(pendingMove.name)}</div>
+                <div className="text-sm text-cyan-100">
+                  {pendingMove.power[0]}-{pendingMove.power[1]} dano
+                </div>
               </div>
+
+              <div>
+                <p className="mb-3 text-center text-sm text-white/80">Escolhe qual ataque queres substituir.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Object.entries(pokemonForEvolution.attacks).map(([attack, [min, max]]) => {
+                    const isSelected = attackToReplace === attack
+                    return (
+                      <Button
+                        key={attack}
+                        onClick={() => setAttackToReplace(attack)}
+                        className={`h-14 text-sm ${
+                          isSelected
+                            ? "bg-gradient-to-r from-green-500 to-emerald-500"
+                            : "bg-gradient-to-r from-gray-500 to-gray-600"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold">{isSelected ? "✓ " : ""}{normalizeDisplayText(attack)}</div>
+                          <div className="text-xs opacity-80">{min}-{max} dano</div>
+                        </div>
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <Button
                 onClick={() => {
-                  if (selectedAttacks.length === 4) {
-                    const finalAttacks = Object.fromEntries(
-                      selectedAttacks.map((attack) => [attack, pendingAttacks[attack]]),
-                    )
-                    updatePokemon(gameState.activePokemon!, { attacks: finalAttacks, pendingAttacks: undefined })
-                    addLog(`✅ Ataques atualizados!`)
-                    setShowModal(null)
-                  }
+                  if (!attackToReplace) return
+
+                  const nextAttacks = Object.fromEntries(
+                    Object.entries(pokemonForEvolution.attacks).map(([attack, power]) =>
+                      attack === attackToReplace ? [pendingMove.name, pendingMove.power] : [attack, power],
+                    ),
+                  )
+
+                  updatePokemon(gameState.activePokemon!, {
+                    attacks: nextAttacks,
+                    attackPP: syncAttackPP(pokemonForEvolution.attackPP, nextAttacks),
+                    pendingMove: undefined,
+                  })
+                  closeModal()
                 }}
-                disabled={selectedAttacks.length !== 4}
+                disabled={!attackToReplace}
                 className="w-full bg-gradient-to-r from-blue-500 to-blue-600"
               >
-                Confirmar ({selectedAttacks.length}/4)
+                Substituir {attackToReplace ? normalizeDisplayText(attackToReplace) : "um ataque"}
               </Button>
+            </div>
+          )
+
+        case "evolution":
+          if (!recentEvolution) return null
+
+          return (
+            <div className="space-y-4 text-center">
+              <div className="text-5xl">✨</div>
+              <h3 className="font-bold text-white text-2xl">Evolução!</h3>
+              <p className="text-white/80">{recentEvolution.from} evoluiu para {recentEvolution.to}.</p>
+              <div className="mx-auto flex w-full max-w-md items-center justify-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4">
+                <div className="text-center">
+                  <AnimatedSprite
+                    sprite={getPokemonSpriteUrl(
+                      recentEvolution.from,
+                      undefined,
+                      "front",
+                      Boolean(gameState.playerTeam[recentEvolution.to]?.isShiny),
+                    )}
+                    size="sm"
+                  />
+                  <div className="mt-2 text-sm font-semibold text-white/80">{recentEvolution.from}</div>
+                </div>
+                <div className="text-2xl text-yellow-300">→</div>
+                <div className="text-center">
+                  <AnimatedSprite
+                    sprite={
+                      gameState.playerTeam[recentEvolution.to]?.spriteSet?.front ||
+                      getPokemonSpriteSet(
+                        recentEvolution.to,
+                        gameState.playerTeam[recentEvolution.to]?.sprite || "",
+                        Boolean(gameState.playerTeam[recentEvolution.to]?.isShiny),
+                      ).front
+                    }
+                    size="sm"
+                  />
+                  <div className="mt-2 text-sm font-semibold text-white">{recentEvolution.to}</div>
+                </div>
+              </div>
+            </div>
+          )
+
+        case "destination":
+          return (
+            <div className="space-y-5 text-center">
+              <div className="text-5xl">🧭</div>
+              <h3 className="font-bold text-white text-2xl">Escolhe o próximo destino</h3>
+              <p className="text-white/80">Após 10 ondas, escolhe para onde a jornada continua.</p>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Button
+                  onClick={() => chooseDestination("caverna")}
+                  className="h-14 bg-gradient-to-r from-slate-700 to-slate-800 text-sm"
+                >
+                  ⛰️ Entrar na Caverna
+                </Button>
+                <Button
+                  onClick={() => chooseDestination("floresta")}
+                  className="h-14 bg-gradient-to-r from-emerald-600 to-green-700 text-sm"
+                >
+                  🌲 Seguir para a Floresta
+                </Button>
+              </div>
             </div>
           )
 
@@ -1162,18 +3508,16 @@ export default function PokemonAdventure() {
     }
 
     return (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto p-6 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isAttackModal ? "bg-black/35 backdrop-blur-[1px]" : "bg-black/70 backdrop-blur-sm"}`}>
+        <div className={`w-full max-w-6xl max-h-[90vh] overflow-y-auto border-4 border-slate-800 p-6 shadow-[10px_10px_0_rgba(15,23,42,0.9)] ${isAttackModal ? "bg-[linear-gradient(180deg,rgba(15,39,66,0.82)_0%,rgba(15,39,66,0.82)_14%,rgba(25,57,91,0.82)_14%,rgba(25,57,91,0.82)_100%),repeating-linear-gradient(0deg,rgba(255,255,255,0.05)_0_2px,transparent_2px_8px)]" : "bg-[linear-gradient(180deg,#0f2742_0%,#0f2742_14%,#19395b_14%,#19395b_100%),repeating-linear-gradient(0deg,rgba(255,255,255,0.05)_0_2px,transparent_2px_8px)]"}`}>
           {modalContent()}
           <div className="mt-4 text-center">
-            {showModal !== "select-continue" &&
-              showModal !== "select-slot" &&
-              !(
+            {!(
                 showModal === "switch" &&
                 gameState.activePokemon &&
                 gameState.playerTeam[gameState.activePokemon].HP <= 0
-              ) && (
-                <Button onClick={() => setShowModal(null)} className="bg-gradient-to-r from-gray-600 to-gray-700">
+              ) && showModal !== "move-vendor" && showModal !== "capture-success" && showModal !== "destination" && (
+                <Button onClick={closeModal} className="pixel-menu-button bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs">
                   ❌ Fechar
                 </Button>
               )}
@@ -1207,23 +3551,93 @@ export default function PokemonAdventure() {
     initializePPForAllPokemon()
   }, [initializePPForAllPokemon])
 
-  if (isLoading) {
+  if (isLoading || isAuthChecking) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white flex items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="min-h-dvh flex items-center justify-center p-4">
+        <div className="pixel-surface bg-[#f8f4dc] px-10 py-8 text-center space-y-4">
           <div className="text-6xl animate-bounce">⚡</div>
-          <h2 className="text-2xl font-bold">Carregando jogo...</h2>
+          <h2 className="font-pixel text-sm leading-relaxed text-slate-900 sm:text-lg">Carregando Jogo...</h2>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4 text-white">
-      <div className="max-w-4xl mx-auto">
-        {gameState.activePokemon && currentScreen !== "main-menu" && statusBar}
+    <div className="min-h-dvh p-3 text-slate-900 md:p-4">
+      <AnimatePresence>
+        {captureThrowAnimation && (
+          <motion.div
+            key={`capture-throw-overlay-${captureThrowAnimation.throwId}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="pointer-events-none fixed inset-0 z-[120] bg-black/70"
+          >
+            <div className="relative h-full w-full overflow-hidden">
+              <motion.div
+                key={`capture-throw-label-${captureThrowAnimation.throwId}`}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18 }}
+                className="absolute left-1/2 top-14 -translate-x-1/2 rounded-xl border-4 border-slate-800 bg-[#f8f4dc] px-4 py-2 font-pixel text-[11px] text-slate-900 shadow-[8px_8px_0_rgba(15,23,42,0.7)]"
+              >
+                Lançaste {captureThrowAnimation.ballType}!
+              </motion.div>
 
-        <div className={`transition-all duration-500 ${isAnimating ? "opacity-50" : "opacity-100"}`}>
+              <motion.div
+                key={`capture-throw-ball-${captureThrowAnimation.throwId}`}
+                initial={{ x: "-18vw", y: "30vh", rotate: 0, scale: 0.9 }}
+                animate={{
+                  x: ["-18vw", "0vw", "24vw"],
+                  y: ["30vh", "8vh", "2vh"],
+                  rotate: [0, 280, 680],
+                  scale: [0.9, 1.05, 0.92],
+                }}
+                transition={{ duration: 0.82, ease: "easeInOut" }}
+                className="absolute left-1/2 top-1/2"
+              >
+                <div className="relative h-14 w-14">
+                  <div
+                    className={`absolute inset-0 rounded-full border-4 border-slate-900 bg-gradient-to-r ${pokeballs[captureThrowAnimation.ballType]?.color || "from-rose-500 to-red-600"}`}
+                  />
+                  <div className="absolute left-[2px] right-[2px] top-1/2 h-[22px] -translate-y-[2px] rounded-b-full bg-white" />
+                  <div className="absolute left-0 right-0 top-1/2 h-[4px] -translate-y-1/2 bg-slate-900" />
+                  <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white" />
+                </div>
+              </motion.div>
+
+              <motion.div
+                key={`capture-throw-impact-${captureThrowAnimation.throwId}`}
+                initial={{ opacity: 0, scale: 0.2 }}
+                animate={{ opacity: [0, 0.85, 0], scale: [0.2, 1.25, 1.9] }}
+                transition={{ duration: 0.42, delay: 0.66, ease: "easeOut" }}
+                className="absolute right-[17vw] top-[34vh] h-16 w-16 rounded-full border-4 border-white/90 bg-white/30"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {defeatAnimationVisible && (
+        <div className="pointer-events-none fixed inset-0 z-[85] bg-black/95 animate-pulse">
+          <div className="flex h-full items-end justify-center pb-8 sm:items-center sm:pb-0">
+            <div className="w-[min(92vw,42rem)] border-4 border-slate-900 bg-[#f8f4dc] p-4 shadow-[8px_8px_0_rgba(0,0,0,0.85)]">
+              <p className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">...</p>
+              <p className="mt-2 font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">Tu desmaiaste! Toda a tua equipa caiu.</p>
+              <p className="mt-2 font-pixel text-xs leading-relaxed text-slate-700 sm:text-sm">Voltando ao menu principal...</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {screenNotice && !defeatAnimationVisible && (
+        <div className="pointer-events-none fixed left-1/2 top-4 z-[70] w-[min(92vw,50rem)] -translate-x-1/2">
+          <div className="rounded-2xl border-4 border-slate-800 bg-[linear-gradient(180deg,#fef3c7_0%,#fde68a_45%,#f59e0b_45%,#f59e0b_100%)] px-4 py-3 text-center text-sm font-black text-slate-900 shadow-[8px_8px_0_rgba(15,23,42,0.85)] sm:text-base">
+            {screenNotice}
+          </div>
+        </div>
+      )}
+      <div className="max-w-5xl mx-auto">
+        <div className={`transition-all duration-500 ${isAnimating ? "opacity-50" : "opacity-100"} ${currentScreen === "battle" ? "h-[calc(100dvh-1.5rem)] overflow-hidden" : ""}`}>
           {currentScreen === "main-menu" && renderMainMenu()}
           {currentScreen === "select-slot" && renderSelectSlotScreen()}
           {currentScreen === "select-continue" && renderSelectContinueScreen()}
@@ -1233,15 +3647,7 @@ export default function PokemonAdventure() {
           {currentScreen === "game" && renderGameMenu()} {/* Added route for 'game' */}
         </div>
 
-        {battleLogComponent}
-
-        {showModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-purple-800 to-blue-800 p-6 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto border-4 border-white/20">
-              {renderModal()}
-            </div>
-          </div>
-        )}
+        {showModal && renderModal()}
       </div>
     </div>
   )

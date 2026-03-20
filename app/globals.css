@@ -62,6 +62,9 @@
 }
 
 @theme inline {
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono-ui);
+  --font-pixel: var(--font-pixel-ui);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -101,14 +104,110 @@
 }
 
 @layer base {
+  html,
+  body,
+  #__next {
+    min-height: 100dvh;
+  }
+
   body {
-    background: radial-gradient(circle at top, #1a1a2e 0%, #0f0f1a 100%);
-    color: white;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0 8px, rgba(255,255,255,0.03) 8px 16px) 0 0 / 100% 42%,
+      repeating-linear-gradient(0deg, rgba(59,130,246,0.12) 0 8px, transparent 8px 16px) 0 0 / 100% 42%,
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.09) 0 10px, rgba(255,255,255,0) 10px 20px) 0 100% / 100% 58%,
+      repeating-linear-gradient(0deg, rgba(34,197,94,0.09) 0 10px, rgba(0,0,0,0) 10px 20px) 0 100% / 100% 58%,
+      linear-gradient(180deg, #8fcbff 0%, #8fcbff 18%, #aedeff 18%, #aedeff 32%, #d6efff 32%, #d6efff 42%, #dcefb2 42%, #dcefb2 54%, #9ae06e 54%, #9ae06e 70%, #74c952 70%, #74c952 84%, #58a63e 84%, #58a63e 100%);
+    color: #16334d;
     min-height: 100vh;
+    font-family: var(--font-ui), "Noto Sans", "Segoe UI", sans-serif;
+    text-rendering: geometricPrecision;
+    background-attachment: fixed;
+    image-rendering: pixelated;
+  }
+
+  * {
+    image-rendering: pixelated;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-pixel {
+    font-family: var(--font-pixel), var(--font-mono-ui), monospace;
+    letter-spacing: 0.08em;
   }
 }
 
 @layer utilities {
+  .pixel-text {
+    font-family: var(--font-pixel), var(--font-mono-ui), monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pixel-window {
+    border: 4px solid #1e293b;
+    border-radius: 22px;
+    box-shadow: 8px 8px 0 #0f172a;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.34), rgba(255,255,255,0.12)),
+      repeating-linear-gradient(0deg, rgba(30,64,175,0.05) 0 4px, transparent 4px 12px),
+      repeating-linear-gradient(90deg, rgba(22,101,52,0.04) 0 4px, transparent 4px 12px),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 6px, transparent 6px 12px),
+      #f8f4dc;
+  }
+
+  .pixel-band {
+    border: 4px solid #1e293b;
+    border-radius: 18px;
+    box-shadow: 4px 4px 0 rgba(15, 23, 42, 0.22);
+    background-size: 24px 24px, 12px 12px;
+    background-blend-mode: normal, multiply;
+  }
+
+  .pixel-badge {
+    border: 3px solid #1e293b;
+    border-radius: 999px;
+    box-shadow: 3px 3px 0 rgba(15, 23, 42, 0.18);
+    font-family: var(--font-pixel), var(--font-mono-ui), monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .pixel-menu-button {
+    border: 4px solid #1e293b;
+    border-radius: 20px;
+    box-shadow: 6px 6px 0 rgba(15, 23, 42, 0.92);
+    background-size: 100% 100%, 16px 16px, 10px 10px;
+    background-blend-mode: normal, multiply;
+    font-family: var(--font-pixel), var(--font-mono-ui), monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pixel-surface {
+    border: 4px solid #1e293b;
+    border-radius: 22px;
+    box-shadow: 8px 8px 0 #0f172a;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.1)),
+      repeating-linear-gradient(0deg, rgba(30,64,175,0.05) 0 4px, transparent 4px 12px),
+      repeating-linear-gradient(90deg, rgba(22,101,52,0.04) 0 4px, transparent 4px 12px),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 6px, transparent 6px 12px);
+  }
+
+  .pixel-inset {
+    box-shadow:
+      inset -4px -4px 0 rgba(15, 23, 42, 0.16),
+      inset 4px 4px 0 rgba(255, 255, 255, 0.24);
+  }
+
+  .pixel-panel {
+    border: 4px solid #1e293b;
+    border-radius: 22px;
+    box-shadow: 8px 8px 0 rgba(15, 23, 42, 0.4);
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.5s ease-in-out;
   }
@@ -125,6 +224,46 @@
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
   }
+
+  .battle-arena-shake {
+    animation: battleArenaShake 0.34s ease-in-out;
+  }
+
+  .battle-attack-banner {
+    animation: battleAttackBanner 0.95s ease-out forwards;
+  }
+
+  .battle-attack-flash {
+    animation: battleAttackFlash 0.82s ease-out forwards;
+  }
+
+  .battle-attack-projectile-player {
+    animation: battleProjectilePlayer 0.72s ease-out forwards;
+  }
+
+  .battle-attack-projectile-enemy {
+    animation: battleProjectileEnemy 0.72s ease-out forwards;
+  }
+
+  .battle-impact-player {
+    animation: battleImpactPlayer 0.56s ease-out forwards;
+  }
+
+  .battle-impact-enemy {
+    animation: battleImpactEnemy 0.56s ease-out forwards;
+  }
+
+  .battle-sprite-attack-player {
+    animation: battleSpriteAttackPlayer 0.56s ease-in-out;
+  }
+
+  .battle-sprite-attack-enemy {
+    animation: battleSpriteAttackEnemy 0.56s ease-in-out;
+  }
+
+  .battle-sprite-hit {
+    animation: battleSpriteHit 0.56s ease-in-out;
+  }
 }
 
 @keyframes fadeIn {
@@ -136,4 +275,75 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes battleArenaShake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes battleAttackBanner {
+  0% { opacity: 0; transform: translate(-50%, -14px) scale(0.96); }
+  20% { opacity: 1; transform: translate(-50%, 0) scale(1.03); }
+  75% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+}
+
+@keyframes battleAttackFlash {
+  0% { opacity: 0; }
+  20% { opacity: 0.34; }
+  55% { opacity: 0.12; }
+  100% { opacity: 0; }
+}
+
+@keyframes battleProjectilePlayer {
+  0% { opacity: 0; transform: translate(-220px, 26px) scaleX(0.2); }
+  20% { opacity: 1; transform: translate(-70px, 6px) scaleX(1); }
+  75% { opacity: 0.95; transform: translate(180px, -8px) scaleX(1.15); }
+  100% { opacity: 0; transform: translate(310px, -16px) scaleX(0.9); }
+}
+
+@keyframes battleProjectileEnemy {
+  0% { opacity: 0; transform: translate(220px, -26px) scaleX(0.2); }
+  20% { opacity: 1; transform: translate(70px, -6px) scaleX(1); }
+  75% { opacity: 0.95; transform: translate(-180px, 8px) scaleX(1.15); }
+  100% { opacity: 0; transform: translate(-310px, 16px) scaleX(0.9); }
+}
+
+@keyframes battleImpactPlayer {
+  0% { opacity: 0; transform: scale(0.4); }
+  30% { opacity: 0.95; transform: scale(1.35); }
+  70% { opacity: 0.28; transform: scale(1.9); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes battleImpactEnemy {
+  0% { opacity: 0; transform: scale(0.4); }
+  30% { opacity: 0.95; transform: scale(1.35); }
+  70% { opacity: 0.28; transform: scale(1.9); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes battleSpriteAttackPlayer {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); }
+  35% { transform: translateX(46px) translateY(-10px) rotate(-7deg); }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); }
+}
+
+@keyframes battleSpriteAttackEnemy {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); }
+  35% { transform: translateX(-46px) translateY(-10px) rotate(7deg); }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); }
+}
+
+@keyframes battleSpriteHit {
+  0% { transform: translateX(0) scale(1); filter: brightness(1); }
+  18% { transform: translateX(-10px) scale(1.07); filter: brightness(2); }
+  40% { transform: translateX(10px) scale(0.96); filter: brightness(0.92); }
+  65% { transform: translateX(-6px) scale(1.02); filter: brightness(1.25); }
+  100% { transform: translateX(0) scale(1); filter: brightness(1); }
 }

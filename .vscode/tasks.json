@@ -1,0 +1,206 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "repair-pokemon-data",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".tmp-fix-pokemon-data.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "repair-pokemon-data-2",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".tmp-fix-pokemon-data.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "repair-pokemon-data-3",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".tmp-fix-pokemon-data.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "run-site",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"next",
+				"dev",
+				"-p",
+				"3001",
+				"-H",
+				"0.0.0.0"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "clean-next-cache",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"if (Test-Path .next) { Remove-Item -Recurse -Force .next }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "next-build-check",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"next",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "free-port-3001",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$conns = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "run-site-clean-3002",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"if (Test-Path .next) { Remove-Item -Recurse -Force .next }; npx next dev -p 3002 -H 0.0.0.0"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "check-port-3002",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$c = Get-NetTCPConnection -LocalPort 3002 -State Listen -ErrorAction SilentlyContinue; if ($c) { Write-Output \"LISTENING\" } else { Write-Output \"NOT_LISTENING\" }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "run-site-3002",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"exec",
+				"next",
+				"dev",
+				"-p",
+				"3002",
+				"-H",
+				"0.0.0.0"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "check-http-3002",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"try { $r = Invoke-WebRequest -Uri http://localhost:3002 -UseBasicParsing; Write-Output \"STATUS:$($r.StatusCode)\" } catch { if ($_.Exception.Response) { Write-Output \"STATUS:$([int]$_.Exception.Response.StatusCode)\" } else { Write-Output \"REQUEST_FAILED\" } }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-tcp-3002",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$ok = Test-NetConnection -ComputerName localhost -Port 3002 -InformationLevel Quiet; if ($ok) { Write-Output \"TCP_OK\" } else { Write-Output \"TCP_FAIL\" }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "restart-site-clean-3001",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$conns = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} }; if (Test-Path .next) { Remove-Item -Recurse -Force .next }; npx next dev -p 3001 -H 0.0.0.0"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "reinstall-deps",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"install",
+				"--frozen-lockfile"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "diagnose-build-error",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"next",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "tsc-check-after-app-error-fix",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"exec",
+				"tsc",
+				"--noEmit"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-build-now",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "build-debug-trace",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"next",
+				"build",
+				"--debug"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

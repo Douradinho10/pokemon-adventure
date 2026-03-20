@@ -1,6 +1,14 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import type { PokemonSpriteSet } from "../lib/utils"
+
+export type StatusCondition = "poisoned" | "burned" | "paralyzed" | "asleep" | "frozen" | "confused"
+
+export interface PendingMove {
+  name: string
+  power: [number, number]
+}
 
 export interface Pokemon {
   HP: number
@@ -10,24 +18,39 @@ export interface Pokemon {
   level: number
   xp: number
   sprite: string
+  spriteSet?: PokemonSpriteSet
   type?: string
   pendingAttacks?: Record<string, [number, number]>
+  pendingMove?: PendingMove
   speed?: number
+  statusCondition?: StatusCondition | null
+  statusTurns?: number
+  statusWavesRemaining?: number
+  isShiny?: boolean
 }
 
 export interface Battle {
   enemyName: string
   enemyType: string
+  enemyDisplayName?: string
+  enemyDisplayType?: string
+  enemyIsDisguised?: boolean
+  enemyIsShiny?: boolean
   enemyHP: number
   enemyMaxHP: number
   enemyLevel: number
   enemyAttacks: Record<string, [number, number]>
   enemySpeed?: number
+  enemySprite?: string
+  playerSprite?: string
+  enemyStatusCondition?: StatusCondition | null
+  enemyStatusTurns?: number
 }
 
 export interface GameState {
   playerTeam: Record<string, Pokemon>
   activePokemon: string | null
+  currentEnvironment: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas"
   money: number
   battles: number
   inventory: Record<string, number>
@@ -39,9 +62,10 @@ export const useGameState = () => {
   const [gameState, setGameState] = useState<GameState>({
     playerTeam: {},
     activePokemon: null,
+    currentEnvironment: "planicie",
     money: 50,
     battles: 0,
-    inventory: { Pokébola: 5 },
+    inventory: { Pokébola: 5, "Scanner Tático": 3 },
     capturedPokemon: [],
     currentBattle: null,
   })

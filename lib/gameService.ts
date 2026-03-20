@@ -1,5 +1,5 @@
 import { getFirebaseDb, isFirebaseReady, getFirebaseError } from "./firebase"
-import { ref, set, get, remove, push } from "firebase/database"
+import { ref, set, get, remove, push, update } from "firebase/database"
 import type { GameState } from "../hooks/useGameState"
 
 export interface GameSave {
@@ -108,16 +108,12 @@ export async function updateGameRun(runId: string, userId: string, gameState: Ga
   try {
     const db = getDb()
     const runRef = ref(db, `gameRuns/${userId}/${runId}`)
-    await set(
-      runRef,
-      {
-        totalBattles: gameState.battles,
-        totalMoney: gameState.money,
-        pokemonCaught: gameState.capturedPokemon.length,
-        finalTeam: gameState.playerTeam,
-      },
-      { merge: true },
-    )
+    await update(runRef, {
+      totalBattles: gameState.battles,
+      totalMoney: gameState.money,
+      pokemonCaught: gameState.capturedPokemon.length,
+      finalTeam: gameState.playerTeam,
+    })
     console.log("[v0] Game run updated")
   } catch (error) {
     console.error("[v0] Error updating game run:", error)
@@ -129,18 +125,14 @@ export async function endGameRun(runId: string, userId: string, gameState: GameS
   try {
     const db = getDb()
     const runRef = ref(db, `gameRuns/${userId}/${runId}`)
-    await set(
-      runRef,
-      {
-        endedAt: Date.now(),
-        totalBattles: gameState.battles,
-        totalMoney: gameState.money,
-        pokemonCaught: gameState.capturedPokemon.length,
-        finalTeam: gameState.playerTeam,
-        isActive: false,
-      },
-      { merge: true },
-    )
+    await update(runRef, {
+      endedAt: Date.now(),
+      totalBattles: gameState.battles,
+      totalMoney: gameState.money,
+      pokemonCaught: gameState.capturedPokemon.length,
+      finalTeam: gameState.playerTeam,
+      isActive: false,
+    })
     console.log("[v0] Game run ended")
   } catch (error) {
     console.error("[v0] Error ending game run:", error)
