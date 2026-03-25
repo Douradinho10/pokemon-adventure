@@ -109,11 +109,11 @@ const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
 const BOSS_WAVE_INTERVAL = 10
 const BOSS_MULTIPLIER = 1.5
-const XP_GAIN_MULTIPLIER = 3.4
-const BOSS_XP_MULTIPLIER = 1.75
+const XP_GAIN_MULTIPLIER = 1.8
+const BOSS_XP_MULTIPLIER = 1.35
 const EARLY_GAME_TARGET_ROUND = 10
 const EARLY_GAME_TARGET_LEVEL = 10
-const FULL_RUN_XP_MULTIPLIER = 2.1
+const FULL_RUN_XP_MULTIPLIER = 1.4
 const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
   comum: 24,
   raro: 42,
@@ -1716,7 +1716,7 @@ export default function PokemonAdventure() {
         let leveledMaxHP = teamPokemon.maxHP
         let leveledHP = teamPokemon.HP
 
-        while (leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
+        while (leveledLevel < waveLevelCap && leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
           const requiredXp = getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)
           leveledXp -= requiredXp
           leveledLevel += 1
@@ -1745,7 +1745,7 @@ export default function PokemonAdventure() {
     let leveledMaxHP = pokemon.maxHP
     let leveledHP = pokemon.HP
 
-    while (leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
+    while (leveledLevel < waveLevelCap && leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
       const requiredXp = getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)
       leveledXp -= requiredXp
       leveledLevel += 1
@@ -1764,14 +1764,6 @@ export default function PokemonAdventure() {
     const learnedMove = getLevelUpMoveForPokemon(activePokemonName, pokemon.type, finalLevel, Object.keys(finalScaledAttacks))
     const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
-
-    // Enforce wave level cap: don't allow player to level above the current wave cap.
-    const cappedLevel = Math.min(finalLevel, waveLevelCap)
-    if (cappedLevel !== finalLevel) {
-      finalLevel = cappedLevel
-      // Make sure XP doesn't show as already enough for another level beyond the cap
-      leveledXp = Math.min(leveledXp, getXpNeededForNextLevelByWaveCap(finalLevel, waveLevelCap) - 1)
-    }
 
     if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
       const evolvedName = evolution.evolvesTo
