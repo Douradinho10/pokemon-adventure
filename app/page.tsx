@@ -180,7 +180,15 @@ const getScaledEnemyLevel = (battleCount: number, random: (min: number, max: num
   const minLevel = Math.min(previousWaveCap, currentWaveCap)
   const maxLevel = Math.max(previousWaveCap, currentWaveCap)
 
-  return random(minLevel, maxLevel)
+  // Smooth progression: interpolate linearly between previous and current cap
+  const waveIndexInTier = ((nextWave - 1) % 10) + 1 // 1..10
+  const ratio = waveIndexInTier / 10
+  const interpolated = Math.round(previousWaveCap + (currentWaveCap - previousWaveCap) * ratio)
+
+  // Small jitter for variety but keep levels monotonic and clamped
+  const jitter = random(-1, 1)
+  const candidate = Math.round(interpolated + jitter)
+  return clamp(candidate, minLevel, maxLevel)
 }
 
 const scaleDamageRange = (range: [number, number], multiplier: number): [number, number] => {
@@ -1855,7 +1863,7 @@ export default function PokemonAdventure() {
         setShowModal("evolution")
       }
     } else {
-      const upgradedAttacks = learnedMove
+      const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
         ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
         : finalScaledAttacks
 
@@ -2909,7 +2917,7 @@ export default function PokemonAdventure() {
                       scale: [0.9, 1.04, 0.92],
                     }}
                     transition={{ duration: 1.05, ease: "easeInOut" }}
-                    className="absolute left-1/2 top-1/2"
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
                   >
                     <div className="relative h-16 w-16">
                       <div
@@ -3710,18 +3718,18 @@ export default function PokemonAdventure() {
                 Lançaste {captureThrowAnimation.ballType}!
               </motion.div>
 
-              <motion.div
-                key={`capture-throw-ball-${captureThrowAnimation.throwId}`}
-                initial={{ x: "-18vw", y: "30vh", rotate: 0, scale: 0.9 }}
-                animate={{
-                  x: ["-18vw", "0vw", "24vw"],
-                  y: ["30vh", "8vh", "2vh"],
-                  rotate: [0, 280, 680],
-                  scale: [0.9, 1.05, 0.92],
-                }}
-                transition={{ duration: 0.82, ease: "easeInOut" }}
-                className="absolute left-1/2 top-1/2"
-              >
+                <motion.div
+                  key={`capture-throw-ball-${captureThrowAnimation.throwId}`}
+                  initial={{ x: "-18vw", y: "30vh", rotate: 0, scale: 0.9 }}
+                  animate={{
+                    x: ["-18vw", "0vw", "24vw"],
+                    y: ["30vh", "8vh", "2vh"],
+                    rotate: [0, 280, 680],
+                    scale: [0.9, 1.05, 0.92],
+                  }}
+                  transition={{ duration: 0.82, ease: "easeInOut" }}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                >
                 <div className="relative h-14 w-14">
                   <div
                     className={`absolute inset-0 rounded-full border-4 border-slate-900 bg-gradient-to-r ${pokeballs[captureThrowAnimation.ballType]?.color || "from-rose-500 to-red-600"}`}
