@@ -1690,7 +1690,7 @@ export default function PokemonAdventure() {
     const isEarlyGame = gameState.battles <= EARLY_GAME_TARGET_ROUND && pokemon.level < EARLY_GAME_TARGET_LEVEL
     const earlyGameMultiplier = isEarlyGame ? 1.2 : 1
     const fullRunMultiplier = FULL_RUN_XP_MULTIPLIER
-    const xpGain = Math.max(
+    let xpGain = Math.max(
       1,
       Math.floor(
         ((baseYield * enemyLevel) / 5) *
@@ -1702,6 +1702,33 @@ export default function PokemonAdventure() {
           earlyGameMultiplier,
       ),
     )
+
+    // Compute remaining battles until the next 10-wave cap and the total XP
+    // required for the active Pokémon to reach the cap. Adjust xpGain so
+    // progression is roughly distributed across the remaining battles.
+    try {
+      const currentBattle = Math.max(1, gameState.battles)
+      const currentTier = Math.floor((currentBattle - 1) / 10)
+      const targetCapWave = (currentTier + 1) * 10
+      const remainingBattles = Math.max(1, targetCapWave - currentBattle)
+      const targetCapLevel = getWaveLevelCap(targetCapWave)
+
+      if (pokemon.level < targetCapLevel) {
+        let xpRemainingToCap = 0
+        for (let lvl = pokemon.level; lvl < targetCapLevel; lvl++) {
+          xpRemainingToCap += getXpNeededForNextLevelByWaveCap(lvl, targetCapLevel)
+        }
+
+        const perBattleTarget = xpRemainingToCap / remainingBattles
+        // Blend the computed xpGain with the per-battle target so changes are gradual.
+        const blended = Math.round(0.65 * perBattleTarget + 0.35 * xpGain)
+        // Prevent huge spikes: cap to 1.5x the perBattleTarget
+        const capGain = Math.max(1, Math.min(blended, Math.ceil(perBattleTarget * 1.5)))
+        xpGain = capGain
+      }
+    } catch (e) {
+      // If anything goes wrong with the dynamic adjustment, fall back to computed xpGain
+    }
     const waveLevelCap = getWaveLevelCap(gameState.battles)
     let newXP = pokemon.xp + xpGain
 
