@@ -109,11 +109,12 @@ const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
 const BOSS_WAVE_INTERVAL = 10
 const BOSS_MULTIPLIER = 1.5
-const XP_GAIN_MULTIPLIER = 1.8
-const BOSS_XP_MULTIPLIER = 1.35
+// Lower base XP multiplier to reduce XP per battle significantly
+const XP_GAIN_MULTIPLIER = 0.6
+const BOSS_XP_MULTIPLIER = 1.25
 const EARLY_GAME_TARGET_ROUND = 10
 const EARLY_GAME_TARGET_LEVEL = 10
-const FULL_RUN_XP_MULTIPLIER = 1.4
+const FULL_RUN_XP_MULTIPLIER = 1.0
 const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
   comum: 24,
   raro: 42,
@@ -1681,11 +1682,13 @@ export default function PokemonAdventure() {
       : "comum"
     const baseYield = CLASSIC_BASE_XP_YIELD[enemyRarity] || CLASSIC_BASE_XP_YIELD.comum
     const levelDelta = enemyLevel - pokemon.level
-    const levelDeltaMultiplier = clamp(1 + levelDelta * 0.08, 0.9, 1.9)
-    const waveProgressMultiplier = 1 + Math.min(0.9, gameState.battles * 0.015)
+    // Reduce influence of level difference on XP (smaller step and tighter clamp)
+    const levelDeltaMultiplier = clamp(1 + levelDelta * 0.04, 0.95, 1.5)
+    // Reduce wave progress contribution so XP doesn't escalate quickly with waves
+    const waveProgressMultiplier = 1 + Math.min(0.2, gameState.battles * 0.005)
     const bossMultiplier = gameState.currentBattle?.enemyIsBoss ? BOSS_XP_MULTIPLIER : 1
     const isEarlyGame = gameState.battles <= EARLY_GAME_TARGET_ROUND && pokemon.level < EARLY_GAME_TARGET_LEVEL
-    const earlyGameMultiplier = isEarlyGame ? 2.4 : 1
+    const earlyGameMultiplier = isEarlyGame ? 1.2 : 1
     const fullRunMultiplier = FULL_RUN_XP_MULTIPLIER
     const xpGain = Math.max(
       1,
