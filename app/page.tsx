@@ -109,8 +109,11 @@ const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
 const BOSS_WAVE_INTERVAL = 10
 const BOSS_MULTIPLIER = 1.5
-const XP_GAIN_MULTIPLIER = 1.8
-const BOSS_XP_MULTIPLIER = 1.35
+const XP_GAIN_MULTIPLIER = 3.4
+const BOSS_XP_MULTIPLIER = 1.75
+const EARLY_GAME_TARGET_ROUND = 10
+const EARLY_GAME_TARGET_LEVEL = 10
+const FULL_RUN_XP_MULTIPLIER = 2.1
 const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
   comum: 24,
   raro: 42,
@@ -168,11 +171,13 @@ const getStabMultiplier = (attackType: string, pokemonType?: string) => {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
-const getScaledEnemyLevel = (playerLevel: number, battleCount: number, random: (min: number, max: number) => number) => {
-  const progressBonus = Math.floor(battleCount / 20)
-  const baselineLevel = Math.max(3, Math.round(playerLevel * 0.95 + progressBonus))
-  const minLevel = Math.max(1, baselineLevel - 2)
-  const maxLevel = Math.max(minLevel, Math.min(playerLevel + 6, baselineLevel + 2))
+const getScaledEnemyLevel = (battleCount: number, random: (min: number, max: number) => number) => {
+  const nextWave = Math.max(1, battleCount + 1)
+  const currentTier = Math.floor((nextWave - 1) / 10)
+  const currentWaveCap = getWaveLevelCap(nextWave)
+  const previousWaveCap = currentTier <= 0 ? 1 : getWaveLevelCap(currentTier * 10)
+  const minLevel = Math.min(previousWaveCap, currentWaveCap)
+  const maxLevel = Math.max(previousWaveCap, currentWaveCap)
 
   return random(minLevel, maxLevel)
 }
@@ -725,7 +730,7 @@ export default function PokemonAdventure() {
       const nextWave = gameState.battles + 1
       const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
       const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment)
-      const enemyLevel = getScaledEnemyLevel(activePokemonLevel, gameState.battles, random)
+      const enemyLevel = getScaledEnemyLevel(gameState.battles, random)
 
       let enemyName = baseEnemyName
       for (let i = 0; i < 4; i++) {
@@ -867,14 +872,8 @@ export default function PokemonAdventure() {
       addLog(`✨ PP de todos os ataques restaurado! (10 batalhas completadas)`)
     }
 
-    const shouldChooseDestination = gameState.battles > 0 && gameState.battles % 10 === 0
-    if (shouldChooseDestination) {
-      setDestinationChoices(getDestinationChoices(gameState.currentEnvironment, gameState.battles))
-      addLog("🧭 Escolhe o próximo ambiente para continuar a jornada.")
-    }
-
     levelUp()
-    setTimeout(() => endBattle(shouldChooseDestination), 900)
+    setTimeout(() => endBattle(), 900)
   }
 
   const applyStatusEffect = (moveName: string, target: "player" | "enemy") => {
@@ -1682,12 +1681,23 @@ export default function PokemonAdventure() {
       : "comum"
     const baseYield = CLASSIC_BASE_XP_YIELD[enemyRarity] || CLASSIC_BASE_XP_YIELD.comum
     const levelDelta = enemyLevel - pokemon.level
-    const levelDeltaMultiplier = clamp(1 + levelDelta * 0.05, 0.8, 1.35)
-    const waveProgressMultiplier = 1 + Math.min(0.45, gameState.battles * 0.008)
+    const levelDeltaMultiplier = clamp(1 + levelDelta * 0.08, 0.9, 1.9)
+    const waveProgressMultiplier = 1 + Math.min(0.9, gameState.battles * 0.015)
     const bossMultiplier = gameState.currentBattle?.enemyIsBoss ? BOSS_XP_MULTIPLIER : 1
+    const isEarlyGame = gameState.battles <= EARLY_GAME_TARGET_ROUND && pokemon.level < EARLY_GAME_TARGET_LEVEL
+    const earlyGameMultiplier = isEarlyGame ? 2.4 : 1
+    const fullRunMultiplier = FULL_RUN_XP_MULTIPLIER
     const xpGain = Math.max(
       1,
-      Math.floor(((baseYield * enemyLevel) / 6) * XP_GAIN_MULTIPLIER * levelDeltaMultiplier * waveProgressMultiplier * bossMultiplier),
+      Math.floor(
+        ((baseYield * enemyLevel) / 5) *
+          XP_GAIN_MULTIPLIER *
+          levelDeltaMultiplier *
+          waveProgressMultiplier *
+          bossMultiplier *
+          fullRunMultiplier *
+          earlyGameMultiplier,
+      ),
     )
     const waveLevelCap = getWaveLevelCap(gameState.battles)
     const xpNeededForNextLevel = getXpNeededForNextLevelByWaveCap(pokemon.level, waveLevelCap)
@@ -2009,10 +2019,15 @@ export default function PokemonAdventure() {
     updateGameState({ currentBattle: null })
     setCurrentScreen("menu")
 
-    if (openDestinationChoice) {
+    const shouldChooseDestination =
+      openDestinationChoice || (gameState.battles > 0 && gameState.battles % 10 === 0)
+
+    if (shouldChooseDestination) {
+      setDestinationChoices(getDestinationChoices(gameState.currentEnvironment, gameState.battles))
+      addLog("🧭 Escolhe o próximo ambiente para continuar a jornada.")
       setShowModal("destination")
     }
-  }, [advanceStatusWaves, updateGameState])
+  }, [advanceStatusWaves, updateGameState, gameState.battles, gameState.currentEnvironment, addLog])
 
   const chooseDestination = useCallback((destination: BattleEnvironment) => {
     updateGameState({ currentEnvironment: destination })

@@ -2437,7 +2437,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
 }
 
 const evolutionRules: Record<string, EvolutionRule> = {
-  Charmander: { level: 16, evolvesTo: "Charmeleon" },
+  Charmander: { level: 17, evolvesTo: "Charmeleon" },
   Charmeleon: { level: 36, evolvesTo: "Charizard" },
   Squirtle: { level: 16, evolvesTo: "Wartortle" },
   Wartortle: { level: 36, evolvesTo: "Blastoise" },
