@@ -1700,8 +1700,7 @@ export default function PokemonAdventure() {
       ),
     )
     const waveLevelCap = getWaveLevelCap(gameState.battles)
-    const xpNeededForNextLevel = getXpNeededForNextLevelByWaveCap(pokemon.level, waveLevelCap)
-    const newXP = pokemon.xp + xpGain
+    let newXP = pokemon.xp + xpGain
 
     const hasXpShare = Number(gameState.inventory[XP_SHARE_ITEM] || 0) > 0
     if (hasXpShare) {
@@ -1740,120 +1739,109 @@ export default function PokemonAdventure() {
       })
     }
 
-    if (newXP >= xpNeededForNextLevel) {
-      const newLevel = pokemon.level + 1
-      const xpCarryOver = newXP - xpNeededForNextLevel
-      const oldMaxHP = pokemon.maxHP
-      const currentTemplate = getPokemonBattleTemplate(activePokemonName)
+    // Process multiple level-ups if XP gain is large enough.
+    let leveledXp = newXP
+    let leveledLevel = pokemon.level
+    let leveledMaxHP = pokemon.maxHP
+    let leveledHP = pokemon.HP
 
-      const newMaxHP = calculateHP(currentTemplate?.baseHP || oldMaxHP, newLevel, activePokemonName)
-      const hpIncrease = newMaxHP - oldMaxHP
-      const newCurrentHP = Math.min(newMaxHP, pokemon.HP + hpIncrease)
+    while (leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
+      const requiredXp = getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)
+      leveledXp -= requiredXp
+      leveledLevel += 1
 
-      const scaledAttacks = scaleAttackSetForLevel(pokemon.attacks)
-      const learnedMove = getLevelUpMoveForPokemon(activePokemonName, pokemon.type, newLevel, Object.keys(scaledAttacks))
-      const evolution = getEvolutionForPokemon(activePokemonName, newLevel)
-      const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
+      const template = getPokemonBattleTemplate(activePokemonName)
+      const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, activePokemonName)
+      const hpIncrease = recalculatedMaxHP - leveledMaxHP
+      leveledMaxHP = recalculatedMaxHP
+      leveledHP = Math.min(leveledMaxHP, leveledHP + hpIncrease)
+    }
 
-      if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
-        const evolvedName = evolution.evolvesTo
-        const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, newLevel, evolvedName)
-        const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, newMaxHP - newCurrentHP))
-        const upgradedAttacks = learnedMove && Object.keys(scaledAttacks).length < 4
-          ? { ...scaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, newLevel) }
-          : scaledAttacks
-        const evolvedPokemon = {
-          ...pokemon,
-          level: newLevel,
-          xp: xpCarryOver,
-          HP: evolvedHP,
-          maxHP: evolvedMaxHP,
-          attacks: upgradedAttacks,
-          attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
-          sprite: evolutionTemplate.sprite,
-          spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
-          type: evolutionTemplate.type,
-          speed: evolutionTemplate.speed,
-          isShiny: pokemon.isShiny,
-          pendingMove:
-            learnedMove && Object.keys(scaledAttacks).length >= 4
-              ? { name: learnedMove.name, power: learnedMove.power }
-              : undefined,
-        }
+    // After leveling loop, handle possible evolution or learned moves based on final level.
+    const finalLevel = leveledLevel
+    const finalTemplate = getPokemonBattleTemplate(activePokemonName)
+    const finalScaledAttacks = scaleAttackSetForLevel(pokemon.attacks)
+    const learnedMove = getLevelUpMoveForPokemon(activePokemonName, pokemon.type, finalLevel, Object.keys(finalScaledAttacks))
+    const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
+    const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
-        const nextTeam = Object.fromEntries(
-          Object.entries(gameState.playerTeam).map(([name, teamPokemon]) =>
-            name === activePokemonName ? [evolvedName, evolvedPokemon] : [name, teamPokemon],
-          ),
-        )
+    if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
+      const evolvedName = evolution.evolvesTo
+      const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, finalLevel, evolvedName)
+      const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, leveledMaxHP - leveledHP))
+      const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
+        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
+        : finalScaledAttacks
 
-        const nextCapturedPokemon = gameState.capturedPokemon.includes(activePokemonName)
-          ? gameState.capturedPokemon.map((name) => (name === activePokemonName ? evolvedName : name))
-          : gameState.capturedPokemon
+      const evolvedPokemon = {
+        ...pokemon,
+        level: finalLevel,
+        xp: leveledXp,
+        HP: evolvedHP,
+        maxHP: evolvedMaxHP,
+        attacks: upgradedAttacks,
+        attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+        sprite: evolutionTemplate.sprite,
+        spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
+        type: evolutionTemplate.type,
+        speed: evolutionTemplate.speed,
+        isShiny: pokemon.isShiny,
+        pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
+      }
 
-        setGameState({
-          ...gameState,
-          activePokemon: evolvedName,
-          capturedPokemon: nextCapturedPokemon,
-          playerTeam: nextTeam,
-          currentBattle: gameState.currentBattle
-            ? {
-                ...gameState.currentBattle,
-                playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
-              }
-            : null,
-        })
+      const nextTeam = Object.fromEntries(
+        Object.entries(gameState.playerTeam).map(([name, teamPokemon]) => (name === activePokemonName ? [evolvedName, evolvedPokemon] : [name, teamPokemon])),
+      )
 
-        setRecentEvolution({ from: activePokemonName, to: evolvedName })
+      const nextCapturedPokemon = gameState.capturedPokemon.includes(activePokemonName)
+        ? gameState.capturedPokemon.map((name) => (name === activePokemonName ? evolvedName : name))
+        : gameState.capturedPokemon
 
-        if (learnedMove) {
-          if (Object.keys(scaledAttacks).length >= 4) {
-            showScreenNotice(`📚 ${evolvedName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
-          } else {
-            showScreenNotice(`📚 ${evolvedName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
-          }
-        }
+      setGameState({
+        ...gameState,
+        activePokemon: evolvedName,
+        capturedPokemon: nextCapturedPokemon,
+        playerTeam: nextTeam,
+        currentBattle: gameState.currentBattle
+          ? {
+              ...gameState.currentBattle,
+              playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
+            }
+          : null,
+      })
 
-        if (learnedMove && Object.keys(scaledAttacks).length >= 4) {
+      setRecentEvolution({ from: activePokemonName, to: evolvedName })
+
+      if (learnedMove) {
+        if (Object.keys(finalScaledAttacks).length >= 4) {
+          showScreenNotice(`📚 ${evolvedName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
           setAttackToReplace(null)
           setShowModal("evolution-attacks")
         } else {
+          showScreenNotice(`📚 ${evolvedName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
           setShowModal("evolution")
         }
-      } else if (learnedMove && Object.keys(scaledAttacks).length >= 4) {
-        updatePokemon(activePokemonName, {
-          level: newLevel,
-          xp: xpCarryOver,
-          maxHP: newMaxHP,
-          HP: newCurrentHP,
-          attacks: scaledAttacks,
-          attackPP: syncAttackPP(pokemon.attackPP, scaledAttacks),
-          pendingMove: { name: learnedMove.name, power: learnedMove.power },
-        })
-        showScreenNotice(`📚 ${activePokemonName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
-        setAttackToReplace(null)
-        setShowModal("evolution-attacks")
       } else {
-        const upgradedAttacks = learnedMove
-          ? { ...scaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, newLevel) }
-          : scaledAttacks
-
-        updatePokemon(activePokemonName, {
-          level: newLevel,
-          xp: xpCarryOver,
-          maxHP: newMaxHP,
-          HP: newCurrentHP,
-          attacks: upgradedAttacks,
-          attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
-          pendingMove: undefined,
-        })
-
-        if (learnedMove) {
-          showScreenNotice(`📚 ${activePokemonName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
-        }
+        setShowModal("evolution")
       }
     } else {
-      updatePokemon(activePokemonName, { xp: newXP })
+      const upgradedAttacks = learnedMove
+        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
+        : finalScaledAttacks
+
+      updatePokemon(activePokemonName, {
+        level: finalLevel,
+        xp: leveledXp,
+        maxHP: leveledMaxHP,
+        HP: leveledHP,
+        attacks: upgradedAttacks,
+        attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+        pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
+      })
+
+      if (learnedMove && Object.keys(finalScaledAttacks).length < 4) {
+        showScreenNotice(`📚 ${activePokemonName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
+      }
     }
 
     addLog(`✨ +${xpGain} XP`)
