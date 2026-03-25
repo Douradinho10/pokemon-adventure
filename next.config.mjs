@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
+// Use a custom distDir only for local development on machines where
+// `.next` inside synced folders (OneDrive) causes instability.
+const isCI = !!process.env.CI || !!process.env.VERCEL
 const nextConfig = {
-  distDir: ".local/next",
+  ...(isCI ? {} : { distDir: ".local/next" }),
   eslint: {
     ignoreDuringBuilds: true,
   },
