@@ -1758,12 +1758,20 @@ export default function PokemonAdventure() {
     }
 
     // After leveling loop, handle possible evolution or learned moves based on final level.
-    const finalLevel = leveledLevel
+    let finalLevel = leveledLevel
     const finalTemplate = getPokemonBattleTemplate(activePokemonName)
     const finalScaledAttacks = scaleAttackSetForLevel(pokemon.attacks)
     const learnedMove = getLevelUpMoveForPokemon(activePokemonName, pokemon.type, finalLevel, Object.keys(finalScaledAttacks))
     const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
+
+    // Enforce wave level cap: don't allow player to level above the current wave cap.
+    const cappedLevel = Math.min(finalLevel, waveLevelCap)
+    if (cappedLevel !== finalLevel) {
+      finalLevel = cappedLevel
+      // Make sure XP doesn't show as already enough for another level beyond the cap
+      leveledXp = Math.min(leveledXp, getXpNeededForNextLevelByWaveCap(finalLevel, waveLevelCap) - 1)
+    }
 
     if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
       const evolvedName = evolution.evolvesTo
