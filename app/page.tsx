@@ -3697,6 +3697,83 @@ export default function PokemonAdventure() {
 
   return (
     <div className="min-h-dvh p-3 text-slate-900 md:p-4">
+      {process.env.NODE_ENV !== "production" && (
+        <div className="fixed right-4 top-4 z-[140]">
+          <Button
+            onClick={() => {
+              if (!gameState.activePokemon) return
+              if (!confirm(`Forçar evolução de ${gameState.activePokemon}?`)) return
+
+              const activeName = gameState.activePokemon!
+              const pokemon = gameState.playerTeam[activeName]
+              const evolution = getEvolutionForPokemon(activeName, Number.MAX_SAFE_INTEGER)
+              if (!evolution) {
+                addLog(`⚠️ ${activeName} não tem evolução definida.`)
+                return
+              }
+
+              const evolvedName = evolution.evolvesTo
+              if (gameState.playerTeam[evolvedName]) {
+                addLog(`⚠️ ${evolvedName} já está na sua equipa.`)
+                return
+              }
+
+              const evolutionTemplate = getPokemonBattleTemplate(evolvedName)
+              if (!evolutionTemplate) {
+                addLog(`⚠️ Template de evolução não encontrado para ${evolvedName}.`)
+                return
+              }
+
+              const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, pokemon.level, evolvedName)
+              const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, pokemon.maxHP - pokemon.HP))
+              const upgradedAttacks = { ...pokemon.attacks }
+
+              const evolvedPokemon = {
+                ...pokemon,
+                level: pokemon.level,
+                xp: pokemon.xp,
+                HP: evolvedHP,
+                maxHP: evolvedMaxHP,
+                attacks: upgradedAttacks,
+                attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+                sprite: evolutionTemplate.sprite,
+                spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
+                type: evolutionTemplate.type,
+                speed: evolutionTemplate.speed,
+                isShiny: pokemon.isShiny,
+              }
+
+              const nextTeam = Object.fromEntries(
+                Object.entries(gameState.playerTeam).map(([name, teamPokemon]) => (name === activeName ? [evolvedName, evolvedPokemon] : [name, teamPokemon])),
+              )
+
+              const nextCapturedPokemon = gameState.capturedPokemon.includes(activeName)
+                ? gameState.capturedPokemon.map((name) => (name === activeName ? evolvedName : name))
+                : gameState.capturedPokemon
+
+              setGameState({
+                ...gameState,
+                activePokemon: evolvedName,
+                capturedPokemon: nextCapturedPokemon,
+                playerTeam: nextTeam,
+                currentBattle: gameState.currentBattle
+                  ? {
+                      ...gameState.currentBattle,
+                      playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
+                    }
+                  : null,
+              })
+
+              setRecentEvolution({ from: activeName, to: evolvedName })
+              setShowModal("evolution")
+              addLog(`✨ Forçada evolução: ${activeName} → ${evolvedName}`)
+            }}
+            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white"
+          >
+            Forçar Evolução
+          </Button>
+        </div>
+      )}
       <AnimatePresence>
         {captureThrowAnimation && (
           <motion.div
