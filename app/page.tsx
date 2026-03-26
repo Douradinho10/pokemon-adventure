@@ -1803,6 +1803,21 @@ export default function PokemonAdventure() {
     const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
+    // Debug: log evolution decision factors to in-game log (development help)
+    try {
+      if (evolution) {
+        addLog(
+          `DEBUG: evolução detectada para ${activePokemonName} → ${evolution.evolvesTo} (nivel requerido: ${evolution.level}). finalLevel=${finalLevel}, evolutionTemplate=${Boolean(
+            evolutionTemplate,
+          )}, jáNaEquipe=${Boolean(gameState.playerTeam[evolution.evolvesTo])}`,
+        )
+      } else {
+        addLog(`DEBUG: nenhuma regra de evolução para ${activePokemonName} no nível ${finalLevel}`)
+      }
+    } catch (e) {
+      // ignore logging errors
+    }
+
     if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
       const evolvedName = evolution.evolvesTo
       const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, finalLevel, evolvedName)
