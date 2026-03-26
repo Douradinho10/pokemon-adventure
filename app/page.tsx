@@ -180,13 +180,18 @@ const getScaledEnemyLevel = (battleCount: number, random: (min: number, max: num
   const minLevel = Math.min(previousWaveCap, currentWaveCap)
   const maxLevel = Math.max(previousWaveCap, currentWaveCap)
 
-  // Smooth progression: interpolate linearly between previous and current cap
+  // Start progression at roughly half of the current cap so early waves are lower
+  const startLevel = Math.max(minLevel, Math.floor(currentWaveCap / 2))
   const waveIndexInTier = ((nextWave - 1) % 10) + 1 // 1..10
-  const ratio = waveIndexInTier / 10
-  const interpolated = Math.round(previousWaveCap + (currentWaveCap - previousWaveCap) * ratio)
 
-  // Small jitter for variety but keep levels monotonic and clamped
-  return random(minLevel, maxLevel)
+  // Linear interpolation from startLevel to currentWaveCap across the 10 waves
+  const t = (waveIndexInTier - 1) / Math.max(1, 10 - 1)
+  const interpolated = Math.round(startLevel + (currentWaveCap - startLevel) * t)
+
+  // Small jitter for variety but keep levels clamped
+  const jitter = random(-1, 1)
+  const candidate = Math.round(interpolated + jitter)
+  return clamp(candidate, minLevel, maxLevel)
 }
 
 const scaleDamageRange = (range: [number, number], multiplier: number): [number, number] => {
