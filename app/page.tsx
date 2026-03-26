@@ -186,9 +186,7 @@ const getScaledEnemyLevel = (battleCount: number, random: (min: number, max: num
   const interpolated = Math.round(previousWaveCap + (currentWaveCap - previousWaveCap) * ratio)
 
   // Small jitter for variety but keep levels monotonic and clamped
-  const jitter = random(-1, 1)
-  const candidate = Math.round(interpolated + jitter)
-  return clamp(candidate, minLevel, maxLevel)
+  return random(minLevel, maxLevel)
 }
 
 const scaleDamageRange = (range: [number, number], multiplier: number): [number, number] => {
@@ -1803,13 +1801,22 @@ export default function PokemonAdventure() {
     const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
-    if (evolution && evolutionTemplate && !gameState.playerTeam[evolution.evolvesTo]) {
+    if (evolution && evolutionTemplate) {
+      // Simplified evolution: rename, change sprite and boost stats dramatically.
       const evolvedName = evolution.evolvesTo
-      const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, finalLevel, evolvedName)
-      const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, leveledMaxHP - leveledHP))
-      const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
-        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
-        : finalScaledAttacks
+
+      const evolvedMaxHP = Math.max(1, Math.round(calculateHP(evolutionTemplate.baseHP, finalLevel, evolvedName) * 1.5))
+      const evolvedHP = evolvedMaxHP
+
+      const evolvedAttacks = Object.fromEntries(
+        Object.entries(finalScaledAttacks).map(([name, [min, max]]) => [
+          name,
+          [
+            Math.max(1, Math.round(min * 1.5)),
+            Math.max(1, Math.round(max * 1.5)),
+          ] as [number, number],
+        ]),
+      )
 
       const evolvedPokemon = {
         ...pokemon,
@@ -1817,14 +1824,13 @@ export default function PokemonAdventure() {
         xp: leveledXp,
         HP: evolvedHP,
         maxHP: evolvedMaxHP,
-        attacks: upgradedAttacks,
-        attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+        attacks: evolvedAttacks,
+        attackPP: syncAttackPP(pokemon.attackPP, evolvedAttacks),
         sprite: evolutionTemplate.sprite,
         spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
         type: evolutionTemplate.type,
-        speed: evolutionTemplate.speed,
+        speed: Math.max(1, Math.round((evolutionTemplate.speed || pokemon.speed) * 1.25)),
         isShiny: pokemon.isShiny,
-        pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
       }
 
       const nextTeam = Object.fromEntries(
@@ -1849,19 +1855,10 @@ export default function PokemonAdventure() {
       })
 
       setRecentEvolution({ from: activePokemonName, to: evolvedName })
-
-      if (learnedMove) {
-        if (Object.keys(finalScaledAttacks).length >= 4) {
-          showScreenNotice(`📚 ${evolvedName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
-          setAttackToReplace(null)
-          setShowModal("evolution-attacks")
-        } else {
-          showScreenNotice(`📚 ${evolvedName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
-          setShowModal("evolution")
-        }
-      } else {
-        setShowModal("evolution")
-      }
+      setShowModal("evolution")
+      addLog(`✨ ${activePokemonName} evoluiu para ${evolvedName}!`)
+      return
+    }
     } else {
       const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
         ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
@@ -3697,83 +3694,7 @@ export default function PokemonAdventure() {
 
   return (
     <div className="min-h-dvh p-3 text-slate-900 md:p-4">
-      {process.env.NODE_ENV !== "production" && (
-        <div className="fixed right-4 top-4 z-[140]">
-          <Button
-            onClick={() => {
-              if (!gameState.activePokemon) return
-              if (!confirm(`Forçar evolução de ${gameState.activePokemon}?`)) return
-
-              const activeName = gameState.activePokemon!
-              const pokemon = gameState.playerTeam[activeName]
-              const evolution = getEvolutionForPokemon(activeName, Number.MAX_SAFE_INTEGER)
-              if (!evolution) {
-                addLog(`⚠️ ${activeName} não tem evolução definida.`)
-                return
-              }
-
-              const evolvedName = evolution.evolvesTo
-              if (gameState.playerTeam[evolvedName]) {
-                addLog(`⚠️ ${evolvedName} já está na sua equipa.`)
-                return
-              }
-
-              const evolutionTemplate = getPokemonBattleTemplate(evolvedName)
-              if (!evolutionTemplate) {
-                addLog(`⚠️ Template de evolução não encontrado para ${evolvedName}.`)
-                return
-              }
-
-              const evolvedMaxHP = calculateHP(evolutionTemplate.baseHP, pokemon.level, evolvedName)
-              const evolvedHP = Math.max(1, evolvedMaxHP - Math.max(0, pokemon.maxHP - pokemon.HP))
-              const upgradedAttacks = { ...pokemon.attacks }
-
-              const evolvedPokemon = {
-                ...pokemon,
-                level: pokemon.level,
-                xp: pokemon.xp,
-                HP: evolvedHP,
-                maxHP: evolvedMaxHP,
-                attacks: upgradedAttacks,
-                attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
-                sprite: evolutionTemplate.sprite,
-                spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
-                type: evolutionTemplate.type,
-                speed: evolutionTemplate.speed,
-                isShiny: pokemon.isShiny,
-              }
-
-              const nextTeam = Object.fromEntries(
-                Object.entries(gameState.playerTeam).map(([name, teamPokemon]) => (name === activeName ? [evolvedName, evolvedPokemon] : [name, teamPokemon])),
-              )
-
-              const nextCapturedPokemon = gameState.capturedPokemon.includes(activeName)
-                ? gameState.capturedPokemon.map((name) => (name === activeName ? evolvedName : name))
-                : gameState.capturedPokemon
-
-              setGameState({
-                ...gameState,
-                activePokemon: evolvedName,
-                capturedPokemon: nextCapturedPokemon,
-                playerTeam: nextTeam,
-                currentBattle: gameState.currentBattle
-                  ? {
-                      ...gameState.currentBattle,
-                      playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
-                    }
-                  : null,
-              })
-
-              setRecentEvolution({ from: activeName, to: evolvedName })
-              setShowModal("evolution")
-              addLog(`✨ Forçada evolução: ${activeName} → ${evolvedName}`)
-            }}
-            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white"
-          >
-            Forçar Evolução
-          </Button>
-        </div>
-      )}
+      
       <AnimatePresence>
         {captureThrowAnimation && (
           <motion.div
