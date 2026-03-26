@@ -1858,7 +1858,6 @@ export default function PokemonAdventure() {
       setShowModal("evolution")
       addLog(`✨ ${activePokemonName} evoluiu para ${evolvedName}!`)
       return
-    }
     } else {
       const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
         ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
