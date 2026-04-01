@@ -18,6 +18,7 @@ import {
   getPokemonBattleTemplate,
   getLevelUpMoveForPokemon,
   getLearnableMovesForPokemon,
+  getLegalBattleAttacksForPokemon,
   getMoveStatusEffect,
   wildPokemonStats,
   getRandomWildPokemon,
@@ -225,7 +226,7 @@ const statusLabels: Record<StatusCondition, string> = {
 
 const getEffectiveSpeed = (speed = 50, statusCondition?: StatusCondition | null) => {
   if (statusCondition === "paralyzed") {
-    return Math.max(1, Math.floor(speed * 0.5))
+    return Math.max(1, Math.floor(speed * 0.25))
   }
 
   return speed
@@ -235,9 +236,36 @@ const persistentStatusWaveDuration: Partial<Record<StatusCondition, number>> = {
   poisoned: 3,
   burned: 3,
   paralyzed: 4,
-  asleep: 2,
-  frozen: 2,
+  asleep: 3,
+  frozen: 3,
   confused: 2,
+}
+
+const getClassicCatchChance = (
+  ballType: string,
+  rarity: "comum" | "raro" | "lendario",
+  enemyHP: number,
+  enemyMaxHP: number,
+  statusCondition?: StatusCondition | null,
+) => {
+  if (ballType === "Master Ball") {
+    return 1
+  }
+
+  const baseCatchRate = rarity === "lendario" ? 25 : rarity === "raro" ? 90 : 160
+  const ballMultiplier = ballType === "Ultra Ball" ? 2 : ballType === "Great Ball" ? 1.5 : 1
+
+  const maxHP = Math.max(1, enemyMaxHP)
+  const currentHP = clamp(enemyHP, 1, maxHP)
+  const captureValue = ((3 * maxHP - 2 * currentHP) * baseCatchRate * ballMultiplier) / (3 * maxHP)
+
+  const statusMultiplier = statusCondition === "asleep" || statusCondition === "frozen"
+    ? 2.5
+    : statusCondition === "paralyzed" || statusCondition === "burned" || statusCondition === "poisoned"
+      ? 1.5
+      : 1
+
+  return clamp((captureValue * statusMultiplier) / 255, 0.01, 0.95)
 }
 
 const trainerBarTypeColors: Record<string, string> = {
@@ -525,6 +553,57 @@ const getRandomWildPokemonForEnvironment = (battleCount: number, environment: Ba
   return environmentPool[0] || getRandomWildPokemon(battleCount)
 }
 
+const getRandomWildPokemonForEnvironmentWithType = (
+  battleCount: number,
+  environment: BattleEnvironment,
+  enemyLevel: number,
+  preferredTypeToken: string | null,
+) => {
+  const targetRarity = getTargetRarityForBattle(battleCount)
+  const environmentPool = getEnvironmentWildPool(environment)
+  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+
+  const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
+  const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
+
+  const typeFilteredPool = preferredTypeToken
+    ? selectedPool.filter((name) =>
+        normalizeTypeText(wildPokemon[name].type)
+          .split("/")
+          .map(normalizeTypeToken)
+          .includes(preferredTypeToken),
+      )
+    : selectedPool
+
+  const finalPool = typeFilteredPool.length > 0 ? typeFilteredPool : selectedPool
+
+  if (finalPool.length === 0) {
+    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+    const fallbackByType = preferredTypeToken
+      ? fallbackByLevel.filter((name) =>
+          normalizeTypeText(wildPokemon[name].type)
+            .split("/")
+            .map(normalizeTypeToken)
+            .includes(preferredTypeToken),
+        )
+      : fallbackByLevel
+    const fallbackPool = fallbackByType.length > 0 ? fallbackByType : fallbackByLevel
+
+    const fallbackPick = pickWeightedPokemon(fallbackPool, environment)
+    if (fallbackPick) {
+      return fallbackPick
+    }
+  }
+
+  const weightedPick = pickWeightedPokemon(finalPool, environment)
+
+  if (weightedPick) {
+    return weightedPick
+  }
+
+  return environmentPool[0] || getRandomWildPokemon(battleCount)
+}
+
 export default function PokemonAdventure() {
   const {
     gameState,
@@ -557,6 +636,7 @@ export default function PokemonAdventure() {
   const [captureCelebration, setCaptureCelebration] = useState<CaptureCelebration | null>(null)
   const [captureThrowAnimation, setCaptureThrowAnimation] = useState<CaptureThrowAnimation | null>(null)
   const [nextEncounterPreview, setNextEncounterPreview] = useState<NextEncounterPreview | null>(null)
+  const [hiddenEncounterPreview, setHiddenEncounterPreview] = useState<NextEncounterPreview | null>(null)
   const [inventoryTab, setInventoryTab] = useState<"pokeballs" | "items">("pokeballs")
   const [pendingEnemyTurnAfterSwitch, setPendingEnemyTurnAfterSwitch] = useState(false)
   const [destinationChoices, setDestinationChoices] = useState<[BattleEnvironment, BattleEnvironment]>(["floresta", "caverna"])
@@ -816,11 +896,21 @@ export default function PokemonAdventure() {
   }
 
   const buildNextEncounterPreview = useCallback(
-    (activePokemonName: string, activePokemonLevel: number): NextEncounterPreview => {
+    (
+      activePokemonName: string,
+      activePokemonLevel: number,
+      options?: { preferredTypeToken?: string | null; fixedEnemyLevel?: number },
+    ): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
       const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
-      const enemyLevel = getScaledEnemyLevel(gameState.battles, random)
-      const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment, enemyLevel)
+      const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(gameState.battles, random)
+      const preferredTypeToken = options?.preferredTypeToken || null
+      const baseEnemyName = getRandomWildPokemonForEnvironmentWithType(
+        nextWave,
+        gameState.currentEnvironment,
+        enemyLevel,
+        preferredTypeToken,
+      )
 
       let enemyName = baseEnemyName
       for (let i = 0; i < 4; i++) {
@@ -840,11 +930,13 @@ export default function PokemonAdventure() {
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
       const isShiny = Math.random() < SHINY_CHANCE
 
+      const legalEnemyAttacks = getLegalBattleAttacksForPokemon(
+        impostorName,
+        wildPokemon[impostorName].type,
+        enemyLevel,
+      )
       const enemyAttacks = Object.fromEntries(
-        Object.entries(wildPokemon[impostorName].attacks).map(([name, power]) => [
-          name,
-          calculateAttackPower(power, enemyLevel),
-        ]),
+        Object.entries(legalEnemyAttacks).map(([name, power]) => [name, calculateAttackPower(power, enemyLevel)]),
       )
 
       return {
@@ -863,6 +955,40 @@ export default function PokemonAdventure() {
     },
     [gameState.battles, gameState.currentEnvironment, random],
   )
+
+  const chooseAnotherPath = useCallback(() => {
+    if (!gameState.activePokemon || !nextEncounterPreview) {
+      return
+    }
+
+    const activePokemon = gameState.playerTeam[gameState.activePokemon]
+    if (!activePokemon) {
+      showScreenNotice("🛰️ Pokémon ativo inválido para o scanner.")
+      return
+    }
+
+    const previousDisplayName = nextEncounterPreview.enemyDisplayName
+
+    let rerolledPreview = buildNextEncounterPreview(gameState.activePokemon, activePokemon.level, {
+      fixedEnemyLevel: nextEncounterPreview.enemyLevel,
+    })
+
+    for (let i = 0; i < 5 && rerolledPreview.enemyDisplayName === previousDisplayName; i++) {
+      rerolledPreview = buildNextEncounterPreview(gameState.activePokemon, activePokemon.level, {
+        fixedEnemyLevel: nextEncounterPreview.enemyLevel,
+      })
+    }
+
+    setHiddenEncounterPreview(rerolledPreview)
+    setNextEncounterPreview(null)
+    setShowModal(null)
+
+    showScreenNotice(
+      rerolledPreview.enemyDisplayName === previousDisplayName
+        ? "🧭 Seguiste por outro caminho. O próximo encontro foi ocultado."
+        : "🧭 Novo caminho escolhido. O próximo encontro foi ocultado.",
+    )
+  }, [gameState, nextEncounterPreview, buildNextEncounterPreview, showScreenNotice])
 
   const clearPokemonStatus = useCallback(
     (pokemonName: string) => {
@@ -1007,7 +1133,7 @@ export default function PokemonAdventure() {
       const currentTurns = pokemon.statusTurns ?? 0
 
       if (currentStatus === "poisoned" || currentStatus === "burned") {
-        const chipDamage = Math.max(1, Math.floor(pokemon.maxHP * (currentStatus === "poisoned" ? 0.08 : 0.06)))
+        const chipDamage = Math.max(1, Math.floor(pokemon.maxHP * 0.125))
         const nextHP = Math.max(0, pokemon.HP - chipDamage)
         updatePokemon(gameState.activePokemon, { HP: nextHP })
         addLog(`☠️ ${gameState.activePokemon} sofreu ${chipDamage} de dano por ${statusLabels[currentStatus].toLowerCase()}!`)
@@ -1027,7 +1153,7 @@ export default function PokemonAdventure() {
       }
 
       if (currentStatus === "frozen") {
-        if (Math.random() < 0.25) {
+        if (Math.random() < 0.2) {
           updatePokemon(gameState.activePokemon, { statusCondition: null, statusTurns: undefined, statusWavesRemaining: undefined })
         } else {
           return { canAct: false, fainted: false }
@@ -1066,10 +1192,7 @@ export default function PokemonAdventure() {
     const currentTurns = gameState.currentBattle.enemyStatusTurns ?? 0
 
     if (currentStatus === "poisoned" || currentStatus === "burned") {
-      const chipDamage = Math.max(
-        1,
-        Math.floor(gameState.currentBattle.enemyMaxHP * (currentStatus === "poisoned" ? 0.08 : 0.06)),
-      )
+      const chipDamage = Math.max(1, Math.floor(gameState.currentBattle.enemyMaxHP * 0.125))
       const nextHP = Math.max(0, gameState.currentBattle.enemyHP - chipDamage)
       updateBattle({ enemyHP: nextHP })
       if (nextHP <= 0) {
@@ -1088,7 +1211,7 @@ export default function PokemonAdventure() {
     }
 
     if (currentStatus === "frozen") {
-      if (Math.random() < 0.25) {
+      if (Math.random() < 0.2) {
         updateBattle({ enemyStatusCondition: null, enemyStatusTurns: undefined })
       } else {
         return { canAct: false, fainted: false }
@@ -1252,6 +1375,12 @@ export default function PokemonAdventure() {
     (starterName: string) => {
       const basePokemon = { ...starterPokemon[starterName] }
       const calculatedHP = calculateHP(basePokemon.HP, basePokemon.level, starterName)
+      const legalStarterAttacks = getLegalBattleAttacksForPokemon(
+        starterName,
+        basePokemon.type,
+        basePokemon.level,
+      )
+      const starterAttackTemplate = Object.keys(legalStarterAttacks).length > 0 ? legalStarterAttacks : basePokemon.attacks
 
       const newPokemon = {
         ...basePokemon,
@@ -1259,12 +1388,12 @@ export default function PokemonAdventure() {
         maxHP: calculatedHP,
         spriteSet: basePokemon.spriteSet || getPokemonSpriteSet(starterName, basePokemon.sprite),
         attacks: Object.fromEntries(
-          Object.entries(basePokemon.attacks).map(([name, power]) => [
+          Object.entries(starterAttackTemplate).map(([name, power]) => [
             name,
             calculateAttackPower(power, basePokemon.level),
           ]),
         ),
-        attackPP: initializePP(basePokemon.attacks),
+        attackPP: initializePP(starterAttackTemplate),
       }
 
       updateGameState({
@@ -1293,14 +1422,21 @@ export default function PokemonAdventure() {
     }
 
     const nextWave = gameState.battles + 1
+    const hasValidHiddenPreview =
+      hiddenEncounterPreview &&
+      hiddenEncounterPreview.forBattles === gameState.battles &&
+      hiddenEncounterPreview.forActivePokemon === gameState.activePokemon
+
     const hasValidPreview =
       nextEncounterPreview &&
       nextEncounterPreview.forBattles === gameState.battles &&
       nextEncounterPreview.forActivePokemon === gameState.activePokemon
 
-    const encounterPreview = hasValidPreview
-      ? nextEncounterPreview
-      : buildNextEncounterPreview(gameState.activePokemon, activePokemon.level)
+    const encounterPreview = hasValidHiddenPreview
+      ? hiddenEncounterPreview
+      : hasValidPreview
+        ? nextEncounterPreview
+        : buildNextEncounterPreview(gameState.activePokemon, activePokemon.level)
 
     const enemyName = encounterPreview.enemyName
     const enemyDisplayName = encounterPreview.enemyDisplayName
@@ -1356,6 +1492,7 @@ export default function PokemonAdventure() {
       currentBattle: newBattle,
     })
     setNextEncounterPreview(null)
+    setHiddenEncounterPreview(null)
 
     setCurrentScreen("battle")
 
@@ -1371,7 +1508,7 @@ export default function PokemonAdventure() {
     const bossTag = isBossWave ? " 👑BOSS" : ""
     const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
     addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
-  }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, buildNextEncounterPreview])
+  }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, hiddenEncounterPreview, buildNextEncounterPreview])
 
   const handleAttack = useCallback(
     async (attackName: string) => {
@@ -2016,21 +2153,13 @@ export default function PokemonAdventure() {
         return
       }
 
-      const catchRate = isLegendaryBoss ? 0.15 : rarity === "raro" ? 0.7 : 1
-      const ballMultiplier = ballConfig.chance
-      const statusCondition = gameState.currentBattle.enemyStatusCondition
-      const statusMultiplier = statusCondition === "asleep" || statusCondition === "frozen"
-        ? 2
-        : statusCondition === "paralyzed" || statusCondition === "burned" || statusCondition === "poisoned"
-          ? 1.5
-          : 1
-
-      const maxHP = Math.max(1, gameState.currentBattle.enemyMaxHP)
-      const currentHP = Math.max(1, gameState.currentBattle.enemyHP)
-      const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP)
-
-      const computedChance = hpFactor * catchRate * ballMultiplier * statusMultiplier
-      const finalChance = ballType === "Master Ball" ? 1 : clamp(computedChance, 0, 1)
+      const finalChance = getClassicCatchChance(
+        ballType,
+        rarity,
+        gameState.currentBattle.enemyHP,
+        gameState.currentBattle.enemyMaxHP,
+        gameState.currentBattle.enemyStatusCondition,
+      )
 
       setShowModal(null)
 
@@ -2045,9 +2174,20 @@ export default function PokemonAdventure() {
         )
 
         const reducedMaxHP = isLegendaryBoss ? Math.max(1, Math.floor(maxHP * 0.85)) : maxHP
+        const legalCapturedMoves = getLegalBattleAttacksForPokemon(
+          gameState.currentBattle.enemyName,
+          enemyData.type,
+          gameState.currentBattle.enemyLevel,
+        )
+        const scaledCapturedMoves = Object.fromEntries(
+          Object.entries(legalCapturedMoves).map(([name, power]) => [
+            name,
+            calculateAttackPower(power, gameState.currentBattle!.enemyLevel),
+          ]),
+        )
         const capturedAttacks = isLegendaryBoss
           ? Object.fromEntries(
-              Object.entries(gameState.currentBattle.enemyAttacks).map(([name, [min, max]]) => {
+              Object.entries(scaledCapturedMoves).map(([name, [min, max]]) => {
                 if (min === 0 && max === 0) {
                   return [name, [0, 0] as [number, number]]
                 }
@@ -2057,7 +2197,7 @@ export default function PokemonAdventure() {
                 return [name, [reducedMin, reducedMax] as [number, number]]
               }),
             )
-          : gameState.currentBattle.enemyAttacks
+          : scaledCapturedMoves
 
         const capturedSpeed = Math.max(1, Math.floor((enemyData.speed || 50) * (isLegendaryBoss ? 0.85 : 1)))
 
@@ -2944,6 +3084,13 @@ export default function PokemonAdventure() {
                 Próximo Pokémon previsto: <span className="font-bold uppercase">{predictedEnemyName}</span> (Nv.{nextEncounterPreview.enemyLevel})
               </div>
 
+              <Button
+                onClick={chooseAnotherPath}
+                className="w-full bg-[linear-gradient(180deg,#10b981_0%,#10b981_50%,#047857_50%,#047857_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"
+              >
+                🧭 Ir Por Outro Caminho
+              </Button>
+
               {nextEncounterPreview.isBoss && (
                 <div className="rounded-xl border border-rose-300/50 bg-rose-500/15 p-3 text-center text-sm text-rose-100">
                   👑 O próximo encontro é um BOSS de onda (1.5x HP e 1.5x dano).
@@ -3071,19 +3218,13 @@ export default function PokemonAdventure() {
 
                     const isMasterBall = ball === "Master Ball"
                     const enemyRarity = wildPokemon[gameState.currentBattle.enemyName]?.rarity
-                    const catchRate = isLegendaryBoss ? 0.15 : enemyRarity === "raro" ? 0.7 : 1
                     const statusCondition = gameState.currentBattle?.enemyStatusCondition
-                    const statusMultiplier = statusCondition === "asleep" || statusCondition === "frozen"
-                      ? 2
-                      : statusCondition === "paralyzed" || statusCondition === "burned" || statusCondition === "poisoned"
-                        ? 1.5
-                        : 1
                     const maxHP = Math.max(1, gameState.currentBattle?.enemyMaxHP || 1)
                     const currentHP = Math.max(1, gameState.currentBattle?.enemyHP || 1)
-                    const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP)
-
-                    const computedChance = hpFactor * catchRate * pokeballs[ball].chance * statusMultiplier
-                    const ballChance = isMasterBall ? 1 : clamp(computedChance, 0, 1)
+                    const rarityForCatch = (isLegendaryBoss ? "lendario" : (enemyRarity || "comum")) as "comum" | "raro" | "lendario"
+                    const ballChance = isMasterBall
+                      ? 1
+                      : getClassicCatchChance(ball, rarityForCatch, currentHP, maxHP, statusCondition)
 
                     return (
                   <Button

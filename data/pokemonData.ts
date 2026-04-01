@@ -198,7 +198,7 @@ export const starterPokemon: Record<string, Pokemon> = {
   Squirtle: {
     HP: 50,
     maxHP: 50,
-    attacks: { Investida: [10, 18], "Pistola d'ÃƒÂgua": [12, 25] },
+    attacks: { Investida: [10, 18], "Pistola d'Água": [12, 25] },
     level: 5,
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/squirtle.gif",
@@ -2178,161 +2178,51 @@ export const initializePP = (
 }
 
 const genericLevelUpMoves: Record<string, LevelUpMove[]> = {
-  Normal: [
-    { level: 7, name: "Ataque Rápido", power: [12, 22] },
-    { level: 12, name: "Cabeçada", power: [18, 30] },
-    { level: 18, name: "Swift", power: [22, 36] },
-    { level: 26, name: "Golpe Corporal", power: [28, 46] },
-  ],
-  Fogo: [
-    { level: 7, name: "Giro de Fogo", power: [16, 28] },
-    { level: 12, name: "Flame Charge", power: [20, 34] },
-    { level: 18, name: "Lança Chamas", power: [28, 46] },
-    { level: 28, name: "Fire Blast", power: [38, 62] },
-  ],
-  Água: [
-    { level: 7, name: "Raio de Bolhas", power: [15, 26] },
-    { level: 12, name: "Water Pulse", power: [20, 34] },
-    { level: 18, name: "Raio de Gelo", power: [26, 42] },
-    { level: 28, name: "Hydro Pump", power: [36, 58] },
-  ],
-  Grama: [
-    { level: 7, name: "Razor Leaf", power: [15, 26] },
-    { level: 12, name: "Bomba de Semente", power: [20, 34] },
-    { level: 18, name: "Energy Ball", power: [26, 42] },
-    { level: 28, name: "Solar Beam", power: [36, 58] },
-  ],
-  Elétrico: [
-    { level: 7, name: "Thunder Wave", power: [0, 0] },
-    { level: 12, name: "Choque do Trovão", power: [18, 30] },
-    { level: 18, name: "Thunderbolt", power: [28, 44] },
-    { level: 28, name: "Thunder", power: [36, 58] },
-  ],
-  Veneno: [
-    { level: 7, name: "Pó Venenoso", power: [0, 0] },
-    { level: 12, name: "Ácido", power: [18, 30] },
-    { level: 18, name: "Poison Sting", power: [20, 34] },
-    { level: 28, name: "Gunk Shot", power: [34, 56] },
-  ],
-  Voador: [
-    { level: 7, name: "Rajada", power: [12, 22] },
-    { level: 12, name: "Ataque de Asa", power: [18, 30] },
-    { level: 18, name: "Air Slash", power: [24, 40] },
-    { level: 28, name: "Sky Attack", power: [34, 56] },
-  ],
-  Lutador: [
-    { level: 7, name: "Soco Karatê", power: [16, 28] },
-    { level: 12, name: "Mach Punch", power: [18, 30] },
-    { level: 18, name: "Sky Uppercut", power: [26, 42] },
-    { level: 28, name: "Close Combat", power: [34, 56] },
-  ],
-  Fantasma: [
-    { level: 7, name: "Lambida", power: [12, 22] },
-    { level: 12, name: "Night Shade", power: [18, 30] },
-    { level: 18, name: "Bola Sombria", power: [28, 44] },
-    { level: 28, name: "Dark Pulse", power: [34, 56] },
-  ],
-  Pedra: [
-    { level: 7, name: "Rock Throw", power: [16, 28] },
-    { level: 12, name: "Ancient Power", power: [20, 34] },
-    { level: 18, name: "Rock Slide", power: [28, 44] },
-    { level: 28, name: "Stone Edge", power: [36, 58] },
-  ],
-  Terra: [
-    { level: 7, name: "Mud Shot", power: [16, 28] },
-    { level: 12, name: "Arremesso de Osso", power: [20, 34] },
-    { level: 18, name: "Bola de Lama", power: [24, 40] },
-    { level: 28, name: "Earthquake", power: [36, 58] },
-  ],
-  Inseto: [
-    { level: 7, name: "String Shot", power: [0, 0] },
-    { level: 12, name: "Bug Bite", power: [18, 30] },
-    { level: 18, name: "U-turn", power: [24, 40] },
-    { level: 28, name: "Megahorn", power: [34, 56] },
-  ],
-  Psíquico: [
-    { level: 7, name: "Confusão", power: [14, 24] },
-    { level: 12, name: "Psybeam", power: [20, 34] },
-    { level: 18, name: "Hipnose", power: [0, 0] },
-    { level: 28, name: "Psychic", power: [34, 56] },
-  ],
-  Gelo: [
-    { level: 7, name: "Powder Snow", power: [12, 22] },
-    { level: 12, name: "Aurora Beam", power: [18, 30] },
-    { level: 18, name: "Ice Beam", power: [28, 44] },
-    { level: 28, name: "Nevasca", power: [36, 58] },
-  ],
-  Dragão: [
-    { level: 7, name: "Fúria do Dragão", power: [18, 30] },
-    { level: 12, name: "Dragon Pulse", power: [24, 40] },
-    { level: 18, name: "Dragon Claw", power: [30, 48] },
-    { level: 28, name: "Hyper Beam", power: [40, 65] },
-  ],
-  Aço: [
-    { level: 7, name: "Metal Claw", power: [18, 30] },
-    { level: 12, name: "Iron Head", power: [24, 40] },
-    { level: 18, name: "Gyro Ball", power: [28, 44] },
-    { level: 28, name: "Meteor Mash", power: [36, 58] },
-  ],
-  Sombrio: [
-    { level: 7, name: "Bite", power: [14, 24] },
-    { level: 12, name: "Crunch", power: [22, 36] },
-    { level: 18, name: "Night Slash", power: [28, 44] },
-    { level: 28, name: "Dark Pulse", power: [34, 56] },
-  ],
-  Fada: [
-    { level: 7, name: "Sweet Kiss", power: [0, 0] },
-    { level: 12, name: "Disarming Voice", power: [18, 30] },
-    { level: 18, name: "Play Rough", power: [28, 44] },
-    { level: 28, name: "Moonblast", power: [34, 56] },
-  ],
+  // Disabled on purpose: fallback by elemental type generated many non-classic moves.
+  // We now prefer species-only learnsets to keep progression close to classic games.
 }
 
 const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   Charmander: [
-    { level: 7, name: "Giro de Fogo", power: [16, 28] },
-    { level: 10, name: "Flame Charge", power: [18, 30] },
-    { level: 16, name: "Fire Fang", power: [22, 36] },
-    { level: 24, name: "Flamethrower", power: [30, 48] },
+    { level: 9, name: "Brasa", power: [14, 24] },
+    { level: 15, name: "Giro de Fogo", power: [16, 28] },
+    { level: 30, name: "Lança Chamas", power: [28, 46] },
   ],
   Charmeleon: [
-    { level: 17, name: "Fire Fang", power: [24, 38] },
-    { level: 24, name: "Flamethrower", power: [30, 48] },
-    { level: 34, name: "Fire Blast", power: [38, 60] },
+    { level: 24, name: "Giro de Fogo", power: [18, 30] },
+    { level: 38, name: "Lança Chamas", power: [30, 48] },
   ],
   Charizard: [
-    { level: 36, name: "Air Slash", power: [30, 48] },
-    { level: 42, name: "Fire Blast", power: [40, 64] },
+    { level: 36, name: "Ataque de Asa", power: [24, 40] },
+    { level: 46, name: "Lança Chamas", power: [34, 54] },
   ],
   Squirtle: [
-    { level: 7, name: "Water Pulse", power: [18, 30] },
-    { level: 10, name: "Bite", power: [14, 24] },
-    { level: 16, name: "Aqua Tail", power: [24, 38] },
-    { level: 24, name: "Hydro Pump", power: [34, 54] },
+    { level: 8, name: "Pistola d'Água", power: [14, 24] },
+    { level: 15, name: "Mordida", power: [14, 24] },
+    { level: 24, name: "Raio de Bolhas", power: [18, 30] },
+    { level: 31, name: "Hidro Bomba", power: [34, 54] },
   ],
   Wartortle: [
-    { level: 17, name: "Aqua Tail", power: [26, 40] },
-    { level: 24, name: "Ice Beam", power: [30, 48] },
-    { level: 34, name: "Hydro Pump", power: [36, 58] },
+    { level: 24, name: "Raio de Bolhas", power: [20, 34] },
+    { level: 42, name: "Hidro Bomba", power: [36, 58] },
   ],
   Blastoise: [
-    { level: 36, name: "Hydro Pump", power: [38, 60] },
-    { level: 42, name: "Flash Cannon", power: [34, 56] },
+    { level: 42, name: "Hidro Bomba", power: [38, 60] },
   ],
   Bulbasaur: [
-    { level: 7, name: "Razor Leaf", power: [16, 28] },
-    { level: 10, name: "Sleep Powder", power: [0, 0] },
-    { level: 16, name: "Bomba de Semente", power: [24, 38] },
-    { level: 24, name: "Energy Ball", power: [30, 48] },
+    { level: 7, name: "Chicote de Vinha", power: [14, 24] },
+    { level: 13, name: "Pó Venenoso", power: [0, 0] },
+    { level: 20, name: "Razor Leaf", power: [20, 34] },
+    { level: 27, name: "Bomba de Semente", power: [28, 44] },
   ],
   Ivysaur: [
-    { level: 17, name: "Bomba de Semente", power: [26, 40] },
-    { level: 24, name: "Energy Ball", power: [30, 48] },
-    { level: 34, name: "Solar Beam", power: [38, 60] },
+    { level: 20, name: "Razor Leaf", power: [22, 36] },
+    { level: 30, name: "Bomba de Semente", power: [30, 48] },
+    { level: 46, name: "Solar Beam", power: [38, 60] },
   ],
   Venusaur: [
-    { level: 36, name: "Petal Dance", power: [34, 56] },
-    { level: 42, name: "Solar Beam", power: [40, 64] },
+    { level: 32, name: "Petal Dance", power: [34, 56] },
+    { level: 53, name: "Solar Beam", power: [40, 64] },
   ],
   Pidgey: [
     { level: 9, name: "Ataque Rápido", power: [14, 24] },
@@ -2617,16 +2507,6 @@ export const getLevelUpMoveForPokemon = (
     return speciesMove
   }
 
-  const types = normalizeTypeText(pokemonType).split("/").filter(Boolean)
-  const movePools = [...types, "Normal"]
-
-  for (const type of movePools) {
-    const candidate = genericLevelUpMoves[type]?.find((move) => move.level === level && !currentMoves.includes(move.name))
-    if (candidate) {
-      return candidate
-    }
-  }
-
   return null
 }
 
@@ -2656,20 +2536,39 @@ export const getLearnableMovesForPokemon = (
   }
 
   const template = getPokemonBattleTemplate(pokemonName)
-  if (template) {
+  const hasSpeciesLearnset = (speciesLevelUpMoves[pokemonName] || []).length > 0
+
+  if (template && !hasSpeciesLearnset) {
     Object.entries(template.attacks).forEach(([name, power]) => registerMove({ level: 1, name, power }))
   }
 
   ;(speciesLevelUpMoves[pokemonName] || []).forEach(registerMove)
 
-  const types = normalizeTypeText(pokemonType).split("/").filter(Boolean)
-  const movePools = [...types, "Normal"]
+  return Array.from(moveMap.values()).sort((moveA, moveB) => moveA.level - moveB.level)
+}
 
-  movePools.forEach((type) => {
-    ;(genericLevelUpMoves[type] || []).forEach(registerMove)
+export const getLegalBattleAttacksForPokemon = (
+  pokemonName: string,
+  pokemonType: string | undefined,
+  level: number,
+  maxMoves = 4,
+): Record<string, [number, number]> => {
+  const learnableMoves = getLearnableMovesForPokemon(pokemonName, pokemonType, level, [])
+
+  if (learnableMoves.length === 0) {
+    return getPokemonBattleTemplate(pokemonName)?.attacks || {}
+  }
+
+  const latestByMove = new Map<string, LevelUpMove>()
+  learnableMoves.forEach((move) => {
+    latestByMove.set(normalizeMoveLookupKey(move.name), move)
   })
 
-  return Array.from(moveMap.values()).sort((moveA, moveB) => moveA.level - moveB.level)
+  const selectedMoves = Array.from(latestByMove.values())
+    .sort((moveA, moveB) => moveA.level - moveB.level)
+    .slice(-maxMoves)
+
+  return Object.fromEntries(selectedMoves.map((move) => [move.name, move.power]))
 }
 
 export const getEvolutionForPokemon = (pokemonName: string, level: number): EvolutionRule | null => {
