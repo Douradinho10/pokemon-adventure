@@ -476,7 +476,29 @@ const buildMinWildLevelBySpecies = () => {
   return result
 }
 
-const minWildLevelBySpecies = buildMinWildLevelBySpecies()
+const minWildLevelOverrides: Record<string, number> = {
+  Raichu: 30,
+  Clefable: 30,
+  Wigglytuff: 30,
+  Vileplume: 36,
+  Victreebel: 36,
+  Poliwrath: 36,
+  Bellossom: 36,
+  Slowking: 37,
+  Steelix: 36,
+  Scizor: 30,
+  Kingdra: 45,
+}
+
+const minWildLevelBySpecies = (() => {
+  const computed = buildMinWildLevelBySpecies()
+
+  Object.entries(minWildLevelOverrides).forEach(([species, minLevel]) => {
+    computed[species] = Math.max(computed[species] || 1, minLevel)
+  })
+
+  return computed
+})()
 
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
