@@ -1884,11 +1884,12 @@ export default function PokemonAdventure() {
     const evolution = getEvolutionForPokemon(activePokemonName, finalLevel)
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
-    if (evolution && evolutionTemplate) {
+    if (evolution) {
       // Simplified evolution: rename, change sprite and boost stats dramatically.
       const evolvedName = evolution.evolvesTo
 
-      const evolvedMaxHP = Math.max(1, Math.round(calculateHP(evolutionTemplate.baseHP, finalLevel, evolvedName) * 1.5))
+      const evolvedBaseHP = evolutionTemplate?.baseHP ?? pokemon.maxHP
+      const evolvedMaxHP = Math.max(1, Math.round(calculateHP(evolvedBaseHP, finalLevel, evolvedName) * 1.5))
       const evolvedHP = evolvedMaxHP
 
       const evolvedAttacks = Object.fromEntries(
@@ -1909,10 +1910,10 @@ export default function PokemonAdventure() {
         maxHP: evolvedMaxHP,
         attacks: evolvedAttacks,
         attackPP: syncAttackPP(pokemon.attackPP, evolvedAttacks),
-        sprite: evolutionTemplate.sprite,
-        spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
-        type: evolutionTemplate.type,
-        speed: Math.max(1, Math.round((evolutionTemplate.speed ?? pokemon.speed ?? 50) * 1.25)),
+        sprite: evolutionTemplate?.sprite || getPokemonSpriteUrl(evolvedName, undefined, "front", Boolean(pokemon.isShiny)),
+        spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate?.sprite, Boolean(pokemon.isShiny)),
+        type: evolutionTemplate?.type ?? pokemon.type,
+        speed: Math.max(1, Math.round(((evolutionTemplate?.speed ?? pokemon.speed ?? 50)) * 1.25)),
         isShiny: pokemon.isShiny,
       }
 
@@ -1932,7 +1933,7 @@ export default function PokemonAdventure() {
         currentBattle: gameState.currentBattle
           ? {
               ...gameState.currentBattle,
-              playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate.sprite, "back", Boolean(pokemon.isShiny)),
+              playerSprite: getPokemonSpriteUrl(evolvedName, evolutionTemplate?.sprite, "back", Boolean(pokemon.isShiny)),
             }
           : null,
       })
