@@ -1885,22 +1885,16 @@ export default function PokemonAdventure() {
     const evolutionTemplate = evolution ? getPokemonBattleTemplate(evolution.evolvesTo) : null
 
     if (evolution) {
-      // Simplified evolution: rename, change sprite and boost stats dramatically.
       const evolvedName = evolution.evolvesTo
 
       const evolvedBaseHP = evolutionTemplate?.baseHP ?? pokemon.maxHP
-      const evolvedMaxHP = Math.max(1, Math.round(calculateHP(evolvedBaseHP, finalLevel, evolvedName) * 1.5))
-      const evolvedHP = evolvedMaxHP
+      const evolvedMaxHP = Math.max(1, calculateHP(evolvedBaseHP, finalLevel, evolvedName))
+      const hpDeficit = Math.max(0, leveledMaxHP - leveledHP)
+      const evolvedHP = Math.max(1, evolvedMaxHP - hpDeficit)
 
-      const evolvedAttacks = Object.fromEntries(
-        Object.entries(finalScaledAttacks).map(([name, [min, max]]) => [
-          name,
-          [
-            Math.max(1, Math.round(min * 1.5)),
-            Math.max(1, Math.round(max * 1.5)),
-          ] as [number, number],
-        ]),
-      )
+      const evolvedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
+        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
+        : finalScaledAttacks
 
       const evolvedPokemon = {
         ...pokemon,
@@ -1913,8 +1907,9 @@ export default function PokemonAdventure() {
         sprite: evolutionTemplate?.sprite || getPokemonSpriteUrl(evolvedName, undefined, "front", Boolean(pokemon.isShiny)),
         spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate?.sprite, Boolean(pokemon.isShiny)),
         type: evolutionTemplate?.type ?? pokemon.type,
-        speed: Math.max(1, Math.round(((evolutionTemplate?.speed ?? pokemon.speed ?? 50)) * 1.25)),
+        speed: Math.max(1, evolutionTemplate?.speed ?? pokemon.speed ?? 50),
         isShiny: pokemon.isShiny,
+        pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
       }
 
       const nextTeam = Object.fromEntries(
@@ -1939,7 +1934,18 @@ export default function PokemonAdventure() {
       })
 
       setRecentEvolution({ from: activePokemonName, to: evolvedName })
-      setShowModal("evolution")
+
+      if (learnedMove && Object.keys(finalScaledAttacks).length >= 4) {
+        showScreenNotice(`📚 ${evolvedName} quer aprender ${normalizeDisplayText(learnedMove.name)}! Escolhe um ataque para trocar.`)
+        setAttackToReplace(null)
+        setShowModal("evolution-attacks")
+      } else {
+        if (learnedMove) {
+          showScreenNotice(`📚 ${evolvedName} aprendeu ${normalizeDisplayText(learnedMove.name)}!`)
+        }
+        setShowModal("evolution")
+      }
+
       addLog(`✨ ${activePokemonName} evoluiu para ${evolvedName}!`)
       return
     } else {
