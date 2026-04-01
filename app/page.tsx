@@ -433,11 +433,67 @@ const getTargetRarityForBattle = (battleCount: number) => {
   return "comum" as const
 }
 
-const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment) => {
+const buildMinWildLevelBySpecies = () => {
+  const speciesNames = Object.keys(wildPokemon)
+  const cache = new Map<string, number>()
+  const visiting = new Set<string>()
+
+  const resolveMinLevel = (species: string): number => {
+    const cached = cache.get(species)
+    if (cached !== undefined) {
+      return cached
+    }
+
+    if (visiting.has(species)) {
+      return 1
+    }
+
+    visiting.add(species)
+
+    const preEvolutionLevels = speciesNames
+      .map((candidate) => {
+        const candidateRule = getEvolutionForPokemon(candidate, 100)
+        if (!candidateRule || candidateRule.evolvesTo !== species) {
+          return null
+        }
+
+        const preMin = resolveMinLevel(candidate)
+        return Math.max(candidateRule.level, preMin)
+      })
+      .filter((value): value is number => value !== null)
+
+    visiting.delete(species)
+
+    const minLevel = preEvolutionLevels.length > 0 ? Math.max(...preEvolutionLevels) : 1
+    cache.set(species, minLevel)
+    return minLevel
+  }
+
+  const result: Record<string, number> = {}
+  speciesNames.forEach((species) => {
+    result[species] = resolveMinLevel(species)
+  })
+  return result
+}
+
+const minWildLevelBySpecies = buildMinWildLevelBySpecies()
+
+const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
   const environmentPool = getEnvironmentWildPool(environment)
-  const rarityPool = environmentPool.filter((name) => wildPokemon[name].rarity === targetRarity)
-  const selectedPool = rarityPool.length > 0 ? rarityPool : environmentPool
+  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+
+  const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
+  const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
+
+  if (selectedPool.length === 0) {
+    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+    const fallbackPick = pickWeightedPokemon(fallbackByLevel, environment)
+    if (fallbackPick) {
+      return fallbackPick
+    }
+  }
+
   const weightedPick = pickWeightedPokemon(selectedPool, environment)
 
   if (weightedPick) {
@@ -741,8 +797,8 @@ export default function PokemonAdventure() {
     (activePokemonName: string, activePokemonLevel: number): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
       const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
-      const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment)
       const enemyLevel = getScaledEnemyLevel(gameState.battles, random)
+      const baseEnemyName = getRandomWildPokemonForEnvironment(nextWave, gameState.currentEnvironment, enemyLevel)
 
       let enemyName = baseEnemyName
       for (let i = 0; i < 4; i++) {
