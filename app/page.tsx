@@ -1890,7 +1890,7 @@ export default function PokemonAdventure() {
         sprite: evolutionTemplate.sprite,
         spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate.sprite, Boolean(pokemon.isShiny)),
         type: evolutionTemplate.type,
-        speed: Math.max(1, Math.round((evolutionTemplate.speed || pokemon.speed) * 1.25)),
+        speed: Math.max(1, Math.round((evolutionTemplate.speed ?? pokemon.speed ?? 50) * 1.25)),
         isShiny: pokemon.isShiny,
       }
 
