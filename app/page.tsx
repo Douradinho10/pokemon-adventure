@@ -43,6 +43,7 @@ import {
   getAvailableLeaderboardMonths,
   getCurrentMonthKey,
   getMonthlyLeaderboard,
+  getPublicCasualLobbies,
   getSoloFarthestLeaderboard,
   joinMultiplayerRoom,
   leaveMultiplayerRoom,
@@ -54,6 +55,8 @@ import {
   updateMultiplayerPlayerWave,
   type MonthlyLeaderboardEntry,
   type MultiplayerRoom,
+  type MultiplayerRoomVisibility,
+  type PublicCasualLobbySummary,
   type SoloLeaderboardEntry,
 } from "../lib/multiplayerService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
@@ -693,7 +696,10 @@ export default function PokemonAdventure() {
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
   const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
+  const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("public")
   const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
+  const [publicCasualLobbies, setPublicCasualLobbies] = useState<PublicCasualLobbySummary[]>([])
+  const [publicCasualLoading, setPublicCasualLoading] = useState(false)
   const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
   const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
   const [multiplayerMode, setMultiplayerMode] = useState(false)
@@ -1031,7 +1037,7 @@ export default function PokemonAdventure() {
   }, [accountName, accountUserId, gameState.battles, multiplayerJoinedRoomId, multiplayerMode])
 
   const handleCreateMultiplayerRoom = useCallback(
-    async (maxPlayers: 2 | 3) => {
+    async (maxPlayers: 2 | 3, visibility: MultiplayerRoomVisibility = "public") => {
       if (!accountUserId) {
         setMultiplayerError("Faz login para criar uma sala multiplayer.")
         return
@@ -1046,6 +1052,7 @@ export default function PokemonAdventure() {
           hostDisplayName: accountName,
           maxPlayers,
           mode: "casual",
+          visibility,
         })
 
         setMultiplayerJoinedRoomId(room.id)
@@ -1064,6 +1071,7 @@ export default function PokemonAdventure() {
           hostUserId: accountUserId,
           hostDisplayName: accountName,
           mode: "casual",
+          visibility,
           maxPlayers,
           status: "waiting",
           createdAt,
@@ -1137,26 +1145,34 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      let targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
+      let targetRoomId: string | null = null
+      let joinedExisting = false
 
-      if (targetRoomId) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
+        if (!targetRoomId) {
+          break
+        }
+
         const joinResult = await joinMultiplayerRoom({
           roomId: targetRoomId,
           userId: accountUserId,
           displayName: accountName,
         })
 
-        if (!joinResult.ok) {
-          targetRoomId = null
+        if (joinResult.ok) {
+          joinedExisting = true
+          break
         }
       }
 
-      if (!targetRoomId) {
+      if (!joinedExisting) {
         const room = await createMultiplayerRoom({
           hostUserId: accountUserId,
           hostDisplayName: accountName,
           maxPlayers,
           mode: "competitive",
+          visibility: "private",
         })
 
         targetRoomId = room.id
@@ -1178,6 +1194,7 @@ export default function PokemonAdventure() {
         hostUserId: accountUserId,
         hostDisplayName: accountName,
         mode: "competitive",
+        visibility: "private",
         maxPlayers,
         status: "active",
         createdAt,
@@ -1200,6 +1217,70 @@ export default function PokemonAdventure() {
       setMultiplayerBusy(false)
     }
   }, [accountName, accountUserId, showScreenNotice])
+
+  const refreshPublicCasualLobbies = useCallback(async () => {
+    setPublicCasualLoading(true)
+    try {
+      const lobbies = await getPublicCasualLobbies(30)
+      setPublicCasualLobbies(lobbies)
+    } catch {
+      setPublicCasualLobbies([])
+    } finally {
+      setPublicCasualLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || Boolean(multiplayerJoinedRoomId)) {
+      return
+    }
+
+    refreshPublicCasualLobbies()
+    const intervalId = window.setInterval(() => {
+      refreshPublicCasualLobbies()
+    }, 5000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [currentScreen, multiplayerJoinedRoomId, multiplayerSection, refreshPublicCasualLobbies])
+
+  const handleJoinPublicCasualLobby = useCallback(
+    async (roomId: string) => {
+      if (!accountUserId) {
+        setMultiplayerError("Faz login para entrar numa sala multiplayer.")
+        return
+      }
+
+      setMultiplayerBusy(true)
+      setMultiplayerError(null)
+
+      try {
+        const result = await joinMultiplayerRoom({
+          roomId,
+          userId: accountUserId,
+          displayName: accountName,
+        })
+
+        if (!result.ok) {
+          setMultiplayerError(result.message || "Nao foi possivel entrar na sala publica.")
+          refreshPublicCasualLobbies()
+          return
+        }
+
+        setMultiplayerJoinedRoomId(roomId)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(true)
+        setMultiplayerSection("casual")
+        showScreenNotice("Entraste numa sala casual publica!")
+      } catch {
+        setMultiplayerError("Erro ao entrar na sala publica.")
+      } finally {
+        setMultiplayerBusy(false)
+      }
+    },
+    [accountName, accountUserId, refreshPublicCasualLobbies, showScreenNotice],
+  )
 
   const handleLeaveMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
@@ -3185,25 +3266,75 @@ export default function PokemonAdventure() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
-                      onClick={() => handleCreateMultiplayerRoom(2)}
-                      disabled={multiplayerBusy}
-                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      onClick={() => setCasualLobbyVisibility("public")}
+                      className={`pixel-menu-button h-10 ${casualLobbyVisibility === "public" ? "bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
                     >
-                      Hostear Casual (2)
+                      Lobby Publico
                     </Button>
                     <Button
-                      onClick={() => handleCreateMultiplayerRoom(3)}
-                      disabled={multiplayerBusy}
-                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      onClick={() => setCasualLobbyVisibility("private")}
+                      className={`pixel-menu-button h-10 ${casualLobbyVisibility === "private" ? "bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
                     >
-                      Hostear Casual (3)
+                      Lobby Privado
                     </Button>
                   </div>
 
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => handleCreateMultiplayerRoom(2, casualLobbyVisibility)}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Hostear {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (2)
+                    </Button>
+                    <Button
+                      onClick={() => handleCreateMultiplayerRoom(3, casualLobbyVisibility)}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Hostear {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (3)
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border-2 border-slate-700 bg-white/70 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">Lobbies Publicos</p>
+                      <Button
+                        onClick={refreshPublicCasualLobbies}
+                        disabled={multiplayerBusy || publicCasualLoading}
+                        className="pixel-menu-button h-8 px-3 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
+                      >
+                        Atualizar
+                      </Button>
+                    </div>
+
+                    {publicCasualLobbies.length === 0 && (
+                      <p className="text-xs text-slate-700">Sem lobbies publicos abertos no momento.</p>
+                    )}
+
+                    <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                      {publicCasualLobbies.map((lobby) => (
+                        <div key={lobby.id} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-white px-2 py-2">
+                          <div className="text-xs text-slate-800">
+                            <div className="font-bold">Host: {lobby.hostDisplayName}</div>
+                            <div className="opacity-80">Jogadores: {lobby.playersCount}/{lobby.maxPlayers}</div>
+                          </div>
+                          <Button
+                            onClick={() => handleJoinPublicCasualLobby(lobby.id)}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-8 px-3 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
+                          >
+                            Entrar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Codigo da sala casual</label>
+                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Codigo da sala privada</label>
                     <input
                       value={multiplayerRoomCodeInput}
                       onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
@@ -3215,7 +3346,7 @@ export default function PokemonAdventure() {
                       disabled={multiplayerBusy}
                       className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                     >
-                      Entrar na Sala (Casual)
+                      Entrar na Sala Privada
                     </Button>
                   </div>
                 </>

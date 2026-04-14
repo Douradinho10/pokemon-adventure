@@ -5,6 +5,7 @@ import { getFirebaseDb } from "./firebase"
 
 export type MultiplayerRoomStatus = "waiting" | "active" | "finished"
 export type MultiplayerRoomMode = "competitive" | "casual"
+export type MultiplayerRoomVisibility = "public" | "private"
 
 export interface MultiplayerRoomPlayer {
   userId: string
@@ -19,6 +20,7 @@ export interface MultiplayerRoom {
   hostUserId: string
   hostDisplayName: string
   mode: MultiplayerRoomMode
+  visibility: MultiplayerRoomVisibility
   maxPlayers: 2 | 3
   status: MultiplayerRoomStatus
   createdAt: number
@@ -42,6 +44,14 @@ export interface SoloLeaderboardEntry {
   displayName: string
   wave: number
   finishedAt: number
+}
+
+export interface PublicCasualLobbySummary {
+  id: string
+  hostDisplayName: string
+  maxPlayers: 2 | 3
+  playersCount: number
+  createdAt: number
 }
 
 const ROOM_ROOT = "multiplayer/rooms"
@@ -171,6 +181,7 @@ export async function createMultiplayerRoom(params: {
   hostDisplayName: string
   maxPlayers: 2 | 3
   mode: MultiplayerRoomMode
+  visibility?: MultiplayerRoomVisibility
 }): Promise<MultiplayerRoom> {
   const db = requireDatabase()
   const roomsRef = ref(db, ROOM_ROOT)
@@ -186,6 +197,7 @@ export async function createMultiplayerRoom(params: {
     hostUserId: params.hostUserId,
     hostDisplayName: params.hostDisplayName,
     mode: params.mode,
+    visibility: params.visibility || "private",
     maxPlayers: params.maxPlayers,
     status: "waiting",
     createdAt,
@@ -214,18 +226,49 @@ export async function findAvailableCompetitiveRoom(maxPlayers: 2 | 3): Promise<s
 
   const rooms = (snapshot.val() as Record<string, MultiplayerRoom>) || {}
   const candidates = Object.values(rooms)
-    .filter((room) => {
-      const playersCount = Object.keys(room.players || {}).length
-      return (
-        room.mode === "competitive" &&
-        room.maxPlayers === maxPlayers &&
-        room.status === "waiting" &&
-        playersCount < room.maxPlayers
-      )
+    .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
+    .filter(({ room, playersCount }) => {
+      return room.mode === "competitive" && room.maxPlayers === maxPlayers && room.status === "waiting" && playersCount < room.maxPlayers
     })
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+    .sort((a, b) => {
+      if (b.playersCount !== a.playersCount) {
+        return b.playersCount - a.playersCount
+      }
+      return (a.room.createdAt || 0) - (b.room.createdAt || 0)
+    })
 
-  return candidates[0]?.id || null
+  return candidates[0]?.room.id || null
+}
+
+export async function getPublicCasualLobbies(limitCount = 30): Promise<PublicCasualLobbySummary[]> {
+  const db = requireDatabase()
+  const roomsRef = ref(db, ROOM_ROOT)
+  const snapshot = await get(roomsRef)
+
+  if (!snapshot.exists()) {
+    return []
+  }
+
+  const rooms = (snapshot.val() as Record<string, MultiplayerRoom>) || {}
+  return Object.values(rooms)
+    .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
+    .filter(({ room, playersCount }) => {
+      return room.mode === "casual" && room.visibility === "public" && room.status === "waiting" && playersCount < room.maxPlayers
+    })
+    .sort((a, b) => {
+      if (b.playersCount !== a.playersCount) {
+        return b.playersCount - a.playersCount
+      }
+      return (a.room.createdAt || 0) - (b.room.createdAt || 0)
+    })
+    .slice(0, limitCount)
+    .map(({ room, playersCount }) => ({
+      id: room.id,
+      hostDisplayName: room.hostDisplayName,
+      maxPlayers: room.maxPlayers,
+      playersCount,
+      createdAt: room.createdAt,
+    }))
 }
 
 export async function joinMultiplayerRoom(params: {
