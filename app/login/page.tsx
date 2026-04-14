@@ -148,7 +148,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center p-4">
       <div className="pixel-window w-full max-w-md bg-[#f8f4dc] p-5">
-        <div className="pixel-band mb-5 bg-[linear-gradient(90deg,#6b7280_0%,#6b7280_30%,#94a3b8_30%,#94a3b8_60%,#7c8b73_60%,#7c8b73_100%)] px-4 py-3 text-center">
+        <div className="pixel-band mb-5 bg-[linear-gradient(180deg,#dbeafe_0%,#dbeafe_50%,#bfdbfe_50%,#bfdbfe_100%)] px-4 py-3 text-center">
           <h1 className="font-pixel text-sm leading-relaxed text-slate-900">{pageTitle}</h1>
           <p className="mt-1 text-xs text-slate-700">Autenticação Firebase</p>
         </div>

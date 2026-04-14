@@ -5,7 +5,7 @@ import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User } from "lucide-react"
+import { Trophy, User, Users } from "lucide-react"
 import { onAuthStateChanged } from "firebase/auth"
 import { useLocalGameState } from "../hooks/useLocalGameState"
 import {
@@ -37,10 +37,39 @@ import { PokemonCard } from "../components/PokemonCard"
 import { AnimatedSprite } from "../components/AnimatedSprite"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { saveGameToFirebase } from "../lib/firebaseRtdbService"
+import {
+  createMultiplayerRoom,
+  findAvailableCompetitiveRoom,
+  getAvailableLeaderboardMonths,
+  getCurrentMonthKey,
+  getMonthlyLeaderboard,
+  getSoloFarthestLeaderboard,
+  joinMultiplayerRoom,
+  leaveMultiplayerRoom,
+  markMultiplayerPlayerFinished,
+  startMultiplayerRoom,
+  submitMonthlyLeaderboardScore,
+  submitSoloFarthestRun,
+  subscribeMultiplayerRoom,
+  updateMultiplayerPlayerWave,
+  type MonthlyLeaderboardEntry,
+  type MultiplayerRoom,
+  type SoloLeaderboardEntry,
+} from "../lib/multiplayerService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import type { StatusCondition } from "../hooks/useGameState"
 
-type Screen = "main-menu" | "menu" | "battle" | "shop" | "select-slot" | "select-continue" | "game" // Added 'game' screen
+type Screen =
+  | "main-menu"
+  | "solo-menu"
+  | "leaderboards"
+  | "menu"
+  | "battle"
+  | "shop"
+  | "select-slot"
+  | "select-continue"
+  | "game"
+  | "multiplayer"
 type Modal =
   | "starter"
   | "attacks"
@@ -121,6 +150,8 @@ const CLASSIC_BASE_XP_YIELD: Record<string, number> = {
   raro: 42,
   lendario: 80,
 }
+
+const LOCAL_ROOM_PREFIX = "LOCAL-"
 
 const getClassicTotalXpForLevel = (level: number) => {
   const safeLevel = Math.max(1, level)
@@ -332,7 +363,21 @@ const environmentLabels: Record<BattleEnvironment, string> = {
 
 const allBattleEnvironments: BattleEnvironment[] = ["planicie", "vulcanico", "costeiro", "floresta", "caverna", "alturas"]
 
+const environmentRoutes: Record<BattleEnvironment, [BattleEnvironment, BattleEnvironment]> = {
+  planicie: ["floresta", "costeiro"],
+  floresta: ["planicie", "caverna"],
+  caverna: ["floresta", "vulcanico"],
+  vulcanico: ["caverna", "alturas"],
+  alturas: ["vulcanico", "costeiro"],
+  costeiro: ["planicie", "alturas"],
+}
+
 const getDestinationChoices = (currentEnvironment: BattleEnvironment, battles: number): [BattleEnvironment, BattleEnvironment] => {
+  const fixedRoutes = environmentRoutes[currentEnvironment]
+  if (fixedRoutes) {
+    return fixedRoutes
+  }
+
   const candidates = allBattleEnvironments.filter((environment) => environment !== currentEnvironment)
 
   if (candidates.length < 2) {
@@ -643,8 +688,22 @@ export default function PokemonAdventure() {
   const [screenNotice, setScreenNotice] = useState<string | null>(null)
   const [defeatAnimationVisible, setDefeatAnimationVisible] = useState(false)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
+  const [accountUserId, setAccountUserId] = useState<string | null>(null)
   const [accountName, setAccountName] = useState("Treinador")
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
+  const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
+  const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
+  const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
+  const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
+  const [multiplayerMode, setMultiplayerMode] = useState(false)
+  const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
+  const [multiplayerBusy, setMultiplayerBusy] = useState(false)
+  const [multiplayerError, setMultiplayerError] = useState<string | null>(null)
+  const [leaderboardMonth, setLeaderboardMonth] = useState(getCurrentMonthKey())
+  const [leaderboardViewMode, setLeaderboardViewMode] = useState<"solo" | "multiplayer">("solo")
+  const [leaderboardMonths, setLeaderboardMonths] = useState<string[]>([getCurrentMonthKey()])
+  const [leaderboardEntries, setLeaderboardEntries] = useState<MonthlyLeaderboardEntry[]>([])
+  const [soloLeaderboardEntries, setSoloLeaderboardEntries] = useState<SoloLeaderboardEntry[]>([])
   const screenNoticeTimeoutRef = useRef<number | null>(null)
   const defeatResetTimeoutRef = useRef<number | null>(null)
   const defeatHideTimeoutRef = useRef<number | null>(null)
@@ -701,6 +760,7 @@ export default function PokemonAdventure() {
 
     if (!auth) {
       hasAutoRoutedAfterAuthRef.current = false
+      setAccountUserId(null)
       setAccountEmail(null)
       setAccountName("Treinador")
       setIsAuthChecking(false)
@@ -710,6 +770,7 @@ export default function PokemonAdventure() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         hasAutoRoutedAfterAuthRef.current = false
+        setAccountUserId(null)
         setAccountEmail(null)
         setAccountName("Treinador")
         setIsAuthChecking(false)
@@ -717,6 +778,7 @@ export default function PokemonAdventure() {
       }
 
       const displayName = user.displayName || user.email?.split("@")[0] || "Treinador"
+      setAccountUserId(user.uid)
       setAccountEmail(user.email || null)
       setAccountName(displayName)
       setIsAuthChecking(false)
@@ -780,7 +842,15 @@ export default function PokemonAdventure() {
 
     if (gameState.activePokemon) {
       hasAutoRoutedAfterAuthRef.current = true
-      if (currentScreen !== "menu" && currentScreen !== "battle" && currentScreen !== "shop" && currentScreen !== "game") {
+      if (
+        currentScreen !== "menu" &&
+        currentScreen !== "battle" &&
+        currentScreen !== "shop" &&
+        currentScreen !== "game" &&
+        currentScreen !== "multiplayer" &&
+        currentScreen !== "leaderboards" &&
+        currentScreen !== "solo-menu"
+      ) {
         setCurrentScreen("menu")
       }
       return
@@ -830,6 +900,371 @@ export default function PokemonAdventure() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!multiplayerJoinedRoomId) {
+      setMultiplayerRoom(null)
+      return
+    }
+
+    if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+      return
+    }
+
+    let cancelled = false
+    const unsubscribe = subscribeMultiplayerRoom(multiplayerJoinedRoomId, (room) => {
+      if (cancelled) {
+        return
+      }
+
+      if (!room) {
+        setMultiplayerError("Nao foi possivel sincronizar esta sala em tempo real.")
+        return
+      }
+
+      setMultiplayerRoom(room)
+
+      if (accountUserId && !room.players?.[accountUserId]) {
+        setMultiplayerJoinedRoomId(null)
+        setMultiplayerMode(false)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [accountUserId, multiplayerJoinedRoomId])
+
+  useEffect(() => {
+    if (currentScreen !== "leaderboards") {
+      return
+    }
+
+    let cancelled = false
+
+    const loadLeaderboardData = async () => {
+      if (leaderboardViewMode === "solo") {
+        try {
+          const entries = await getSoloFarthestLeaderboard(100)
+
+          if (cancelled) {
+            return
+          }
+
+          setSoloLeaderboardEntries(entries)
+          setMultiplayerError(null)
+        } catch {
+          if (!cancelled) {
+            setMultiplayerError("Nao foi possivel carregar a tabela solo.")
+          }
+        }
+        return
+      }
+
+      try {
+        const [months, entries] = await Promise.all([
+          getAvailableLeaderboardMonths(12),
+          getMonthlyLeaderboard(leaderboardMonth, 100),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        setLeaderboardMonths(months)
+        setLeaderboardEntries(entries)
+        setMultiplayerError(null)
+      } catch {
+        if (!cancelled) {
+          setMultiplayerError("Nao foi possivel carregar a tabela multiplayer.")
+        }
+      }
+    }
+
+    loadLeaderboardData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentScreen, leaderboardMonth, leaderboardViewMode])
+
+  useEffect(() => {
+    if (!multiplayerRoom || !accountUserId) {
+      return
+    }
+
+    const playersCount = Object.keys(multiplayerRoom.players || {}).length
+    const shouldAutoStart = multiplayerRoom.mode === "competitive" && multiplayerRoom.status === "waiting" && playersCount >= 2
+
+    if (!shouldAutoStart || multiplayerRoom.hostUserId !== accountUserId) {
+      return
+    }
+
+    startMultiplayerRoom(multiplayerRoom.id, accountUserId).catch(() => {
+      // Auto-start can race between clients; ignore failures.
+    })
+  }, [accountUserId, multiplayerRoom])
+
+  useEffect(() => {
+    if (!multiplayerMode || !multiplayerJoinedRoomId || !accountUserId) {
+      return
+    }
+
+    if (gameState.battles <= 0) {
+      return
+    }
+
+    if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+      setMultiplayerRoom((prev) => {
+        if (!prev || !prev.players?.[accountUserId]) {
+          return prev
+        }
+
+        const currentPlayer = prev.players[accountUserId]
+        return {
+          ...prev,
+          players: {
+            ...prev.players,
+            [accountUserId]: {
+              ...currentPlayer,
+              bestWave: Math.max(currentPlayer.bestWave, gameState.battles),
+            },
+          },
+        }
+      })
+      return
+    }
+
+    updateMultiplayerPlayerWave({
+      roomId: multiplayerJoinedRoomId,
+      userId: accountUserId,
+      displayName: accountName,
+      wave: gameState.battles,
+    }).catch(() => {
+      // Ignore transient sync errors; next wave update retries.
+    })
+  }, [accountName, accountUserId, gameState.battles, multiplayerJoinedRoomId, multiplayerMode])
+
+  const handleCreateMultiplayerRoom = useCallback(
+    async (maxPlayers: 2 | 3) => {
+      if (!accountUserId) {
+        setMultiplayerError("Faz login para criar uma sala multiplayer.")
+        return
+      }
+
+      setMultiplayerBusy(true)
+      setMultiplayerError(null)
+
+      try {
+        const room = await createMultiplayerRoom({
+          hostUserId: accountUserId,
+          hostDisplayName: accountName,
+          maxPlayers,
+          mode: "casual",
+        })
+
+        setMultiplayerJoinedRoomId(room.id)
+        setMultiplayerRoom(room)
+        setMultiplayerRoomCodeInput(room.id)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(true)
+        showScreenNotice(`Sala criada! Codigo: ${room.id}`)
+      } catch {
+        const localCode = `${LOCAL_ROOM_PREFIX}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+        const createdAt = Date.now()
+
+        setMultiplayerJoinedRoomId(localCode)
+        setMultiplayerRoom({
+          id: localCode,
+          hostUserId: accountUserId,
+          hostDisplayName: accountName,
+          mode: "casual",
+          maxPlayers,
+          status: "waiting",
+          createdAt,
+          players: {
+            [accountUserId]: {
+              userId: accountUserId,
+              displayName: accountName,
+              joinedAt: createdAt,
+              bestWave: 0,
+            },
+          },
+        })
+        setMultiplayerRoomCodeInput(localCode)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(true)
+        setMultiplayerError("Sala criada em modo local. O realtime do Firebase esta indisponivel agora.")
+        showScreenNotice(`Sala local criada! Codigo: ${localCode}`)
+      } finally {
+        setMultiplayerBusy(false)
+      }
+    },
+    [accountName, accountUserId, showScreenNotice],
+  )
+
+  const handleJoinMultiplayerRoom = useCallback(async () => {
+    if (!accountUserId) {
+      setMultiplayerError("Faz login para entrar numa sala multiplayer.")
+      return
+    }
+
+    const roomCode = multiplayerRoomCodeInput.trim()
+    if (!roomCode) {
+      setMultiplayerError("Introduz o codigo da sala.")
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      const result = await joinMultiplayerRoom({
+        roomId: roomCode,
+        userId: accountUserId,
+        displayName: accountName,
+      })
+
+      if (!result.ok) {
+        setMultiplayerError(result.message || "Nao foi possivel entrar na sala.")
+        return
+      }
+
+      setMultiplayerJoinedRoomId(roomCode)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(true)
+      setMultiplayerSection("casual")
+      showScreenNotice("Entraste na sala casual por codigo!")
+    } catch {
+      setMultiplayerError("Erro ao entrar na sala.")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountName, accountUserId, multiplayerRoomCodeInput, showScreenNotice])
+
+  const handleEnterCompetitiveMatch = useCallback(async () => {
+    if (!accountUserId) {
+      setMultiplayerError("Faz login para entrar em competitivo.")
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      let targetRoomId = await findAvailableCompetitiveRoom()
+
+      if (targetRoomId) {
+        const joinResult = await joinMultiplayerRoom({
+          roomId: targetRoomId,
+          userId: accountUserId,
+          displayName: accountName,
+        })
+
+        if (!joinResult.ok) {
+          targetRoomId = null
+        }
+      }
+
+      if (!targetRoomId) {
+        const room = await createMultiplayerRoom({
+          hostUserId: accountUserId,
+          hostDisplayName: accountName,
+          maxPlayers: 2,
+          mode: "competitive",
+        })
+
+        targetRoomId = room.id
+        setMultiplayerRoom(room)
+      }
+
+      setMultiplayerJoinedRoomId(targetRoomId)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerSection("competitive")
+      showScreenNotice("Entraste na fila competitiva. A partida comeca quando completar 2 jogadores.")
+    } catch {
+      setMultiplayerError("Nao foi possivel entrar no competitivo agora.")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountName, accountUserId, showScreenNotice])
+
+  const handleLeaveMultiplayerRoom = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId) {
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        setMultiplayerJoinedRoomId(null)
+        setMultiplayerRoom(null)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(false)
+        showScreenNotice("Saida da sala concluida.")
+        return
+      }
+
+      await leaveMultiplayerRoom(multiplayerJoinedRoomId, accountUserId)
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      showScreenNotice("Saida da sala concluida.")
+    } catch {
+      setMultiplayerError("Erro ao sair da sala.")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
+
+  const handleStartMultiplayerRoom = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId) {
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        setMultiplayerRoom((prev) => (prev ? { ...prev, status: "active", startedAt: Date.now() } : prev))
+        showScreenNotice("Disputa local iniciada!")
+        return
+      }
+
+      const result = await startMultiplayerRoom(multiplayerJoinedRoomId, accountUserId)
+      if (!result.ok) {
+        setMultiplayerError(result.message || "Nao foi possivel iniciar a sala.")
+        return
+      }
+
+      showScreenNotice("Disputa iniciada! Cada jogador pode comecar a run multiplayer.")
+    } catch {
+      setMultiplayerError("Erro ao iniciar a sala.")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
+
+  const handleStartMultiplayerRun = useCallback(() => {
+    if (!multiplayerRoom || multiplayerRoom.status !== "active") {
+      setMultiplayerError("A sala precisa de estar iniciada para comecar a run.")
+      return
+    }
+
+    setMultiplayerMode(true)
+    setCurrentScreen("select-slot")
+    showScreenNotice(
+      multiplayerIsCasual
+        ? "Disputa casual ativa: vence quem chegar mais longe (nao conta no ranking mensal)!"
+        : "Modo multiplayer rankeado ativo: vence quem chegar mais longe!",
+    )
+  }, [multiplayerIsCasual, multiplayerRoom, showScreenNotice])
 
   useEffect(() => {
     const legacyCharges = Number(gameState.inventory[LEGACY_BATTLE_SIM_ITEM] || 0)
@@ -1020,6 +1455,41 @@ export default function PokemonAdventure() {
   }, [gameState.playerTeam, updatePokemon, clearPokemonStatus, addLog])
 
   const handleGameOver = () => {
+    const finalWave = Math.max(0, latestGameStateRef.current.battles)
+
+    if (multiplayerMode && accountUserId) {
+      if (!multiplayerIsCasual) {
+        submitMonthlyLeaderboardScore({
+          userId: accountUserId,
+          displayName: accountName,
+          wave: finalWave,
+          roomId: multiplayerJoinedRoomId || undefined,
+        }).catch(() => {
+          // Ignore monthly submission failures to keep game flow responsive.
+        })
+      }
+
+      if (multiplayerJoinedRoomId && !multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        markMultiplayerPlayerFinished({
+          roomId: multiplayerJoinedRoomId,
+          userId: accountUserId,
+          wave: finalWave,
+        }).catch(() => {
+          // Ignore finish sync failures; room can still continue.
+        })
+      }
+    }
+
+    if (!multiplayerMode && accountUserId) {
+      submitSoloFarthestRun({
+        userId: accountUserId,
+        displayName: accountName,
+        wave: finalWave,
+      }).catch(() => {
+        // Ignore solo leaderboard failures to preserve game flow.
+      })
+    }
+
     setDefeatAnimationVisible(true)
     setScreenNotice(null)
 
@@ -1051,6 +1521,8 @@ export default function PokemonAdventure() {
       clearLog()
       setCurrentScreen("main-menu")
       setShowModal(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
       defeatResetTimeoutRef.current = null
     }, 2300)
 
@@ -1082,11 +1554,6 @@ export default function PokemonAdventure() {
 
     addLog(`🎉 ${enemyName} derrotado! +${reward} moedas`)
     updateGameState({ money: gameState.money + reward })
-
-    if ((gameState.battles + 1) % 10 === 0) {
-      restoreAllPP()
-      addLog(`✨ PP de todos os ataques restaurado! (10 batalhas completadas)`)
-    }
 
     levelUp()
     setTimeout(() => endBattle(), 900)
@@ -1651,6 +2118,23 @@ export default function PokemonAdventure() {
       }
     })
   }, [gameState, updatePokemon])
+
+  const restoreTeamAtCheckpoint = useCallback(() => {
+    Object.keys(gameState.playerTeam).forEach((pokemonName) => {
+      const pokemon = gameState.playerTeam[pokemonName]
+      const restoredPP = pokemon.attackPP
+        ? Object.fromEntries(Object.entries(pokemon.attackPP).map(([move, pp]) => [move, { current: pp.max, max: pp.max }]))
+        : initializePP(pokemon.attacks)
+
+      updatePokemon(pokemonName, {
+        HP: pokemon.maxHP,
+        attackPP: restoredPP,
+        statusCondition: null,
+        statusTurns: undefined,
+        statusWavesRemaining: undefined,
+      })
+    })
+  }, [gameState.playerTeam, updatePokemon])
 
   const useElixir = useCallback(() => {
     if (!gameState.activePokemon || !gameState.inventory["Elixir"] || gameState.inventory["Elixir"] <= 0) {
@@ -2271,15 +2755,22 @@ export default function PokemonAdventure() {
     updateGameState({ currentBattle: null })
     setCurrentScreen("menu")
 
+    const reachedCheckpoint = gameState.battles > 0 && gameState.battles % 10 === 0
+
+    if (reachedCheckpoint) {
+      restoreTeamAtCheckpoint()
+      addLog("💖 Equipa recuperada no checkpoint: HP, PP e status restaurados.")
+    }
+
     const shouldChooseDestination =
-      openDestinationChoice || (gameState.battles > 0 && gameState.battles % 10 === 0)
+      openDestinationChoice || reachedCheckpoint
 
     if (shouldChooseDestination) {
       setDestinationChoices(getDestinationChoices(gameState.currentEnvironment, gameState.battles))
       addLog("🧭 Escolhe o próximo ambiente para continuar a jornada.")
       setShowModal("destination")
     }
-  }, [advanceStatusWaves, updateGameState, gameState.battles, gameState.currentEnvironment, addLog])
+  }, [advanceStatusWaves, updateGameState, gameState.battles, gameState.currentEnvironment, addLog, restoreTeamAtCheckpoint])
 
   const chooseDestination = useCallback((destination: BattleEnvironment) => {
     updateGameState({ currentEnvironment: destination })
@@ -2518,17 +3009,28 @@ export default function PokemonAdventure() {
   )
 
   const renderMainMenu = () => (
-    <div className="relative flex min-h-[60vh] flex-col items-center justify-start gap-8 overflow-visible py-8">
+    <div className="relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden py-2">
       <div className="pointer-events-none absolute inset-0 opacity-70">
         <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
         <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
         <div className="absolute bottom-10 left-12 h-12 w-12 border-4 border-slate-800 bg-sky-300" />
       </div>
+      <div className="pointer-events-none absolute inset-0 z-[5] opacity-65">
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/charizard.png" alt="" aria-hidden="true" className="absolute left-2 top-[10%] hidden h-24 w-24 -rotate-6 md:block lg:left-4 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/gengar.png" alt="" aria-hidden="true" className="absolute left-6 top-[34%] hidden h-24 w-24 rotate-3 md:block lg:left-10 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/lapras.png" alt="" aria-hidden="true" className="absolute left-1 bottom-[26%] hidden h-24 w-24 -rotate-3 md:block lg:left-3 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/snorlax.png" alt="" aria-hidden="true" className="absolute left-8 bottom-[6%] hidden h-24 w-24 rotate-2 md:block lg:left-12 lg:h-28 lg:w-28" />
+
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/blastoise.png" alt="" aria-hidden="true" className="absolute right-2 top-[12%] hidden h-24 w-24 rotate-6 md:block lg:right-4 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/venusaur.png" alt="" aria-hidden="true" className="absolute right-7 top-[36%] hidden h-24 w-24 -rotate-2 md:block lg:right-11 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/pikachu.png" alt="" aria-hidden="true" className="absolute right-2 bottom-[28%] hidden h-24 w-24 rotate-3 md:block lg:right-4 lg:h-28 lg:w-28" />
+        <img src="https://play.pokemonshowdown.com/sprites/gen5/dragonite.png" alt="" aria-hidden="true" className="absolute right-9 bottom-[7%] hidden h-24 w-24 -rotate-4 md:block lg:right-14 lg:h-28 lg:w-28" />
+      </div>
       <div className="relative z-20 w-full max-w-3xl">
         <div className="flex justify-end">
           <Button
             asChild
-            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-4 text-[10px] leading-relaxed sm:text-xs"
+            className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
           >
             <Link href="/perfil" aria-label="Abrir perfil">
               <User className="mr-2 h-4 w-4" />
@@ -2537,41 +3039,355 @@ export default function PokemonAdventure() {
           </Button>
         </div>
       </div>
-      <div className="pixel-surface relative z-10 w-full max-w-3xl bg-[#f8f4dc]/95 p-8 text-center space-y-5">
-        <h2 className="font-pixel text-3xl leading-[1.7] text-slate-900 sm:text-5xl">
+      <div className="pixel-surface relative z-10 w-full max-w-3xl bg-[#f8f4dc]/95 p-5 text-center space-y-3">
+        <h2 className="font-pixel text-2xl leading-[1.5] text-slate-900 sm:text-4xl">
           Pokémon
-          <span className="mt-3 block text-xl text-slate-600 sm:text-3xl">Adventure</span>
+          <span className="mt-2 block text-lg text-slate-600 sm:text-2xl">Adventure</span>
         </h2>
         <p className="mx-auto max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Bem-vindo à tua jornada Pokémon.</p>
-        <p className="text-slate-500 text-sm pixel-text leading-relaxed">
+        <p className="text-slate-500 text-xs pixel-text leading-relaxed">
           📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
         </p>
       </div>
 
-      <div className="flex w-full max-w-md flex-col gap-4">
-        {saveSlots.some((slot) => slot.gameState?.activePokemon) && (
-          <Button
-            onClick={() => setCurrentScreen("select-continue")}
-            className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#0891b2_50%,#0891b2_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
-          >
-            Continuar
-          </Button>
-        )}
-
+      <div className="flex w-full max-w-md flex-col gap-3">
         <Button
-          onClick={() => setCurrentScreen("select-slot")}
-          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
+          onClick={() => setCurrentScreen("solo-menu")}
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
         >
-          🎮 Novo Jogo
+          🎮 Modo Solo
         </Button>
 
-        <div className="mt-4 text-center text-sm text-white/60">
-          <p className="border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Escolhe um espaço para guardar a aventura.</p>
-        </div>
+        <Button
+          onClick={() => setCurrentScreen("multiplayer")}
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Modo Multiplayer
+        </Button>
+
+        <Button
+          onClick={() => setCurrentScreen("leaderboards")}
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        >
+          <Trophy className="mr-2 h-4 w-4" />
+          Ver Tabelas
+        </Button>
       </div>
 
     </div>
   )
+
+  const renderSoloModeScreen = () => (
+    <div className="space-y-4">
+      <div className="pixel-window bg-[#f8f4dc] p-5">
+        <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Modo Solo</h2>
+        <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700">
+          O competitivo solo e o jogo normal: tenta ir o mais longe possivel em cada run.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-3">
+          {saveSlots.some((slot) => slot.gameState?.activePokemon) && (
+            <Button
+              onClick={() => setCurrentScreen("select-continue")}
+              className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#0891b2_50%,#0891b2_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
+            >
+              Continuar Run Solo
+            </Button>
+          )}
+
+          <Button
+            onClick={() => setCurrentScreen("select-slot")}
+            className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
+          >
+            Novo Jogo Solo
+          </Button>
+        </div>
+      </div>
+
+      <Button
+        onClick={() => setCurrentScreen("main-menu")}
+        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+      >
+        Voltar
+      </Button>
+    </div>
+  )
+
+  const renderMultiplayerScreen = () => {
+    const roomPlayers = multiplayerRoom
+      ? Object.values(multiplayerRoom.players || {}).sort((a, b) => b.bestWave - a.bestWave)
+      : []
+    const isHost = Boolean(multiplayerRoom && accountUserId && multiplayerRoom.hostUserId === accountUserId)
+
+    return (
+      <div className="space-y-4">
+        <div className="pixel-window bg-[#f8f4dc] p-5">
+          <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Arena Multiplayer</h2>
+          <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700">
+            Escolhe entre competitivo e casual. No competitivo, entra na fila sem codigo; no casual, hosteia por codigo.
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button
+              onClick={() => setMultiplayerSection("competitive")}
+              className={`pixel-menu-button h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+            >
+              Competitivo
+            </Button>
+            <Button
+              onClick={() => setMultiplayerSection("casual")}
+              className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+            >
+              Casual
+            </Button>
+          </div>
+
+          {!multiplayerJoinedRoomId && (
+            <div className="mt-4 space-y-3">
+              {multiplayerSection === "competitive" ? (
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleEnterCompetitiveMatch}
+                    disabled={multiplayerBusy}
+                    className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                  >
+                    Entrar na Fila Competitiva
+                  </Button>
+                  <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-xs text-slate-700">
+                    Sem codigo: quem entra primeiro vai para a partida em espera.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => handleCreateMultiplayerRoom(2)}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Hostear Casual (2)
+                    </Button>
+                    <Button
+                      onClick={() => handleCreateMultiplayerRoom(3)}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Hostear Casual (3)
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Codigo da sala casual</label>
+                    <input
+                      value={multiplayerRoomCodeInput}
+                      onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
+                      placeholder="Ex: -OKVbm1fX23"
+                      className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                    <Button
+                      onClick={handleJoinMultiplayerRoom}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Entrar na Sala (Casual)
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {multiplayerJoinedRoomId && multiplayerRoom && (
+            <div className="mt-4 space-y-3 rounded-xl border-4 border-slate-800 bg-white/80 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-pixel text-xs text-slate-900 sm:text-sm">Sala: {multiplayerJoinedRoomId}</p>
+                <Badge className="pixel-badge bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
+                  {multiplayerRoom.status === "waiting" ? "Aguardando" : multiplayerRoom.status === "active" ? "Ativa" : "Finalizada"}
+                </Badge>
+              </div>
+              <p className="text-xs font-semibold text-slate-600">Modo da disputa: {multiplayerRoom.mode === "casual" ? "Casual" : "Competitivo"}</p>
+
+              <div className="space-y-2">
+                {roomPlayers.map((player, index) => (
+                  <div key={player.userId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-semibold text-slate-900">
+                      {index + 1}. {player.displayName}
+                      {multiplayerRoom.hostUserId === player.userId ? " (Host)" : ""}
+                    </span>
+                    <span className="text-xs font-black text-slate-700">Wave {player.bestWave}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button
+                  onClick={handleLeaveMultiplayerRoom}
+                  disabled={multiplayerBusy}
+                  className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                >
+                  Sair da Sala
+                </Button>
+
+                {multiplayerRoom.mode === "casual" ? (
+                  <Button
+                    onClick={handleStartMultiplayerRoom}
+                    disabled={multiplayerBusy || !isHost || multiplayerRoom.status !== "waiting"}
+                    className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                  >
+                    Iniciar Disputa
+                  </Button>
+                ) : (
+                  <div className="flex h-11 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-100 px-2 text-[10px] font-semibold text-slate-700">
+                    Inicio automatico no competitivo
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleStartMultiplayerRun}
+                  disabled={multiplayerBusy || multiplayerRoom.status !== "active"}
+                  className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                >
+                  Jogar Run Multiplayer
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {multiplayerError && (
+            <p className="mt-3 rounded-lg border-2 border-red-700 bg-red-100 px-3 py-2 text-xs font-semibold text-red-900">{multiplayerError}</p>
+          )}
+        </div>
+
+        <Button
+          onClick={() => setCurrentScreen("leaderboards")}
+          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        >
+          Ver Tabelas
+        </Button>
+
+        <Button
+          onClick={() => setCurrentScreen("main-menu")}
+          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        >
+          Voltar ao Menu Principal
+        </Button>
+      </div>
+    )
+  }
+
+  const renderLeaderboardsScreen = () => {
+    const selectedEntries = leaderboardViewMode === "solo" ? soloLeaderboardEntries : leaderboardEntries
+    const playerPlacementIndex = accountUserId
+      ? selectedEntries.findIndex((entry) => entry.userId === accountUserId)
+      : -1
+
+    const placementLabel = !accountUserId
+      ? "Faz login para ver a tua colocacao."
+      : selectedEntries.length === 0
+        ? "Sem runs registadas neste modo ainda."
+        : playerPlacementIndex >= 0
+          ? `A tua colocacao atual: #${playerPlacementIndex + 1}`
+          : "Ainda nao apareces no Top 100 deste modo."
+
+    return (
+    <div className="space-y-4">
+      <div className="pixel-window bg-[#f8f4dc] p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-amber-700" />
+          <h3 className="font-pixel text-base text-slate-900 sm:text-xl">Tabelas De Classificacao</h3>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <Button
+            onClick={() => setLeaderboardViewMode("solo")}
+            className={`pixel-menu-button h-11 ${leaderboardViewMode === "solo" ? "bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+          >
+            Solo
+          </Button>
+          <Button
+            onClick={() => setLeaderboardViewMode("multiplayer")}
+            className={`pixel-menu-button h-11 ${leaderboardViewMode === "multiplayer" ? "bg-[linear-gradient(180deg,#ea580c_0%,#ea580c_50%,#9a3412_50%,#9a3412_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+          >
+            Multiplayer
+          </Button>
+        </div>
+
+        {leaderboardViewMode === "solo" ? (
+          <div>
+            <div className="space-y-2">
+            {soloLeaderboardEntries.length === 0 && (
+              <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-sm text-slate-700">
+                Ainda sem runs solo registadas.
+              </p>
+            )}
+
+            {soloLeaderboardEntries.map((entry, index) => (
+              <div key={entry.runId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-white/90 px-3 py-2">
+                <div className="text-sm text-slate-900">
+                  <span className="font-black">#{index + 1}</span> {entry.displayName}
+                </div>
+                <div className="text-right text-xs font-black text-slate-700">
+                  <div>Wave {entry.wave}</div>
+                  <div className="text-[10px] font-semibold text-slate-500">Run individual</div>
+                </div>
+              </div>
+            ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Mes</label>
+              <select
+                value={leaderboardMonth}
+                onChange={(event) => setLeaderboardMonth(event.target.value)}
+                className="rounded-lg border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900"
+              >
+                {leaderboardMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              {leaderboardEntries.length === 0 && (
+                <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-sm text-slate-700">
+                  Ainda sem pontuacoes para {leaderboardMonth}.
+                </p>
+              )}
+
+              {leaderboardEntries.map((entry, index) => (
+                <div key={entry.runId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-white/90 px-3 py-2">
+                  <div className="text-sm text-slate-900">
+                    <span className="font-black">#{index + 1}</span> {entry.displayName}
+                  </div>
+                  <div className="text-right text-xs font-black text-slate-700">
+                    <div>Wave {entry.wave}</div>
+                    <div className="text-[10px] font-semibold text-slate-500">Run individual</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="pixel-window bg-[#f8f4dc] p-4">
+        <p className="text-center text-sm font-black text-slate-800">{placementLabel}</p>
+      </div>
+
+      <Button
+        onClick={() => setCurrentScreen("main-menu")}
+        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+      >
+        Voltar
+      </Button>
+    </div>
+    )
+  }
 
   const renderGameMenu = () => (
     <div className="space-y-4">
@@ -2774,8 +3590,8 @@ export default function PokemonAdventure() {
     <div className="space-y-4">
       {gameState.activePokemon && statusBar}
       <div className="pixel-window mb-6 flex items-center justify-between bg-[#f8f4dc] px-5 py-4">
-        <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Poké Mart</h2>
-        <Badge className="pixel-badge bg-[linear-gradient(180deg,#78716c_0%,#78716c_50%,#57534e_50%,#57534e_100%)] px-4 py-2 text-white">
+        <h2 className="font-pixel pixel-text text-lg leading-relaxed text-slate-900 [text-shadow:2px_2px_0_rgba(255,255,255,0.65)] sm:text-2xl">Poké Mart</h2>
+        <Badge className="pixel-badge bg-[linear-gradient(180deg,#fde047_0%,#fde047_50%,#eab308_50%,#eab308_100%)] px-4 py-2 text-slate-900">
           💰 {gameState.money}
         </Badge>
       </div>
@@ -3923,7 +4739,7 @@ export default function PokemonAdventure() {
   }
 
   return (
-    <div className="min-h-dvh p-3 text-slate-900 md:p-4">
+    <div className={`min-h-dvh text-slate-900 ${currentScreen === "main-menu" ? "h-dvh overflow-hidden p-2 md:p-2" : "p-3 md:p-4"}`}>
       
       <AnimatePresence>
         {captureThrowAnimation && (
@@ -3998,10 +4814,17 @@ export default function PokemonAdventure() {
         </div>
       )}
       <div className="max-w-5xl mx-auto">
-        <div className={`transition-all duration-500 ${isAnimating ? "opacity-50" : "opacity-100"} ${currentScreen === "battle" ? "h-[calc(100dvh-1.5rem)] overflow-hidden" : ""}`}>
+        <div
+          className={`transition-all duration-500 ${isAnimating ? "opacity-50" : "opacity-100"} ${
+            currentScreen === "battle" ? "h-[calc(100dvh-1.5rem)] overflow-hidden" : currentScreen === "main-menu" ? "h-full overflow-hidden" : ""
+          }`}
+        >
           {currentScreen === "main-menu" && renderMainMenu()}
+          {currentScreen === "solo-menu" && renderSoloModeScreen()}
+          {currentScreen === "leaderboards" && renderLeaderboardsScreen()}
           {currentScreen === "select-slot" && renderSelectSlotScreen()}
           {currentScreen === "select-continue" && renderSelectContinueScreen()}
+          {currentScreen === "multiplayer" && renderMultiplayerScreen()}
           {currentScreen === "menu" && renderGameMenu()}
           {currentScreen === "battle" && renderBattleScreen()}
           {currentScreen === "shop" && renderShop()}

@@ -201,7 +201,7 @@ export const BattleArena = memo(
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="inline-flex items-center gap-2 border-4 border-slate-800 bg-[linear-gradient(90deg,#6b7280_0%,#6b7280_34%,#94a3b8_34%,#94a3b8_67%,#7c8b73_67%,#7c8b73_100%)] px-4 py-1.5 shadow-[6px_6px_0_rgba(22,51,77,0.38)]"
+            className="inline-flex items-center gap-2 border-4 border-slate-800 bg-[linear-gradient(180deg,#dbeafe_0%,#dbeafe_50%,#bfdbfe_50%,#bfdbfe_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.18)_0_6px,rgba(15,23,42,0.05)_6px_12px)] px-4 py-1.5 shadow-[6px_6px_0_rgba(22,51,77,0.38)]"
           >
             <Swords className="h-5 w-5 text-slate-900" />
               <span className="font-pixel text-[11px] sm:text-xs tracking-[0.25em] text-slate-900 uppercase">
