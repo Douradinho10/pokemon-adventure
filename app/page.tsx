@@ -1218,9 +1218,36 @@ export default function PokemonAdventure() {
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
+      const createdAt = Date.now()
+      const localCode = `${LOCAL_ROOM_PREFIX}COMP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+
+      setMultiplayerJoinedRoomId(localCode)
+      setMultiplayerRoom({
+        id: localCode,
+        hostUserId: accountUserId,
+        hostDisplayName: accountName,
+        mode: "competitive",
+        visibility: "private",
+        maxPlayers,
+        status: "active",
+        createdAt,
+        startedAt: createdAt,
+        players: {
+          [accountUserId]: {
+            userId: accountUserId,
+            displayName: accountName,
+            joinedAt: createdAt,
+            bestWave: 0,
+          },
+        },
+      })
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerSection("competitive")
       setMultiplayerError(
-        getMultiplayerErrorMessage(error, "Nao foi possivel entrar na fila competitiva agora. Tenta novamente em alguns segundos."),
+        `${getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")} A sala foi aberta em modo local para nao bloquear.`,
       )
+      showScreenNotice("Entraste no lobby competitivo local.")
     } finally {
       setMultiplayerBusy(false)
     }
