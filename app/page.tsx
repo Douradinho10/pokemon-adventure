@@ -757,6 +757,25 @@ export default function PokemonAdventure() {
     }, duration)
   }, [])
 
+  const getMultiplayerErrorMessage = useCallback((error: unknown, fallbackMessage: string) => {
+    const raw = error instanceof Error ? error.message : String(error || "")
+    const normalized = raw.toLowerCase()
+
+    if (normalized.includes("permission") || normalized.includes("denied") || normalized.includes("unauthorized")) {
+      return "Firebase bloqueou o multiplayer (PERMISSION_DENIED). Verifica regras do RTDB para /multiplayer."
+    }
+
+    if (normalized.includes("indisponivel") || normalized.includes("database") || normalized.includes("config")) {
+      return "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* no deploy."
+    }
+
+    if (normalized.includes("network") || normalized.includes("offline") || normalized.includes("timeout")) {
+      return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
+    }
+
+    return fallbackMessage
+  }, [])
+
   useEffect(() => {
     latestGameStateRef.current = gameState
   }, [gameState])
@@ -1061,9 +1080,11 @@ export default function PokemonAdventure() {
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
         showScreenNotice(`Sala criada! Codigo: ${room.id}`)
-      } catch {
+      } catch (error) {
         if (visibility === "public") {
-          setMultiplayerError("Nao foi possivel hostear lobby publico agora. Verifica o Firebase e tenta novamente.")
+          setMultiplayerError(
+            getMultiplayerErrorMessage(error, "Nao foi possivel hostear lobby publico agora. Verifica o Firebase e tenta novamente."),
+          )
           return
         }
 
@@ -1098,7 +1119,7 @@ export default function PokemonAdventure() {
         setMultiplayerBusy(false)
       }
     },
-    [accountName, accountUserId, showScreenNotice],
+    [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice],
   )
 
   const handleJoinMultiplayerRoom = useCallback(async () => {
@@ -1196,12 +1217,14 @@ export default function PokemonAdventure() {
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
-    } catch {
-      setMultiplayerError("Nao foi possivel entrar na fila competitiva agora. Tenta novamente em alguns segundos.")
+    } catch (error) {
+      setMultiplayerError(
+        getMultiplayerErrorMessage(error, "Nao foi possivel entrar na fila competitiva agora. Tenta novamente em alguns segundos."),
+      )
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, showScreenNotice])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
@@ -1211,13 +1234,13 @@ export default function PokemonAdventure() {
       if (multiplayerError && multiplayerError.includes("lobbies")) {
         setMultiplayerError(null)
       }
-    } catch {
+    } catch (error) {
       setPublicCasualLobbies([])
-      setMultiplayerError("Nao foi possivel carregar os lobbies publicos agora.")
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel carregar os lobbies publicos agora."))
     } finally {
       setPublicCasualLoading(false)
     }
-  }, [multiplayerError])
+  }, [getMultiplayerErrorMessage, multiplayerError])
 
   useEffect(() => {
     if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || Boolean(multiplayerJoinedRoomId)) {
