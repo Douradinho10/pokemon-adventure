@@ -251,17 +251,35 @@ export async function joinMultiplayerRoom(params: {
       return current
     }
 
+    const nextPlayers: Record<string, MultiplayerRoomPlayer> = {
+      ...players,
+      [params.userId]: {
+        userId: params.userId,
+        displayName: params.displayName,
+        joinedAt: Date.now(),
+        bestWave: 0,
+      },
+    }
+
+    const nextCount = Object.keys(nextPlayers).length
+    const shouldAutoStartCompetitive = current.mode === "competitive" && nextCount >= current.maxPlayers
+
     return {
       ...current,
-      players: {
-        ...players,
-        [params.userId]: {
-          userId: params.userId,
-          displayName: params.displayName,
-          joinedAt: Date.now(),
-          bestWave: 0,
-        },
-      },
+      status: shouldAutoStartCompetitive ? "active" : current.status,
+      startedAt: shouldAutoStartCompetitive ? Date.now() : current.startedAt,
+      players: shouldAutoStartCompetitive
+        ? Object.fromEntries(
+            Object.entries(nextPlayers).map(([id, player]) => [
+              id,
+              {
+                ...player,
+                bestWave: 0,
+                finishedAt: undefined,
+              },
+            ]),
+          )
+        : nextPlayers,
     }
   })
 
