@@ -693,6 +693,7 @@ export default function PokemonAdventure() {
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
   const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
+  const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
   const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
   const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
   const [multiplayerMode, setMultiplayerMode] = useState(false)
@@ -990,23 +991,6 @@ export default function PokemonAdventure() {
   }, [currentScreen, leaderboardMonth, leaderboardViewMode])
 
   useEffect(() => {
-    if (!multiplayerRoom || !accountUserId) {
-      return
-    }
-
-    const playersCount = Object.keys(multiplayerRoom.players || {}).length
-    const shouldAutoStart = multiplayerRoom.mode === "competitive" && multiplayerRoom.status === "waiting" && playersCount >= 2
-
-    if (!shouldAutoStart || multiplayerRoom.hostUserId !== accountUserId) {
-      return
-    }
-
-    startMultiplayerRoom(multiplayerRoom.id, accountUserId).catch(() => {
-      // Auto-start can race between clients; ignore failures.
-    })
-  }, [accountUserId, multiplayerRoom])
-
-  useEffect(() => {
     if (!multiplayerMode || !multiplayerJoinedRoomId || !accountUserId) {
       return
     }
@@ -1143,7 +1127,7 @@ export default function PokemonAdventure() {
     }
   }, [accountName, accountUserId, multiplayerRoomCodeInput, showScreenNotice])
 
-  const handleEnterCompetitiveMatch = useCallback(async () => {
+  const handleEnterCompetitiveMatch = useCallback(async (maxPlayers: 2 | 3) => {
     if (!accountUserId) {
       setMultiplayerError("Faz login para entrar em competitivo.")
       return
@@ -1153,7 +1137,7 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      let targetRoomId = await findAvailableCompetitiveRoom()
+      let targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
 
       if (targetRoomId) {
         const joinResult = await joinMultiplayerRoom({
@@ -1171,7 +1155,7 @@ export default function PokemonAdventure() {
         const room = await createMultiplayerRoom({
           hostUserId: accountUserId,
           hostDisplayName: accountName,
-          maxPlayers: 2,
+          maxPlayers,
           mode: "competitive",
         })
 
@@ -1183,9 +1167,35 @@ export default function PokemonAdventure() {
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
-      showScreenNotice("Entraste na fila competitiva. A partida comeca quando completar 2 jogadores.")
+      showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch {
-      setMultiplayerError("Nao foi possivel entrar no competitivo agora.")
+      const createdAt = Date.now()
+      const localCode = `${LOCAL_ROOM_PREFIX}COMP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+
+      setMultiplayerJoinedRoomId(localCode)
+      setMultiplayerRoom({
+        id: localCode,
+        hostUserId: accountUserId,
+        hostDisplayName: accountName,
+        mode: "competitive",
+        maxPlayers,
+        status: "active",
+        createdAt,
+        startedAt: createdAt,
+        players: {
+          [accountUserId]: {
+            userId: accountUserId,
+            displayName: accountName,
+            joinedAt: createdAt,
+            bestWave: 0,
+          },
+        },
+      })
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerSection("competitive")
+      setMultiplayerError("Fila competitiva em modo local. O Firebase nao respondeu agora.")
+      showScreenNotice("Entraste no competitivo local. Ja podes iniciar a run.")
     } finally {
       setMultiplayerBusy(false)
     }
@@ -3147,15 +3157,30 @@ export default function PokemonAdventure() {
             <div className="mt-4 space-y-3">
               {multiplayerSection === "competitive" ? (
                 <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => setCompetitiveQueueSize(2)}
+                      className={`pixel-menu-button h-10 ${competitiveQueueSize === 2 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                    >
+                      Fila 2 Jogadores
+                    </Button>
+                    <Button
+                      onClick={() => setCompetitiveQueueSize(3)}
+                      className={`pixel-menu-button h-10 ${competitiveQueueSize === 3 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                    >
+                      Fila 3 Jogadores
+                    </Button>
+                  </div>
+
                   <Button
-                    onClick={handleEnterCompetitiveMatch}
+                    onClick={() => handleEnterCompetitiveMatch(competitiveQueueSize)}
                     disabled={multiplayerBusy}
                     className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                   >
-                    Entrar na Fila Competitiva
+                    Entrar na Fila Competitiva ({competitiveQueueSize})
                   </Button>
                   <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-xs text-slate-700">
-                    Sem codigo: quem entra primeiro vai para a partida em espera.
+                    Sem codigo: quem entra primeiro ocupa vagas na fila escolhida.
                   </p>
                 </div>
               ) : (

@@ -203,7 +203,7 @@ export async function createMultiplayerRoom(params: {
   return room
 }
 
-export async function findAvailableCompetitiveRoom(): Promise<string | null> {
+export async function findAvailableCompetitiveRoom(maxPlayers: 2 | 3): Promise<string | null> {
   const db = requireDatabase()
   const roomsRef = ref(db, ROOM_ROOT)
   const snapshot = await get(roomsRef)
@@ -216,7 +216,12 @@ export async function findAvailableCompetitiveRoom(): Promise<string | null> {
   const candidates = Object.values(rooms)
     .filter((room) => {
       const playersCount = Object.keys(room.players || {}).length
-      return room.mode === "competitive" && room.status === "waiting" && playersCount < room.maxPlayers
+      return (
+        room.mode === "competitive" &&
+        room.maxPlayers === maxPlayers &&
+        room.status === "waiting" &&
+        playersCount < room.maxPlayers
+      )
     })
     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
 
