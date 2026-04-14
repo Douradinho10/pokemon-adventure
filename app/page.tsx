@@ -666,6 +666,7 @@ export default function PokemonAdventure() {
     loadSlotGame,
     startNewGameInSlot,
     deleteSaveSlot,
+    clearSelectedSlot,
   } = useLocalGameState()
 
   const addLog = useCallback((_message: string) => {}, [])
@@ -720,6 +721,7 @@ export default function PokemonAdventure() {
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
   const latestGameStateRef = useRef(gameState)
+  const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
   const redirectToLogin = useCallback(() => {
@@ -1387,14 +1389,46 @@ export default function PokemonAdventure() {
       return
     }
 
+    // Online multiplayer runs are session-based and must not write to save slots.
+    clearSelectedSlot()
+    setGameState({
+      playerTeam: {},
+      activePokemon: null,
+      currentEnvironment: "planicie",
+      money: 50,
+      battles: 0,
+      inventory: { Pokébola: 5, "Scanner Tático": 3 },
+      capturedPokemon: [],
+      currentBattle: null,
+    })
+
     setMultiplayerMode(true)
-    setCurrentScreen("select-slot")
+    setCurrentScreen("menu")
+    setShowModal("starter")
     showScreenNotice(
       multiplayerIsCasual
         ? "Disputa casual ativa: vence quem chegar mais longe (nao conta no ranking mensal)!"
         : "Modo multiplayer rankeado ativo: vence quem chegar mais longe!",
     )
-  }, [multiplayerIsCasual, multiplayerRoom, showScreenNotice])
+  }, [clearSelectedSlot, multiplayerIsCasual, multiplayerRoom, setGameState, showScreenNotice])
+
+  useEffect(() => {
+    if (!multiplayerRoom || !multiplayerJoinedRoomId) {
+      autoStartedCompetitiveRoomRef.current = null
+      return
+    }
+
+    if (multiplayerRoom.mode !== "competitive" || multiplayerRoom.status !== "active") {
+      return
+    }
+
+    if (autoStartedCompetitiveRoomRef.current === multiplayerJoinedRoomId) {
+      return
+    }
+
+    autoStartedCompetitiveRoomRef.current = multiplayerJoinedRoomId
+    handleStartMultiplayerRun()
+  }, [handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerRoom])
 
   useEffect(() => {
     const legacyCharges = Number(gameState.inventory[LEGACY_BATTLE_SIM_ITEM] || 0)
@@ -3265,12 +3299,18 @@ export default function PokemonAdventure() {
             >
               Competitivo
             </Button>
-            <Button
-              onClick={() => setMultiplayerSection("casual")}
-              className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
-            >
-              Casual
-            </Button>
+            {multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive" ? (
+              <div className="flex h-11 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-100 px-2 text-[10px] font-semibold text-slate-700">
+                Competitivo ativo
+              </div>
+            ) : (
+              <Button
+                onClick={() => setMultiplayerSection("casual")}
+                className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+              >
+                Casual
+              </Button>
+            )}
           </div>
 
           {!multiplayerJoinedRoomId && (
@@ -3415,16 +3455,16 @@ export default function PokemonAdventure() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <Button
-                  onClick={handleLeaveMultiplayerRoom}
-                  disabled={multiplayerBusy}
-                  className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                >
-                  Sair da Sala
-                </Button>
+              {multiplayerRoom.mode === "casual" ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <Button
+                    onClick={handleLeaveMultiplayerRoom}
+                    disabled={multiplayerBusy}
+                    className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                  >
+                    Sair da Sala
+                  </Button>
 
-                {multiplayerRoom.mode === "casual" ? (
                   <Button
                     onClick={handleStartMultiplayerRoom}
                     disabled={multiplayerBusy || !isHost || multiplayerRoom.status !== "waiting"}
@@ -3432,20 +3472,22 @@ export default function PokemonAdventure() {
                   >
                     Iniciar Disputa
                   </Button>
-                ) : (
-                  <div className="flex h-11 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-100 px-2 text-[10px] font-semibold text-slate-700">
-                    Inicio automatico no competitivo
-                  </div>
-                )}
 
-                <Button
-                  onClick={handleStartMultiplayerRun}
-                  disabled={multiplayerBusy || multiplayerRoom.status !== "active"}
-                  className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                >
-                  Jogar Run Multiplayer
-                </Button>
-              </div>
+                  <Button
+                    onClick={handleStartMultiplayerRun}
+                    disabled={multiplayerBusy || multiplayerRoom.status !== "active"}
+                    className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                  >
+                    Jogar Run Multiplayer
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-xl border-2 border-slate-700 bg-slate-100 px-3 py-3 text-center text-[11px] font-semibold text-slate-700">
+                  {Object.keys(multiplayerRoom.players || {}).length >= multiplayerRoom.maxPlayers
+                    ? "Lobby completo! A partida vai comecar automaticamente."
+                    : `A aguardar jogadores (${Object.keys(multiplayerRoom.players || {}).length}/${multiplayerRoom.maxPlayers}).`}
+                </div>
+              )}
             </div>
           )}
 

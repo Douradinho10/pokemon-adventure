@@ -428,6 +428,10 @@ export const useLocalGameState = () => {
     [authenticatedUserId, currentSlot, saveSlots, setGameState],
   )
 
+  const clearSelectedSlot = useCallback(() => {
+    setCurrentSlot(null)
+  }, [])
+
   return {
     ...gameStateHook,
     isLoading,
@@ -437,6 +441,7 @@ export const useLocalGameState = () => {
     loadSlotGame,
     startNewGameInSlot,
     deleteSaveSlot,
+    clearSelectedSlot,
     saveSource,
     GAME_SAVE_KEY,
   }
