@@ -59,6 +59,7 @@ const LEADERBOARD_ROOT = "multiplayer/leaderboards"
 const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
 const SOLO_LOCAL_FALLBACK_KEY = "pokemon-adventure:solo-runs-fallback"
+const LOBBY_STALE_MS = 30 * 60 * 1000
 
 function readSoloFallbackRuns(): SoloLeaderboardEntry[] {
   if (typeof window === "undefined") {
@@ -224,17 +225,25 @@ export async function findAvailableCompetitiveRoom(maxPlayers: 2 | 3): Promise<s
     return null
   }
 
+  const now = Date.now()
   const rooms = (snapshot.val() as Record<string, MultiplayerRoom>) || {}
   const candidates = Object.values(rooms)
     .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
     .filter(({ room, playersCount }) => {
-      return room.mode === "competitive" && room.maxPlayers === maxPlayers && room.status === "waiting" && playersCount < room.maxPlayers
+      const isFresh = now - (room.createdAt || 0) <= LOBBY_STALE_MS
+      return (
+        room.mode === "competitive" &&
+        room.maxPlayers === maxPlayers &&
+        room.status === "waiting" &&
+        playersCount < room.maxPlayers &&
+        isFresh
+      )
     })
     .sort((a, b) => {
       if (b.playersCount !== a.playersCount) {
         return b.playersCount - a.playersCount
       }
-      return (a.room.createdAt || 0) - (b.room.createdAt || 0)
+      return (b.room.createdAt || 0) - (a.room.createdAt || 0)
     })
 
   return candidates[0]?.room.id || null
@@ -249,17 +258,25 @@ export async function getPublicCasualLobbies(limitCount = 30): Promise<PublicCas
     return []
   }
 
+  const now = Date.now()
   const rooms = (snapshot.val() as Record<string, MultiplayerRoom>) || {}
   return Object.values(rooms)
     .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
     .filter(({ room, playersCount }) => {
-      return room.mode === "casual" && room.visibility === "public" && room.status === "waiting" && playersCount < room.maxPlayers
+      const isFresh = now - (room.createdAt || 0) <= LOBBY_STALE_MS
+      return (
+        room.mode === "casual" &&
+        room.visibility === "public" &&
+        room.status === "waiting" &&
+        playersCount < room.maxPlayers &&
+        isFresh
+      )
     })
     .sort((a, b) => {
       if (b.playersCount !== a.playersCount) {
         return b.playersCount - a.playersCount
       }
-      return (a.room.createdAt || 0) - (b.room.createdAt || 0)
+      return (b.room.createdAt || 0) - (a.room.createdAt || 0)
     })
     .slice(0, limitCount)
     .map(({ room, playersCount }) => ({

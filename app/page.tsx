@@ -1062,6 +1062,11 @@ export default function PokemonAdventure() {
         setMultiplayerIsCasual(true)
         showScreenNotice(`Sala criada! Codigo: ${room.id}`)
       } catch {
+        if (visibility === "public") {
+          setMultiplayerError("Nao foi possivel hostear lobby publico agora. Verifica o Firebase e tenta novamente.")
+          return
+        }
+
         const localCode = `${LOCAL_ROOM_PREFIX}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
         const createdAt = Date.now()
 
@@ -1185,34 +1190,7 @@ export default function PokemonAdventure() {
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch {
-      const createdAt = Date.now()
-      const localCode = `${LOCAL_ROOM_PREFIX}COMP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
-
-      setMultiplayerJoinedRoomId(localCode)
-      setMultiplayerRoom({
-        id: localCode,
-        hostUserId: accountUserId,
-        hostDisplayName: accountName,
-        mode: "competitive",
-        visibility: "private",
-        maxPlayers,
-        status: "active",
-        createdAt,
-        startedAt: createdAt,
-        players: {
-          [accountUserId]: {
-            userId: accountUserId,
-            displayName: accountName,
-            joinedAt: createdAt,
-            bestWave: 0,
-          },
-        },
-      })
-      setMultiplayerMode(false)
-      setMultiplayerIsCasual(false)
-      setMultiplayerSection("competitive")
-      setMultiplayerError("Fila competitiva em modo local. O Firebase nao respondeu agora.")
-      showScreenNotice("Entraste no competitivo local. Ja podes iniciar a run.")
+      setMultiplayerError("Nao foi possivel entrar na fila competitiva agora. Tenta novamente em alguns segundos.")
     } finally {
       setMultiplayerBusy(false)
     }
