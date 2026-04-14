@@ -1153,8 +1153,13 @@ export default function PokemonAdventure() {
       let targetRoomId: string | null = null
       let joinedExisting = false
 
-      for (let attempt = 0; attempt < 2; attempt++) {
-        targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
+        } catch (error) {
+          targetRoomId = null
+        }
+
         if (!targetRoomId) {
           break
         }
@@ -1169,6 +1174,8 @@ export default function PokemonAdventure() {
           joinedExisting = true
           break
         }
+
+        targetRoomId = null
       }
 
       if (!joinedExisting) {
@@ -1201,12 +1208,16 @@ export default function PokemonAdventure() {
     try {
       const lobbies = await getPublicCasualLobbies(30)
       setPublicCasualLobbies(lobbies)
+      if (multiplayerError && multiplayerError.includes("lobbies")) {
+        setMultiplayerError(null)
+      }
     } catch {
       setPublicCasualLobbies([])
+      setMultiplayerError("Nao foi possivel carregar os lobbies publicos agora.")
     } finally {
       setPublicCasualLoading(false)
     }
-  }, [])
+  }, [multiplayerError])
 
   useEffect(() => {
     if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || Boolean(multiplayerJoinedRoomId)) {
