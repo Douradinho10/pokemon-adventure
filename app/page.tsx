@@ -1239,6 +1239,9 @@ export default function PokemonAdventure() {
       }
 
       setMultiplayerJoinedRoomId(roomCode)
+      if (result.room) {
+        setMultiplayerRoom(result.room)
+      }
       setMultiplayerMode(false)
       setMultiplayerIsCasual(true)
       setMultiplayerSection("casual")
@@ -1319,6 +1322,9 @@ export default function PokemonAdventure() {
       }
 
       setMultiplayerJoinedRoomId(roomCode)
+      if (result.room) {
+        setMultiplayerRoom(result.room)
+      }
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
@@ -1385,6 +1391,9 @@ export default function PokemonAdventure() {
         }
 
         setMultiplayerJoinedRoomId(roomId)
+        if (result.room) {
+          setMultiplayerRoom(result.room)
+        }
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
         setMultiplayerSection("casual")

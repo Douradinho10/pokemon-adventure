@@ -316,7 +316,7 @@ export async function joinMultiplayerRoom(params: {
   roomId: string
   userId: string
   displayName: string
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
   const db = requireDatabase()
   const roomRef = ref(db, `${ROOM_ROOT}/${params.roomId}`)
 
@@ -402,7 +402,7 @@ export async function joinMultiplayerRoom(params: {
     return { ok: false, message: "Nao foi possivel entrar na sala" }
   }
 
-  return { ok: true }
+  return { ok: true, room }
 }
 
 async function getRoomById(roomId: string): Promise<MultiplayerRoom | null> {
@@ -491,7 +491,7 @@ export async function joinCompetitiveQueue(params: {
     })
 
     if (joinResult.ok) {
-      const joinedRoom = await getRoomById(pointerRoomId)
+      const joinedRoom = joinResult.room || (await getRoomById(pointerRoomId))
       if (joinedRoom) {
         const joinedCount = Object.keys(joinedRoom.players || {}).length
         if (joinedRoom.status !== "waiting" || joinedCount >= joinedRoom.maxPlayers) {
@@ -510,26 +510,7 @@ export async function joinCompetitiveQueue(params: {
         return { ok: true, room: joinedRoom }
       }
 
-      const optimisticRoom: MultiplayerRoom = {
-        id: pointerRoomId,
-        hostUserId: params.userId,
-        hostDisplayName: params.displayName,
-        mode: "competitive",
-        visibility: "private",
-        maxPlayers: params.maxPlayers,
-        status: "waiting",
-        createdAt: Date.now(),
-        players: {
-          [params.userId]: {
-            userId: params.userId,
-            displayName: params.displayName,
-            joinedAt: Date.now(),
-            bestWave: 0,
-          },
-        },
-      }
-
-      return { ok: true, room: optimisticRoom }
+      return { ok: false, message: "Sala nao encontrada" }
     }
 
     const message = (joinResult.message || "").toLowerCase()
