@@ -1210,19 +1210,25 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const socketResult = await joinCompetitiveQueueWithSocket({
-        maxPlayers,
-        userId: accountUserId,
-        displayName: accountName,
-      })
+      const socketResult = await Promise.race([
+        joinCompetitiveQueueWithSocket({
+          maxPlayers,
+          userId: accountUserId,
+          displayName: accountName,
+        }),
+        delay(8000).then(() => ({ ok: false, room: undefined, message: "WebSocket sem resposta" })),
+      ])
 
       const queueResult = socketResult.ok
         ? socketResult
-        : await joinCompetitiveQueue({
-            maxPlayers,
-            userId: accountUserId,
-            displayName: accountName,
-          })
+        : await Promise.race([
+            joinCompetitiveQueue({
+              maxPlayers,
+              userId: accountUserId,
+              displayName: accountName,
+            }),
+            delay(8000).then(() => ({ ok: false, room: undefined, message: "Fila Firebase sem resposta" })),
+          ])
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
@@ -1236,13 +1242,20 @@ export default function PokemonAdventure() {
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
       try {
-        const fallbackRoom = await createMultiplayerRoom({
-          hostUserId: accountUserId,
-          hostDisplayName: accountName,
-          maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
+        const fallbackRoom = await Promise.race([
+          createMultiplayerRoom({
+            hostUserId: accountUserId,
+            hostDisplayName: accountName,
+            maxPlayers,
+            mode: "competitive",
+            visibility: "private",
+          }),
+          delay(6000).then(() => null),
+        ])
+
+        if (!fallbackRoom) {
+          throw new Error("Nao foi possivel criar sala competitiva agora")
+        }
 
         setMultiplayerJoinedRoomId(fallbackRoom.id)
         setMultiplayerRoom(fallbackRoom)
