@@ -468,7 +468,8 @@ export async function joinCompetitiveQueue(params: {
         joinMessage.includes("nao foi possivel entrar na sala")
 
       if (!retryable) {
-        return { ok: false, message: joinResult.message || "Nao foi possivel entrar na fila competitiva" }
+        // Skip this candidate and let fallback creation handle non-retryable joins.
+        continue
       }
     }
 
@@ -524,7 +525,15 @@ export async function joinCompetitiveQueue(params: {
     await sleep(90)
   }
 
-  return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
+  const createdRoom = await createMultiplayerRoom({
+    hostUserId: params.userId,
+    hostDisplayName: params.displayName,
+    maxPlayers: params.maxPlayers,
+    mode: "competitive",
+    visibility: "private",
+  })
+
+  return { ok: true, room: createdRoom }
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
