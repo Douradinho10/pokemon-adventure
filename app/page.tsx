@@ -748,6 +748,8 @@ export default function PokemonAdventure() {
     [],
   )
 
+  const delay = useCallback((ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)), [])
+
   const redirectToLogin = useCallback(() => {
     if (typeof window === "undefined") {
       return
@@ -1260,74 +1262,51 @@ export default function PokemonAdventure() {
       let targetRoomId: string | null = null
       let joinedExisting = false
 
-      for (let attempt = 0; attempt < 4; attempt++) {
-        targetRoomId = await withTimeout(
-          findAvailableCompetitiveRoom(maxPlayers),
-          12000,
-          "A procura da fila competitiva demorou demasiado.",
-        )
+      for (let attempt = 0; attempt < 6; attempt++) {
+        targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
 
         if (!targetRoomId) {
+          if (attempt < 2) {
+            await delay(250)
+            continue
+          }
           break
         }
 
-        try {
-          const joinResult = await withTimeout(
-            joinMultiplayerRoom({
-              roomId: targetRoomId,
-              userId: accountUserId,
-              displayName: accountName,
-            }),
-            15000,
-            "A entrada na fila competitiva demorou demasiado.",
-          )
+        const joinResult = await joinMultiplayerRoom({
+          roomId: targetRoomId,
+          userId: accountUserId,
+          displayName: accountName,
+        })
 
-          if (joinResult.ok) {
-            joinedExisting = true
-            break
-          }
-
-          const joinMessage = (joinResult.message || "").toLowerCase()
-          const canRetryAnotherRoom =
-            joinMessage.includes("sala cheia") ||
-            joinMessage.includes("ja foi iniciada") ||
-            joinMessage.includes("sala nao encontrada") ||
-            joinMessage.includes("nao foi possivel entrar na sala")
-
-          if (!canRetryAnotherRoom) {
-            throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
-          }
-
-          targetRoomId = null
-        } catch (joinError) {
-          const joinErrorText = (joinError instanceof Error ? joinError.message : String(joinError || "")).toLowerCase()
-          const canRetryJoin =
-            joinErrorText.includes("demorou") ||
-            joinErrorText.includes("timeout") ||
-            joinErrorText.includes("sala nao encontrada") ||
-            joinErrorText.includes("offline") ||
-            joinErrorText.includes("network")
-
-          if (!canRetryJoin) {
-            throw joinError
-          }
-
-          targetRoomId = null
+        if (joinResult.ok) {
+          joinedExisting = true
+          break
         }
+
+        const joinMessage = (joinResult.message || "").toLowerCase()
+        const canRetryAnotherRoom =
+          joinMessage.includes("sala cheia") ||
+          joinMessage.includes("ja foi iniciada") ||
+          joinMessage.includes("sala nao encontrada") ||
+          joinMessage.includes("nao foi possivel entrar na sala")
+
+        if (!canRetryAnotherRoom) {
+          throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
+        }
+
+        targetRoomId = null
+        await delay(250)
       }
 
       if (!joinedExisting) {
-        const room = await withTimeout(
-          createMultiplayerRoom({
-            hostUserId: accountUserId,
-            hostDisplayName: accountName,
-            maxPlayers,
-            mode: "competitive",
-            visibility: "private",
-          }),
-          15000,
-          "A criacao da sala competitiva demorou demasiado.",
-        )
+        const room = await createMultiplayerRoom({
+          hostUserId: accountUserId,
+          hostDisplayName: accountName,
+          maxPlayers,
+          mode: "competitive",
+          visibility: "private",
+        })
 
         targetRoomId = room.id
         setMultiplayerRoom(room)
@@ -1351,7 +1330,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice, withTimeout])
+  }, [accountName, accountUserId, delay, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
