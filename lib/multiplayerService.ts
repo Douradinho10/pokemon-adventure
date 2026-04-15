@@ -521,13 +521,25 @@ export async function markMultiplayerPlayerFinished(params: { roomId: string; us
   })
 }
 
-export function subscribeMultiplayerRoom(roomId: string, onRoomUpdate: (room: MultiplayerRoom | null) => void): () => void {
+export function subscribeMultiplayerRoom(
+  roomId: string,
+  onRoomUpdate: (room: MultiplayerRoom | null) => void,
+  onError?: (error: unknown) => void,
+): () => void {
   const db = requireDatabase()
   const roomRef = ref(db, `${ROOM_ROOT}/${roomId}`)
 
-  const unsubscribe = onValue(roomRef, (snapshot) => {
-    onRoomUpdate((snapshot.val() as MultiplayerRoom | null) || null)
-  })
+  const unsubscribe = onValue(
+    roomRef,
+    (snapshot) => {
+      onRoomUpdate((snapshot.val() as MultiplayerRoom | null) || null)
+    },
+    (error) => {
+      if (onError) {
+        onError(error)
+      }
+    },
+  )
 
   return () => unsubscribe()
 }

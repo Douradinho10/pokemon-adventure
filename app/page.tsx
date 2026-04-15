@@ -994,29 +994,42 @@ export default function PokemonAdventure() {
     }
 
     let cancelled = false
-    const unsubscribe = subscribeMultiplayerRoom(multiplayerJoinedRoomId, (room) => {
-      if (cancelled) {
-        return
-      }
+    const unsubscribe = subscribeMultiplayerRoom(
+      multiplayerJoinedRoomId,
+      (room) => {
+        if (cancelled) {
+          return
+        }
 
-      if (!room) {
-        setMultiplayerError("Nao foi possivel sincronizar esta sala em tempo real.")
-        return
-      }
+        // Ignore transient null snapshots to avoid false lobby desync errors.
+        if (!room) {
+          return
+        }
 
-      setMultiplayerRoom(room)
+        setMultiplayerError(null)
+        setMultiplayerRoom(room)
 
-      if (accountUserId && !room.players?.[accountUserId]) {
-        setMultiplayerJoinedRoomId(null)
-        setMultiplayerMode(false)
-      }
-    })
+        if (accountUserId && !room.players?.[accountUserId]) {
+          setMultiplayerJoinedRoomId(null)
+          setMultiplayerMode(false)
+        }
+      },
+      (error) => {
+        if (cancelled) {
+          return
+        }
+
+        setMultiplayerError(
+          getMultiplayerErrorMessage(error, "Nao foi possivel sincronizar esta sala em tempo real. Verifica o Firebase RTDB."),
+        )
+      },
+    )
 
     return () => {
       cancelled = true
       unsubscribe()
     }
-  }, [accountUserId, multiplayerJoinedRoomId])
+  }, [accountUserId, getMultiplayerErrorMessage, multiplayerJoinedRoomId])
 
   useEffect(() => {
     if (currentScreen !== "leaderboards") {
@@ -3396,18 +3409,12 @@ export default function PokemonAdventure() {
             >
               Competitivo
             </Button>
-            {multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive" ? (
-              <div className="flex h-11 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-100 px-2 text-[10px] font-semibold text-slate-700">
-                Competitivo ativo
-              </div>
-            ) : (
-              <Button
-                onClick={() => setMultiplayerSection("casual")}
-                className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
-              >
-                Casual
-              </Button>
-            )}
+            <Button
+              onClick={() => setMultiplayerSection("casual")}
+              className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+            >
+              Casual
+            </Button>
           </div>
 
           {!multiplayerJoinedRoomId && (
