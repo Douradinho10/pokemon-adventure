@@ -1260,10 +1260,10 @@ export default function PokemonAdventure() {
       let targetRoomId: string | null = null
       let joinedExisting = false
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 4; attempt++) {
         targetRoomId = await withTimeout(
           findAvailableCompetitiveRoom(maxPlayers),
-          8000,
+          12000,
           "A procura da fila competitiva demorou demasiado.",
         )
 
@@ -1271,29 +1271,49 @@ export default function PokemonAdventure() {
           break
         }
 
-        const joinResult = await withTimeout(
-          joinMultiplayerRoom({
-            roomId: targetRoomId,
-            userId: accountUserId,
-            displayName: accountName,
-          }),
-          10000,
-          "A entrada na fila competitiva demorou demasiado.",
-        )
+        try {
+          const joinResult = await withTimeout(
+            joinMultiplayerRoom({
+              roomId: targetRoomId,
+              userId: accountUserId,
+              displayName: accountName,
+            }),
+            15000,
+            "A entrada na fila competitiva demorou demasiado.",
+          )
 
-        if (joinResult.ok) {
-          joinedExisting = true
-          break
+          if (joinResult.ok) {
+            joinedExisting = true
+            break
+          }
+
+          const joinMessage = (joinResult.message || "").toLowerCase()
+          const canRetryAnotherRoom =
+            joinMessage.includes("sala cheia") ||
+            joinMessage.includes("ja foi iniciada") ||
+            joinMessage.includes("sala nao encontrada") ||
+            joinMessage.includes("nao foi possivel entrar na sala")
+
+          if (!canRetryAnotherRoom) {
+            throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
+          }
+
+          targetRoomId = null
+        } catch (joinError) {
+          const joinErrorText = (joinError instanceof Error ? joinError.message : String(joinError || "")).toLowerCase()
+          const canRetryJoin =
+            joinErrorText.includes("demorou") ||
+            joinErrorText.includes("timeout") ||
+            joinErrorText.includes("sala nao encontrada") ||
+            joinErrorText.includes("offline") ||
+            joinErrorText.includes("network")
+
+          if (!canRetryJoin) {
+            throw joinError
+          }
+
+          targetRoomId = null
         }
-
-        const joinMessage = (joinResult.message || "").toLowerCase()
-        const canRetryAnotherRoom = joinMessage.includes("sala cheia") || joinMessage.includes("ja foi iniciada")
-
-        if (!canRetryAnotherRoom) {
-          throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
-        }
-
-        targetRoomId = null
       }
 
       if (!joinedExisting) {
@@ -1305,7 +1325,7 @@ export default function PokemonAdventure() {
             mode: "competitive",
             visibility: "private",
           }),
-          10000,
+          15000,
           "A criacao da sala competitiva demorou demasiado.",
         )
 
