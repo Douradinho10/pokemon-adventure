@@ -784,15 +784,27 @@ export default function PokemonAdventure() {
   }, [])
 
   const getMultiplayerErrorMessage = useCallback((error: unknown, fallbackMessage: string) => {
+    const code =
+      error && typeof error === "object"
+        ? String((error as { code?: string }).code || (error as { name?: string }).name || "")
+        : ""
     const raw = error instanceof Error ? error.message : String(error || "")
     const normalized = raw.toLowerCase()
+    const technicalDetail = [code.trim(), raw.trim()]
+      .filter(Boolean)
+      .join(" | ")
+      .slice(0, 180)
+
+    const withDetail = (message: string) => (technicalDetail ? `${message} [detalhe: ${technicalDetail}]` : message)
 
     if (normalized.includes("permission") || normalized.includes("denied") || normalized.includes("unauthorized")) {
-      return "Firebase bloqueou o multiplayer (PERMISSION_DENIED). Verifica regras do RTDB para /multiplayer."
+      return withDetail("Firebase bloqueou o multiplayer (PERMISSION_DENIED). Verifica regras do RTDB para /multiplayer.")
     }
 
     if (normalized.includes("indisponivel") || normalized.includes("database") || normalized.includes("config")) {
-      return "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* e se os dois dispositivos estao no mesmo projeto Firebase com regras publicadas."
+      return withDetail(
+        "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* e se os dois dispositivos estao no mesmo projeto Firebase com regras publicadas.",
+      )
     }
 
     if (
@@ -801,10 +813,10 @@ export default function PokemonAdventure() {
       normalized.includes("timeout") ||
       normalized.includes("demorou")
     ) {
-      return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
+      return withDetail("Falha de rede no multiplayer. Tenta novamente em alguns segundos.")
     }
 
-    return fallbackMessage
+    return withDetail(fallbackMessage)
   }, [])
 
   useEffect(() => {
@@ -1228,12 +1240,12 @@ export default function PokemonAdventure() {
       setMultiplayerIsCasual(true)
       setMultiplayerSection("casual")
       showScreenNotice("Entraste na sala casual por codigo!")
-    } catch {
-      setMultiplayerError("Erro ao entrar na sala.")
+    } catch (error) {
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar na sala."))
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, multiplayerRoomCodeInput, showScreenNotice])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, multiplayerRoomCodeInput, showScreenNotice])
 
   const handleEnterCompetitiveMatch = useCallback(async (maxPlayers: 2 | 3) => {
     if (!accountUserId) {
@@ -1380,13 +1392,13 @@ export default function PokemonAdventure() {
         setMultiplayerIsCasual(true)
         setMultiplayerSection("casual")
         showScreenNotice("Entraste numa sala casual publica!")
-      } catch {
-        setMultiplayerError("Erro ao entrar na sala publica.")
+      } catch (error) {
+        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar na sala publica."))
       } finally {
         setMultiplayerBusy(false)
       }
     },
-    [accountName, accountUserId, refreshPublicCasualLobbies, showScreenNotice],
+    [accountName, accountUserId, getMultiplayerErrorMessage, refreshPublicCasualLobbies, showScreenNotice],
   )
 
   const handleLeaveMultiplayerRoom = useCallback(async () => {
