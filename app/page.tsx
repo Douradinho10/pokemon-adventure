@@ -1238,25 +1238,19 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const socketResult = await Promise.race([
-        joinCompetitiveQueueWithSocket({
-          maxPlayers,
-          userId: accountUserId,
-          displayName: accountName,
-        }),
-        delay(8000).then(() => ({ ok: false, room: undefined, message: "WebSocket sem resposta" })),
-      ])
+      const socketResult = await joinCompetitiveQueueWithSocket({
+        maxPlayers,
+        userId: accountUserId,
+        displayName: accountName,
+      })
 
       const queueResult = socketResult.ok
         ? socketResult
-        : await Promise.race([
-            joinCompetitiveQueue({
-              maxPlayers,
-              userId: accountUserId,
-              displayName: accountName,
-            }),
-            delay(8000).then(() => ({ ok: false, room: undefined, message: "Fila Firebase sem resposta" })),
-          ])
+        : await joinCompetitiveQueue({
+            maxPlayers,
+            userId: accountUserId,
+            displayName: accountName,
+          })
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
@@ -1269,41 +1263,15 @@ export default function PokemonAdventure() {
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
-      try {
-        const retryQueueResult = await Promise.race([
-          joinCompetitiveQueue({
-            maxPlayers,
-            userId: accountUserId,
-            displayName: accountName,
-          }),
-          delay(10000).then(() => ({ ok: false, room: undefined, message: "Fila competitiva sem resposta" })),
-        ])
+      const friendlyMessage = getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")
 
-        if (!retryQueueResult.ok || !retryQueueResult.room) {
-          throw new Error(retryQueueResult.message || "Nao foi possivel entrar na fila competitiva")
-        }
-
-        setMultiplayerJoinedRoomId(retryQueueResult.room.id)
-        setMultiplayerRoom(retryQueueResult.room)
-        setMultiplayerMode(false)
-        setMultiplayerIsCasual(false)
-        setMultiplayerSection("competitive")
-        setMultiplayerError(null)
-        showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
-      } catch (fallbackError) {
-        const friendlyMessage = getMultiplayerErrorMessage(
-          fallbackError,
-          getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online."),
-        )
-
-        setMultiplayerJoinedRoomId(null)
-        setMultiplayerRoom(null)
-        setMultiplayerMode(false)
-        setMultiplayerIsCasual(false)
-        setMultiplayerSection("competitive")
-        setMultiplayerError(friendlyMessage)
-        showScreenNotice(friendlyMessage)
-      }
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerSection("competitive")
+      setMultiplayerError(friendlyMessage)
+      showScreenNotice(friendlyMessage)
     } finally {
       setMultiplayerBusy(false)
     }
