@@ -9,6 +9,12 @@
           ".write": "auth != null"
         }
       },
+      "competitiveQueue": {
+        "$queueSize": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      },
       "leaderboards": {
         "$month": {
           "$runId": {

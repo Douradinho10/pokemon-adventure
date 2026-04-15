@@ -725,28 +725,6 @@ export default function PokemonAdventure() {
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
-  const withTimeout = useCallback(
-    async <T,>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
-      let timeoutId: number | null = null
-
-      try {
-        return await Promise.race([
-          operation,
-          new Promise<T>((_, reject) => {
-            timeoutId = window.setTimeout(() => {
-              reject(new Error(timeoutMessage))
-            }, timeoutMs)
-          }),
-        ])
-      } finally {
-        if (timeoutId !== null) {
-          window.clearTimeout(timeoutId)
-        }
-      }
-    },
-    [],
-  )
-
   const delay = useCallback((ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)), [])
 
   const redirectToLogin = useCallback(() => {
@@ -1231,15 +1209,11 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const queueResult = await withTimeout(
-        joinCompetitiveQueue({
-          maxPlayers,
-          userId: accountUserId,
-          displayName: accountName,
-        }),
-        12000,
-        "Timeout ao entrar na fila competitiva.",
-      )
+      const queueResult = await joinCompetitiveQueue({
+        maxPlayers,
+        userId: accountUserId,
+        displayName: accountName,
+      })
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
@@ -1252,19 +1226,40 @@ export default function PokemonAdventure() {
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
-      const friendlyMessage = getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")
+      try {
+        const fallbackRoom = await createMultiplayerRoom({
+          hostUserId: accountUserId,
+          hostDisplayName: accountName,
+          maxPlayers,
+          mode: "competitive",
+          visibility: "private",
+        })
 
-      setMultiplayerJoinedRoomId(null)
-      setMultiplayerRoom(null)
-      setMultiplayerMode(false)
-      setMultiplayerIsCasual(false)
-      setMultiplayerSection("competitive")
-      setMultiplayerError(friendlyMessage)
-      showScreenNotice(friendlyMessage)
+        setMultiplayerJoinedRoomId(fallbackRoom.id)
+        setMultiplayerRoom(fallbackRoom)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(false)
+        setMultiplayerSection("competitive")
+        setMultiplayerError(null)
+        showScreenNotice(`Fila ocupada. Criaste nova sala competitiva (${maxPlayers}).`)
+      } catch (fallbackError) {
+        const friendlyMessage = getMultiplayerErrorMessage(
+          fallbackError,
+          getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online."),
+        )
+
+        setMultiplayerJoinedRoomId(null)
+        setMultiplayerRoom(null)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(false)
+        setMultiplayerSection("competitive")
+        setMultiplayerError(friendlyMessage)
+        showScreenNotice(friendlyMessage)
+      }
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice, withTimeout])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
