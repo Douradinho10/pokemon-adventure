@@ -423,6 +423,7 @@ export async function joinCompetitiveQueue(params: {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
   const openLobbyRef = ref(db, `${COMPETITIVE_OPEN_LOBBY_ROOT}/${params.maxPlayers}`)
+  const markerStaleMs = 12000
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const marker = `creating:${params.userId}:${Date.now()}:${attempt}`
@@ -445,9 +446,40 @@ export async function joinCompetitiveQueue(params: {
 
     const pointerState = (pointerTx.snapshot.val() as { roomId?: string; updatedAt?: number } | null) || null
     const pointerRoomId = (pointerState?.roomId || "").trim()
+    const pointerUpdatedAt = Number(pointerState?.updatedAt || 0)
+    const pointerAge = pointerUpdatedAt > 0 ? Date.now() - pointerUpdatedAt : Number.POSITIVE_INFINITY
 
     if (!pointerRoomId) {
       await sleep(80)
+      continue
+    }
+
+    if (pointerRoomId.startsWith("creating:")) {
+      if (pointerAge <= markerStaleMs) {
+        await sleep(140)
+        continue
+      }
+
+      await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+        const currentRoomId = (current?.roomId || "").trim()
+        const currentUpdatedAt = Number(current?.updatedAt || 0)
+        const currentAge = currentUpdatedAt > 0 ? Date.now() - currentUpdatedAt : Number.POSITIVE_INFINITY
+
+        if (!currentRoomId.startsWith("creating:")) {
+          return current
+        }
+
+        if (currentAge <= markerStaleMs) {
+          return current
+        }
+
+        return {
+          roomId: "",
+          updatedAt: Date.now(),
+        }
+      })
+
+      await sleep(120)
       continue
     }
 
