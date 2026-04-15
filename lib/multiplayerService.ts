@@ -493,7 +493,23 @@ async function joinCompetitiveQueueUsingSlot(
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
   const slotRef = ref(db, slotRefPath)
 
-  for (let pass = 0; pass < 40; pass++) {
+  for (;;) {
+    const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
+    if (availableRoomId) {
+      const directJoin = await joinMultiplayerRoom({
+        roomId: availableRoomId,
+        userId: params.userId,
+        displayName: params.displayName,
+      })
+
+      if (directJoin.ok) {
+        const joinedRoom = directJoin.room || (await getRoomById(availableRoomId))
+        if (joinedRoom) {
+          return { ok: true, room: joinedRoom }
+        }
+      }
+    }
+
     const slotSnapshot = await get(slotRef)
     const slot = (slotSnapshot.val() as CompetitiveQueueSlot | null) || null
     const slotRoomId = slot?.roomId || ""
@@ -539,23 +555,6 @@ async function joinCompetitiveQueueUsingSlot(
     const someoneElseCreating = slotRoomId.startsWith("creating:") && slotOwner && slotOwner !== params.userId && !lockIsStale
 
     if (someoneElseCreating) {
-      // If another client is creating, opportunistically join any waiting room already visible.
-      const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
-      if (availableRoomId) {
-        const joinResult = await joinMultiplayerRoom({
-          roomId: availableRoomId,
-          userId: params.userId,
-          displayName: params.displayName,
-        })
-
-        if (joinResult.ok) {
-          const joinedRoom = joinResult.room || (await getRoomById(availableRoomId))
-          if (joinedRoom) {
-            return { ok: true, room: joinedRoom }
-          }
-        }
-      }
-
       await sleep(140)
       continue
     }
@@ -629,27 +628,6 @@ async function joinCompetitiveQueueUsingSlot(
       })
     }
   }
-
-  const finalSlotSnapshot = await get(slotRef)
-  const finalSlot = (finalSlotSnapshot.val() as CompetitiveQueueSlot | null) || null
-  const finalRoomId = finalSlot?.roomId || ""
-
-  if (finalRoomId && !finalRoomId.startsWith("creating:")) {
-    const finalJoin = await joinMultiplayerRoom({
-      roomId: finalRoomId,
-      userId: params.userId,
-      displayName: params.displayName,
-    })
-
-    if (finalJoin.ok) {
-      const joinedRoom = finalJoin.room || (await getRoomById(finalRoomId))
-      if (joinedRoom) {
-        return { ok: true, room: joinedRoom }
-      }
-    }
-  }
-
-  throw new Error("queue-slot-timeout")
 }
 
 export async function joinCompetitiveQueue(params: {
@@ -660,12 +638,8 @@ export async function joinCompetitiveQueue(params: {
   try {
     return await joinCompetitiveQueueUsingSlot(params, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
   } catch {
-    try {
-      // Deterministic fallback under rooms path for projects with strict rules that block /competitiveQueue.
-      return await joinCompetitiveQueueUsingSlot(params, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
-    } catch {
-      return { ok: false, message: "Nao foi possivel entrar na fila competitiva." }
-    }
+    // Deterministic fallback under rooms path for projects with strict rules that block /competitiveQueue.
+    return joinCompetitiveQueueUsingSlot(params, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
   }
 }
 

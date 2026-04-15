@@ -717,7 +717,6 @@ export default function PokemonAdventure() {
   const defeatHideTimeoutRef = useRef<number | null>(null)
   const captureThrowTimeoutRef = useRef<number | null>(null)
   const loginRedirectTimeoutRef = useRef<number | null>(null)
-  const multiplayerBusyTimeoutRef = useRef<number | null>(null)
   const hasAutoRoutedAfterAuthRef = useRef(false)
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
@@ -802,33 +801,6 @@ export default function PokemonAdventure() {
   useEffect(() => {
     latestGameStateRef.current = gameState
   }, [gameState])
-
-  useEffect(() => {
-    if (!multiplayerBusy) {
-      if (multiplayerBusyTimeoutRef.current) {
-        window.clearTimeout(multiplayerBusyTimeoutRef.current)
-        multiplayerBusyTimeoutRef.current = null
-      }
-      return
-    }
-
-    if (multiplayerBusyTimeoutRef.current) {
-      window.clearTimeout(multiplayerBusyTimeoutRef.current)
-    }
-
-    multiplayerBusyTimeoutRef.current = window.setTimeout(() => {
-      setMultiplayerBusy(false)
-      setMultiplayerError((prev) => prev || "A operacao multiplayer demorou demasiado. Tenta novamente.")
-      multiplayerBusyTimeoutRef.current = null
-    }, 35000)
-
-    return () => {
-      if (multiplayerBusyTimeoutRef.current) {
-        window.clearTimeout(multiplayerBusyTimeoutRef.current)
-        multiplayerBusyTimeoutRef.current = null
-      }
-    }
-  }, [multiplayerBusy])
 
   useEffect(() => {
     initializeFirebase()
