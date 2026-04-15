@@ -423,9 +423,9 @@ export async function joinCompetitiveQueue(params: {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
   const openLobbyRef = ref(db, `${COMPETITIVE_OPEN_LOBBY_ROOT}/${params.maxPlayers}`)
-  const markerStaleMs = 12000
+  const markerStaleMs = 2000
 
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < 24; attempt++) {
     const marker = `creating:${params.userId}:${Date.now()}:${attempt}`
 
     const pointerTx = await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
@@ -462,35 +462,7 @@ export async function joinCompetitiveQueue(params: {
       continue
     }
 
-    if (pointerRoomId.startsWith("creating:")) {
-      if (pointerAge <= markerStaleMs) {
-        await sleep(140)
-        continue
-      }
-
-      await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-        const currentRoomId = (current?.roomId || "").trim()
-        const currentUpdatedAt = Number(current?.updatedAt || 0)
-        const currentAge = currentUpdatedAt > 0 ? Date.now() - currentUpdatedAt : Number.POSITIVE_INFINITY
-
-        if (!currentRoomId.startsWith("creating:")) {
-          return current
-        }
-
-        if (currentAge <= markerStaleMs) {
-          return current
-        }
-
-        return {
-          roomId: "",
-          updatedAt: Date.now(),
-        }
-      })
-
-      await sleep(120)
-      continue
-    }
-
+    // The client that reserved the marker must be allowed to create the room.
     if (pointerRoomId === marker) {
       try {
         const createdRoom = await createMultiplayerRoom({
@@ -522,6 +494,35 @@ export async function joinCompetitiveQueue(params: {
         const message = error instanceof Error ? error.message : String(error || "")
         return { ok: false, message: message || "Falha ao criar sala competitiva" }
       }
+    }
+
+    if (pointerRoomId.startsWith("creating:")) {
+      if (pointerAge <= markerStaleMs) {
+        await sleep(140)
+        continue
+      }
+
+      await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+        const currentRoomId = (current?.roomId || "").trim()
+        const currentUpdatedAt = Number(current?.updatedAt || 0)
+        const currentAge = currentUpdatedAt > 0 ? Date.now() - currentUpdatedAt : Number.POSITIVE_INFINITY
+
+        if (!currentRoomId.startsWith("creating:")) {
+          return current
+        }
+
+        if (currentAge <= markerStaleMs) {
+          return current
+        }
+
+        return {
+          roomId: "",
+          updatedAt: Date.now(),
+        }
+      })
+
+      await sleep(120)
+      continue
     }
 
     const joinResult = await joinMultiplayerRoom({
