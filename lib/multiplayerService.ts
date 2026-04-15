@@ -55,6 +55,7 @@ export interface PublicCasualLobbySummary {
 }
 
 const ROOM_ROOT = "multiplayer/rooms"
+const COMPETITIVE_QUEUE_ROOT = "multiplayer/competitiveQueues"
 const LEADERBOARD_ROOT = "multiplayer/leaderboards"
 const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
@@ -371,6 +372,144 @@ export async function joinMultiplayerRoom(params: {
   }
 
   return { ok: true }
+}
+
+async function getRoomById(roomId: string): Promise<MultiplayerRoom | null> {
+  const db = requireDatabase()
+  const snapshot = await get(ref(db, `${ROOM_ROOT}/${roomId}`))
+  if (!snapshot.exists()) {
+    return null
+  }
+
+  return snapshot.val() as MultiplayerRoom
+}
+
+export async function joinCompetitiveQueue(params: {
+  maxPlayers: 2 | 3
+  userId: string
+  displayName: string
+}): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
+  const db = requireDatabase()
+  const queueRef = ref(db, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const marker = `creating-${params.userId}-${Date.now()}-${attempt}`
+
+    const queueTx = await runTransaction(queueRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+      const currentRoomId = current?.roomId || ""
+      if (currentRoomId && !currentRoomId.startsWith("creating-")) {
+        return current
+      }
+
+      return {
+        roomId: marker,
+        updatedAt: Date.now(),
+      }
+    })
+
+    if (!queueTx.committed) {
+      return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
+    }
+
+    const queueState = (queueTx.snapshot.val() as { roomId?: string; updatedAt?: number } | null) || null
+    const queueRoomId = queueState?.roomId || ""
+
+    if (queueRoomId && queueRoomId !== marker) {
+      const joinResult = await joinMultiplayerRoom({
+        roomId: queueRoomId,
+        userId: params.userId,
+        displayName: params.displayName,
+      })
+
+      if (joinResult.ok) {
+        const joinedRoom = await getRoomById(queueRoomId)
+
+        // Once the room is active/full, clear queue pointer so the next queue can form.
+        if (joinedRoom && (joinedRoom.status !== "waiting" || Object.keys(joinedRoom.players || {}).length >= joinedRoom.maxPlayers)) {
+          await runTransaction(queueRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+            if ((current?.roomId || "") !== queueRoomId) {
+              return current
+            }
+
+            return {
+              roomId: "",
+              updatedAt: Date.now(),
+            }
+          })
+        }
+
+        if (!joinedRoom) {
+          return { ok: false, message: "Sala nao encontrada" }
+        }
+
+        return { ok: true, room: joinedRoom }
+      }
+
+      const message = (joinResult.message || "").toLowerCase()
+      const retryable =
+        message.includes("sala cheia") ||
+        message.includes("ja foi iniciada") ||
+        message.includes("sala nao encontrada") ||
+        message.includes("nao foi possivel entrar na sala")
+
+      if (!retryable) {
+        return { ok: false, message: joinResult.message || "Nao foi possivel entrar na fila competitiva" }
+      }
+
+      await runTransaction(queueRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+        if ((current?.roomId || "") !== queueRoomId) {
+          return current
+        }
+
+        return {
+          roomId: "",
+          updatedAt: Date.now(),
+        }
+      })
+
+      continue
+    }
+
+    try {
+      const createdRoom = await createMultiplayerRoom({
+        hostUserId: params.userId,
+        hostDisplayName: params.displayName,
+        maxPlayers: params.maxPlayers,
+        mode: "competitive",
+        visibility: "private",
+      })
+
+      await runTransaction(queueRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+        const currentRoomId = current?.roomId || ""
+        if (currentRoomId !== marker && currentRoomId !== "") {
+          return current
+        }
+
+        return {
+          roomId: createdRoom.id,
+          updatedAt: Date.now(),
+        }
+      })
+
+      return { ok: true, room: createdRoom }
+    } catch (error) {
+      await runTransaction(queueRef, (current: { roomId?: string; updatedAt?: number } | null) => {
+        if ((current?.roomId || "") !== marker) {
+          return current
+        }
+
+        return {
+          roomId: "",
+          updatedAt: Date.now(),
+        }
+      })
+
+      const message = error instanceof Error ? error.message : String(error || "")
+      return { ok: false, message: message || "Falha ao criar sala competitiva" }
+    }
+  }
+
+  return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {

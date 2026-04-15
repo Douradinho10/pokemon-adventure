@@ -39,12 +39,12 @@ import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { saveGameToFirebase } from "../lib/firebaseRtdbService"
 import {
   createMultiplayerRoom,
-  findAvailableCompetitiveRoom,
   getAvailableLeaderboardMonths,
   getCurrentMonthKey,
   getMonthlyLeaderboard,
   getPublicCasualLobbies,
   getSoloFarthestLeaderboard,
+  joinCompetitiveQueue,
   joinMultiplayerRoom,
   leaveMultiplayerRoom,
   markMultiplayerPlayerFinished,
@@ -1259,60 +1259,22 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      let targetRoomId: string | null = null
-      let joinedExisting = false
-
-      for (let attempt = 0; attempt < 6; attempt++) {
-        targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
-
-        if (!targetRoomId) {
-          if (attempt < 2) {
-            await delay(250)
-            continue
-          }
-          break
-        }
-
-        const joinResult = await joinMultiplayerRoom({
-          roomId: targetRoomId,
+      const queueResult = await withTimeout(
+        joinCompetitiveQueue({
+          maxPlayers,
           userId: accountUserId,
           displayName: accountName,
-        })
+        }),
+        22000,
+        "A entrada na fila competitiva demorou demasiado.",
+      )
 
-        if (joinResult.ok) {
-          joinedExisting = true
-          break
-        }
-
-        const joinMessage = (joinResult.message || "").toLowerCase()
-        const canRetryAnotherRoom =
-          joinMessage.includes("sala cheia") ||
-          joinMessage.includes("ja foi iniciada") ||
-          joinMessage.includes("sala nao encontrada") ||
-          joinMessage.includes("nao foi possivel entrar na sala")
-
-        if (!canRetryAnotherRoom) {
-          throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
-        }
-
-        targetRoomId = null
-        await delay(250)
+      if (!queueResult.ok || !queueResult.room) {
+        throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
       }
 
-      if (!joinedExisting) {
-        const room = await createMultiplayerRoom({
-          hostUserId: accountUserId,
-          hostDisplayName: accountName,
-          maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
-
-        targetRoomId = room.id
-        setMultiplayerRoom(room)
-      }
-
-      setMultiplayerJoinedRoomId(targetRoomId)
+      setMultiplayerJoinedRoomId(queueResult.room.id)
+      setMultiplayerRoom(queueResult.room)
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
@@ -1330,7 +1292,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, delay, getMultiplayerErrorMessage, showScreenNotice])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice, withTimeout])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
