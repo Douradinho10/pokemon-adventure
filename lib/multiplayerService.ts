@@ -61,7 +61,7 @@ const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
 const SOLO_LOCAL_FALLBACK_KEY = "pokemon-adventure:solo-runs-fallback"
 const LOBBY_STALE_MS = 30 * 60 * 1000
-const COMPETITIVE_QUEUE_LOCK_STALE_MS = 4 * 1000
+const COMPETITIVE_QUEUE_LOCK_STALE_MS = 30 * 1000
 const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const ROOM_ID_LENGTH = 5
 
