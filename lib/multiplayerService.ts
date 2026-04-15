@@ -61,7 +61,7 @@ const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
 const SOLO_LOCAL_FALLBACK_KEY = "pokemon-adventure:solo-runs-fallback"
 const LOBBY_STALE_MS = 30 * 60 * 1000
-const COMPETITIVE_QUEUE_LOCK_STALE_MS = 8 * 1000
+const COMPETITIVE_QUEUE_LOCK_STALE_MS = 45 * 1000
 const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const ROOM_ID_LENGTH = 5
 
@@ -817,10 +817,18 @@ export async function joinCompetitiveQueue(params: {
     const shouldRecycleSlot =
       joinMessage.includes("sala cheia") ||
       joinMessage.includes("ja foi iniciada") ||
-      joinMessage.includes("sala nao encontrada") ||
-      joinMessage.includes("nao foi possivel entrar na sala")
+      joinMessage.includes("sala nao encontrada")
 
     if (shouldRecycleSlot) {
+      const roomState = await getRoomById(slotRoomId)
+      const roomIsInvalid =
+        !roomState || roomState.status !== "waiting" || Object.keys(roomState.players || {}).length >= roomState.maxPlayers
+
+      if (!roomIsInvalid) {
+        await sleep(120)
+        continue
+      }
+
       const recycleMarker = `creating:${params.userId}:${Date.now()}`
       await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
         if (!current || current.roomId !== slotRoomId) {
