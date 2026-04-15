@@ -1209,14 +1209,11 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const queueResult = await Promise.race([
-        joinCompetitiveQueue({
-          maxPlayers,
-          userId: accountUserId,
-          displayName: accountName,
-        }),
-        delay(25000).then(() => ({ ok: false, room: undefined, message: "Ligacao ao multiplayer sem resposta." })),
-      ])
+      const queueResult = await joinCompetitiveQueue({
+        maxPlayers,
+        userId: accountUserId,
+        displayName: accountName,
+      })
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
