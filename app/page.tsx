@@ -723,6 +723,7 @@ export default function PokemonAdventure() {
   const latestGameStateRef = useRef(gameState)
   const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
+  const multiplayerBusyTimeoutRef = useRef<number | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
   const withTimeout = useCallback(
@@ -933,6 +934,33 @@ export default function PokemonAdventure() {
   }, [accountEmail])
 
   useEffect(() => {
+    if (!multiplayerBusy) {
+      if (multiplayerBusyTimeoutRef.current) {
+        window.clearTimeout(multiplayerBusyTimeoutRef.current)
+        multiplayerBusyTimeoutRef.current = null
+      }
+      return
+    }
+
+    if (multiplayerBusyTimeoutRef.current) {
+      window.clearTimeout(multiplayerBusyTimeoutRef.current)
+    }
+
+    multiplayerBusyTimeoutRef.current = window.setTimeout(() => {
+      setMultiplayerBusy(false)
+      setMultiplayerError("A operacao multiplayer demorou demasiado e foi cancelada. Tenta novamente.")
+      multiplayerBusyTimeoutRef.current = null
+    }, 15000)
+
+    return () => {
+      if (multiplayerBusyTimeoutRef.current) {
+        window.clearTimeout(multiplayerBusyTimeoutRef.current)
+        multiplayerBusyTimeoutRef.current = null
+      }
+    }
+  }, [multiplayerBusy])
+
+  useEffect(() => {
     return () => {
       if (screenNoticeTimeoutRef.current) {
         window.clearTimeout(screenNoticeTimeoutRef.current)
@@ -948,6 +976,9 @@ export default function PokemonAdventure() {
       }
       if (loginRedirectTimeoutRef.current) {
         window.clearTimeout(loginRedirectTimeoutRef.current)
+      }
+      if (multiplayerBusyTimeoutRef.current) {
+        window.clearTimeout(multiplayerBusyTimeoutRef.current)
       }
     }
   }, [])
