@@ -60,6 +60,17 @@ const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
 const SOLO_LOCAL_FALLBACK_KEY = "pokemon-adventure:solo-runs-fallback"
 const LOBBY_STALE_MS = 30 * 60 * 1000
+const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const ROOM_ID_LENGTH = 5
+
+function generateRoomId(length = ROOM_ID_LENGTH): string {
+  let output = ""
+  for (let index = 0; index < length; index++) {
+    const randomIndex = Math.floor(Math.random() * ROOM_ID_ALPHABET.length)
+    output += ROOM_ID_ALPHABET[randomIndex]
+  }
+  return output
+}
 
 function readSoloFallbackRuns(): SoloLeaderboardEntry[] {
   if (typeof window === "undefined") {
@@ -185,35 +196,47 @@ export async function createMultiplayerRoom(params: {
   visibility?: MultiplayerRoomVisibility
 }): Promise<MultiplayerRoom> {
   const db = requireDatabase()
-  const roomsRef = ref(db, ROOM_ROOT)
-  const newRoomRef = push(roomsRef)
 
-  if (!newRoomRef.key) {
-    throw new Error("Falha ao gerar codigo da sala")
-  }
-
-  const createdAt = Date.now()
-  const room: MultiplayerRoom = {
-    id: newRoomRef.key,
-    hostUserId: params.hostUserId,
-    hostDisplayName: params.hostDisplayName,
-    mode: params.mode,
-    visibility: params.visibility || "private",
-    maxPlayers: params.maxPlayers,
-    status: "waiting",
-    createdAt,
-    players: {
-      [params.hostUserId]: {
-        userId: params.hostUserId,
-        displayName: params.hostDisplayName,
-        joinedAt: createdAt,
-        bestWave: 0,
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const roomId = generateRoomId()
+    const createdAt = Date.now()
+    const room: MultiplayerRoom = {
+      id: roomId,
+      hostUserId: params.hostUserId,
+      hostDisplayName: params.hostDisplayName,
+      mode: params.mode,
+      visibility: params.visibility || "private",
+      maxPlayers: params.maxPlayers,
+      status: "waiting",
+      createdAt,
+      players: {
+        [params.hostUserId]: {
+          userId: params.hostUserId,
+          displayName: params.hostDisplayName,
+          joinedAt: createdAt,
+          bestWave: 0,
+        },
       },
-    },
+    }
+
+    const roomRef = ref(db, `${ROOM_ROOT}/${roomId}`)
+    const transaction = await runTransaction(roomRef, (current: MultiplayerRoom | null) => {
+      if (current) {
+        return current
+      }
+
+      return room
+    })
+
+    if (transaction.committed) {
+      const createdRoom = transaction.snapshot.val() as MultiplayerRoom | null
+      if (createdRoom?.hostUserId === params.hostUserId && createdRoom.id === roomId) {
+        return createdRoom
+      }
+    }
   }
 
-  await set(newRoomRef, room)
-  return room
+  throw new Error("Falha ao gerar codigo da sala")
 }
 
 export async function findAvailableCompetitiveRoom(maxPlayers: 2 | 3): Promise<string | null> {
