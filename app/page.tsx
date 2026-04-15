@@ -3517,13 +3517,6 @@ export default function PokemonAdventure() {
         </div>
 
         <Button
-          onClick={() => setCurrentScreen("leaderboards")}
-          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-        >
-          Ver Tabelas
-        </Button>
-
-        <Button
           onClick={() => setCurrentScreen("main-menu")}
           className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
         >
