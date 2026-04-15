@@ -440,11 +440,19 @@ export async function joinCompetitiveQueue(params: {
       }
     })
 
-    if (!pointerTx.committed) {
-      return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
+    let pointerState = (pointerTx.snapshot.val() as { roomId?: string; updatedAt?: number } | null) || null
+    if (!pointerState) {
+      const pointerSnapshot = await get(openLobbyRef)
+      pointerState = pointerSnapshot.exists()
+        ? ((pointerSnapshot.val() as { roomId?: string; updatedAt?: number }) || null)
+        : null
     }
 
-    const pointerState = (pointerTx.snapshot.val() as { roomId?: string; updatedAt?: number } | null) || null
+    if (!pointerState) {
+      await sleep(80)
+      continue
+    }
+
     const pointerRoomId = (pointerState?.roomId || "").trim()
     const pointerUpdatedAt = Number(pointerState?.updatedAt || 0)
     const pointerAge = pointerUpdatedAt > 0 ? Date.now() - pointerUpdatedAt : Number.POSITIVE_INFINITY
