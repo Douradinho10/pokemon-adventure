@@ -1399,6 +1399,18 @@ export default function PokemonAdventure() {
     }
   }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
 
+  const handleExitMultiplayerToMainMenu = useCallback(async () => {
+    if (multiplayerJoinedRoomId) {
+      await handleLeaveMultiplayerRoom()
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+    }
+
+    setCurrentScreen("main-menu")
+  }, [handleLeaveMultiplayerRoom, multiplayerJoinedRoomId])
+
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
       return false
@@ -3582,7 +3594,8 @@ export default function PokemonAdventure() {
         </div>
 
         <Button
-          onClick={() => setCurrentScreen("main-menu")}
+          onClick={handleExitMultiplayerToMainMenu}
+          disabled={multiplayerBusy}
           className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
         >
           Voltar ao Menu Principal
