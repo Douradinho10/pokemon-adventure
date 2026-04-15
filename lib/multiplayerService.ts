@@ -391,7 +391,7 @@ export async function joinCompetitiveQueue(params: {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-  for (let pass = 0; pass < 4; pass++) {
+  for (let pass = 0; pass < 6; pass++) {
     const roomsSnapshot = await get(ref(db, ROOM_ROOT))
     const now = Date.now()
     const rooms = (roomsSnapshot.val() as Record<string, MultiplayerRoom>) || {}
@@ -424,11 +424,35 @@ export async function joinCompetitiveQueue(params: {
 
       if (joinResult.ok) {
         const joinedRoom = await getRoomById(candidate.room.id)
-        if (!joinedRoom) {
-          continue
+        if (joinedRoom) {
+          return { ok: true, room: joinedRoom }
         }
 
-        return { ok: true, room: joinedRoom }
+        // If immediate read lags or is denied transiently, still consider join successful.
+        const optimisticPlayers: Record<string, MultiplayerRoomPlayer> = {
+          ...(candidate.room.players || {}),
+          [params.userId]: {
+            userId: params.userId,
+            displayName: params.displayName,
+            joinedAt: Date.now(),
+            bestWave: 0,
+          },
+        }
+        const optimisticPlayersCount = Object.keys(optimisticPlayers).length
+        const optimisticRoom: MultiplayerRoom = {
+          ...candidate.room,
+          players: optimisticPlayers,
+          status:
+            candidate.room.mode === "competitive" && optimisticPlayersCount >= candidate.room.maxPlayers
+              ? "active"
+              : candidate.room.status,
+          startedAt:
+            candidate.room.mode === "competitive" && optimisticPlayersCount >= candidate.room.maxPlayers
+              ? Date.now()
+              : candidate.room.startedAt,
+        }
+
+        return { ok: true, room: optimisticRoom }
       }
 
       const message = (joinResult.message || "").toLowerCase()
@@ -460,7 +484,7 @@ export async function joinCompetitiveQueue(params: {
       }
     }
 
-    await sleep(120)
+    await sleep(100)
   }
 
   return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
