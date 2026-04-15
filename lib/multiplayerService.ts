@@ -485,192 +485,170 @@ async function joinCompetitiveQueueLegacy(params: {
   return { ok: true, room: createdRoom }
 }
 
-export async function joinCompetitiveQueue(params: {
-  maxPlayers: 2 | 3
-  userId: string
-  displayName: string
-}): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
+async function joinCompetitiveQueueUsingSlot(
+  params: { maxPlayers: 2 | 3; userId: string; displayName: string },
+  slotRefPath: string,
+): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-  const slotRef = ref(db, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
+  const slotRef = ref(db, slotRefPath)
 
-  try {
-    for (let pass = 0; pass < 100; pass++) {
-      const slotSnapshot = await get(slotRef)
-      const slot = (slotSnapshot.val() as CompetitiveQueueSlot | null) || null
-      const slotRoomId = slot?.roomId || ""
+  for (let pass = 0; pass < 100; pass++) {
+    const slotSnapshot = await get(slotRef)
+    const slot = (slotSnapshot.val() as CompetitiveQueueSlot | null) || null
+    const slotRoomId = slot?.roomId || ""
 
-      if (slotRoomId && !slotRoomId.startsWith("creating:")) {
-        const joinResult = await joinMultiplayerRoom({
-          roomId: slotRoomId,
-          userId: params.userId,
-          displayName: params.displayName,
-        })
+    if (slotRoomId && !slotRoomId.startsWith("creating:")) {
+      const joinResult = await joinMultiplayerRoom({
+        roomId: slotRoomId,
+        userId: params.userId,
+        displayName: params.displayName,
+      })
 
-        if (joinResult.ok) {
-          const joinedRoom = joinResult.room || (await getRoomById(slotRoomId))
-          if (joinedRoom) {
-            return { ok: true, room: joinedRoom }
+      if (joinResult.ok) {
+        const joinedRoom = joinResult.room || (await getRoomById(slotRoomId))
+        if (joinedRoom) {
+          return { ok: true, room: joinedRoom }
+        }
+      }
+
+      const joinMessage = (joinResult.message || "").toLowerCase()
+      const shouldClearSlot =
+        joinMessage.includes("sala cheia") ||
+        joinMessage.includes("ja foi iniciada") ||
+        joinMessage.includes("sala nao encontrada") ||
+        joinMessage.includes("nao foi possivel entrar na sala")
+
+      if (shouldClearSlot) {
+        await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
+          if (!current || current.roomId !== slotRoomId) {
+            return current
           }
-        }
-
-        const joinMessage = (joinResult.message || "").toLowerCase()
-        const shouldClearSlot =
-          joinMessage.includes("sala cheia") ||
-          joinMessage.includes("ja foi iniciada") ||
-          joinMessage.includes("sala nao encontrada") ||
-          joinMessage.includes("nao foi possivel entrar na sala")
-
-        if (shouldClearSlot) {
-          await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-            if (!current || current.roomId !== slotRoomId) {
-              return current
-            }
-            return null
-          })
-        }
-
-        await sleep(100)
-        continue
+          return null
+        })
       }
 
-      const now = Date.now()
-      const slotOwner = slot?.ownerUserId || ""
-      const slotUpdatedAt = Number(slot?.updatedAt || 0)
-      const lockIsStale = now - slotUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
-      const someoneElseCreating =
-        slotRoomId.startsWith("creating:") && slotOwner && slotOwner !== params.userId && !lockIsStale
+      await sleep(100)
+      continue
+    }
 
-      if (someoneElseCreating) {
-        await sleep(140)
-        continue
+    const now = Date.now()
+    const slotOwner = slot?.ownerUserId || ""
+    const slotUpdatedAt = Number(slot?.updatedAt || 0)
+    const lockIsStale = now - slotUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
+    const someoneElseCreating = slotRoomId.startsWith("creating:") && slotOwner && slotOwner !== params.userId && !lockIsStale
+
+    if (someoneElseCreating) {
+      await sleep(140)
+      continue
+    }
+
+    const marker = `creating:${params.userId}:${Date.now()}`
+    const acquireTx = await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
+      const txNow = Date.now()
+
+      if (!current) {
+        return {
+          roomId: marker,
+          ownerUserId: params.userId,
+          updatedAt: txNow,
+        }
       }
 
-      const marker = `creating:${params.userId}:${Date.now()}`
-      const acquireTx = await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-        const txNow = Date.now()
+      const currentRoomId = current.roomId || ""
+      const currentOwner = current.ownerUserId || ""
+      const currentUpdatedAt = Number(current.updatedAt || 0)
+      const currentStale = txNow - currentUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
 
-        if (!current) {
+      if (currentRoomId.startsWith("creating:")) {
+        if (currentOwner === params.userId || currentStale) {
           return {
             roomId: marker,
             ownerUserId: params.userId,
             updatedAt: txNow,
           }
         }
-
-        const currentRoomId = current.roomId || ""
-        const currentOwner = current.ownerUserId || ""
-        const currentUpdatedAt = Number(current.updatedAt || 0)
-        const currentStale = txNow - currentUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
-
-        if (currentRoomId.startsWith("creating:")) {
-          if (currentOwner === params.userId || currentStale) {
-            return {
-              roomId: marker,
-              ownerUserId: params.userId,
-              updatedAt: txNow,
-            }
-          }
-        }
-
-        return current
-      })
-
-      const acquiredSlot = (acquireTx.snapshot.val() as CompetitiveQueueSlot | null) || null
-      const lockAcquired = acquiredSlot?.roomId === marker && acquiredSlot.ownerUserId === params.userId
-
-      if (!lockAcquired) {
-        await sleep(90)
-        continue
-      }
-
-      try {
-        const createdRoom = await createMultiplayerRoom({
-          hostUserId: params.userId,
-          hostDisplayName: params.displayName,
-          maxPlayers: params.maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
-
-        await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-          if (!current || current.roomId !== marker || current.ownerUserId !== params.userId) {
-            return current
-          }
-
-          return {
-            roomId: createdRoom.id,
-            ownerUserId: params.userId,
-            updatedAt: Date.now(),
-          }
-        })
-
-        return { ok: true, room: createdRoom }
-      } catch {
-        await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-          if (!current || current.roomId !== marker || current.ownerUserId !== params.userId) {
-            return current
-          }
-          return null
-        })
-      }
-    }
-
-    const finalSlotSnapshot = await get(slotRef)
-    const finalSlot = (finalSlotSnapshot.val() as CompetitiveQueueSlot | null) || null
-    const finalRoomId = finalSlot?.roomId || ""
-
-    if (finalRoomId && !finalRoomId.startsWith("creating:")) {
-      const finalJoin = await joinMultiplayerRoom({
-        roomId: finalRoomId,
-        userId: params.userId,
-        displayName: params.displayName,
-      })
-
-      if (finalJoin.ok) {
-        const joinedRoom = finalJoin.room || (await getRoomById(finalRoomId))
-        if (joinedRoom) {
-          return { ok: true, room: joinedRoom }
-        }
-      }
-    }
-
-    const fallbackRoom = await createMultiplayerRoom({
-      hostUserId: params.userId,
-      hostDisplayName: params.displayName,
-      maxPlayers: params.maxPlayers,
-      mode: "competitive",
-      visibility: "private",
-    })
-
-    await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-      const now = Date.now()
-      if (!current) {
-        return {
-          roomId: fallbackRoom.id,
-          ownerUserId: params.userId,
-          updatedAt: now,
-        }
-      }
-
-      const currentRoomId = current.roomId || ""
-      const currentUpdatedAt = Number(current.updatedAt || 0)
-      const currentStale = now - currentUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
-
-      if (currentRoomId.startsWith("creating:") && currentStale) {
-        return {
-          roomId: fallbackRoom.id,
-          ownerUserId: params.userId,
-          updatedAt: now,
-        }
       }
 
       return current
     })
 
-    return { ok: true, room: fallbackRoom }
+    const acquiredSlot = (acquireTx.snapshot.val() as CompetitiveQueueSlot | null) || null
+    const lockAcquired = acquiredSlot?.roomId === marker && acquiredSlot.ownerUserId === params.userId
+
+    if (!lockAcquired) {
+      await sleep(90)
+      continue
+    }
+
+    try {
+      const createdRoom = await createMultiplayerRoom({
+        hostUserId: params.userId,
+        hostDisplayName: params.displayName,
+        maxPlayers: params.maxPlayers,
+        mode: "competitive",
+        visibility: "private",
+      })
+
+      await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
+        if (!current || current.roomId !== marker || current.ownerUserId !== params.userId) {
+          return current
+        }
+
+        return {
+          roomId: createdRoom.id,
+          ownerUserId: params.userId,
+          updatedAt: Date.now(),
+        }
+      })
+
+      return { ok: true, room: createdRoom }
+    } catch {
+      await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
+        if (!current || current.roomId !== marker || current.ownerUserId !== params.userId) {
+          return current
+        }
+        return null
+      })
+    }
+  }
+
+  const finalSlotSnapshot = await get(slotRef)
+  const finalSlot = (finalSlotSnapshot.val() as CompetitiveQueueSlot | null) || null
+  const finalRoomId = finalSlot?.roomId || ""
+
+  if (finalRoomId && !finalRoomId.startsWith("creating:")) {
+    const finalJoin = await joinMultiplayerRoom({
+      roomId: finalRoomId,
+      userId: params.userId,
+      displayName: params.displayName,
+    })
+
+    if (finalJoin.ok) {
+      const joinedRoom = finalJoin.room || (await getRoomById(finalRoomId))
+      if (joinedRoom) {
+        return { ok: true, room: joinedRoom }
+      }
+    }
+  }
+
+  throw new Error("queue-slot-timeout")
+}
+
+export async function joinCompetitiveQueue(params: {
+  maxPlayers: 2 | 3
+  userId: string
+  displayName: string
+}): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
+  try {
+    return await joinCompetitiveQueueUsingSlot(params, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
   } catch {
-    return joinCompetitiveQueueLegacy(params)
+    try {
+      // Fallback to a slot under rooms path for projects with strict rules that block /competitiveQueue.
+      return await joinCompetitiveQueueUsingSlot(params, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
+    } catch {
+      return joinCompetitiveQueueLegacy(params)
+    }
   }
 }
 

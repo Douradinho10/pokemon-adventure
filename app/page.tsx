@@ -1270,28 +1270,26 @@ export default function PokemonAdventure() {
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
       try {
-        const fallbackRoom = await Promise.race([
-          createMultiplayerRoom({
-            hostUserId: accountUserId,
-            hostDisplayName: accountName,
+        const retryQueueResult = await Promise.race([
+          joinCompetitiveQueue({
             maxPlayers,
-            mode: "competitive",
-            visibility: "private",
+            userId: accountUserId,
+            displayName: accountName,
           }),
-          delay(6000).then(() => null),
+          delay(10000).then(() => ({ ok: false, room: undefined, message: "Fila competitiva sem resposta" })),
         ])
 
-        if (!fallbackRoom) {
-          throw new Error("Nao foi possivel criar sala competitiva agora")
+        if (!retryQueueResult.ok || !retryQueueResult.room) {
+          throw new Error(retryQueueResult.message || "Nao foi possivel entrar na fila competitiva")
         }
 
-        setMultiplayerJoinedRoomId(fallbackRoom.id)
-        setMultiplayerRoom(fallbackRoom)
+        setMultiplayerJoinedRoomId(retryQueueResult.room.id)
+        setMultiplayerRoom(retryQueueResult.room)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(false)
         setMultiplayerSection("competitive")
         setMultiplayerError(null)
-        showScreenNotice(`Fila ocupada. Criaste nova sala competitiva (${maxPlayers}).`)
+        showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
       } catch (fallbackError) {
         const friendlyMessage = getMultiplayerErrorMessage(
           fallbackError,
