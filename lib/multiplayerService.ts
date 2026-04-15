@@ -644,10 +644,10 @@ export async function joinCompetitiveQueue(params: {
     return await joinCompetitiveQueueUsingSlot(params, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
   } catch {
     try {
-      // Fallback to a slot under rooms path for projects with strict rules that block /competitiveQueue.
+      // Deterministic fallback under rooms path for projects with strict rules that block /competitiveQueue.
       return await joinCompetitiveQueueUsingSlot(params, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
     } catch {
-      return joinCompetitiveQueueLegacy(params)
+      return { ok: false, message: "Nao foi possivel entrar na fila competitiva." }
     }
   }
 }

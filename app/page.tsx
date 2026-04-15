@@ -59,7 +59,6 @@ import {
   type PublicCasualLobbySummary,
   type SoloLeaderboardEntry,
 } from "../lib/multiplayerService"
-import { joinCompetitiveQueueWithSocket } from "../lib/socketCompetitiveService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import type { StatusCondition } from "../hooks/useGameState"
 
@@ -1238,19 +1237,11 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const socketResult = await joinCompetitiveQueueWithSocket({
+      const queueResult = await joinCompetitiveQueue({
         maxPlayers,
         userId: accountUserId,
         displayName: accountName,
       })
-
-      const queueResult = socketResult.ok
-        ? socketResult
-        : await joinCompetitiveQueue({
-            maxPlayers,
-            userId: accountUserId,
-            displayName: accountName,
-          })
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
