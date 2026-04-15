@@ -1307,9 +1307,7 @@ export default function PokemonAdventure() {
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
-      setMultiplayerError(
-        `${getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")} O competitivo precisa do Firebase RTDB online para juntar varias contas na mesma fila. Se o botao ficar cinzento por muito tempo, tenta novamente.`,
-      )
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online."))
       showScreenNotice("Competitivo indisponivel sem Firebase RTDB online.")
     } finally {
       setMultiplayerBusy(false)
