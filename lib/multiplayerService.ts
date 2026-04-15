@@ -493,7 +493,7 @@ async function joinCompetitiveQueueUsingSlot(
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
   const slotRef = ref(db, slotRefPath)
 
-  for (;;) {
+  for (let pass = 0; pass < 120; pass++) {
     const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
     if (availableRoomId) {
       const directJoin = await joinMultiplayerRoom({
@@ -628,6 +628,58 @@ async function joinCompetitiveQueueUsingSlot(
       })
     }
   }
+
+  const finalAvailableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
+  if (finalAvailableRoomId) {
+    const finalJoin = await joinMultiplayerRoom({
+      roomId: finalAvailableRoomId,
+      userId: params.userId,
+      displayName: params.displayName,
+    })
+
+    if (finalJoin.ok) {
+      const joinedRoom = finalJoin.room || (await getRoomById(finalAvailableRoomId))
+      if (joinedRoom) {
+        return { ok: true, room: joinedRoom }
+      }
+    }
+  }
+
+  const createdRoom = await createMultiplayerRoom({
+    hostUserId: params.userId,
+    hostDisplayName: params.displayName,
+    maxPlayers: params.maxPlayers,
+    mode: "competitive",
+    visibility: "private",
+  })
+
+  // Best effort: publish created room to queue slot for the next player.
+  await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
+    const now = Date.now()
+    if (!current) {
+      return {
+        roomId: createdRoom.id,
+        ownerUserId: params.userId,
+        updatedAt: now,
+      }
+    }
+
+    const currentRoomId = current.roomId || ""
+    const currentUpdatedAt = Number(current.updatedAt || 0)
+    const currentStale = now - currentUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
+
+    if (currentRoomId.startsWith("creating:") && currentStale) {
+      return {
+        roomId: createdRoom.id,
+        ownerUserId: params.userId,
+        updatedAt: now,
+      }
+    }
+
+    return current
+  })
+
+  return { ok: true, room: createdRoom }
 }
 
 export async function joinCompetitiveQueue(params: {
