@@ -795,7 +795,12 @@ export default function PokemonAdventure() {
       return "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* e se os dois dispositivos estao no mesmo projeto Firebase com regras publicadas."
     }
 
-    if (normalized.includes("network") || normalized.includes("offline") || normalized.includes("timeout")) {
+    if (
+      normalized.includes("network") ||
+      normalized.includes("offline") ||
+      normalized.includes("timeout") ||
+      normalized.includes("demorou")
+    ) {
       return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
     }
 
@@ -1302,13 +1307,15 @@ export default function PokemonAdventure() {
       setMultiplayerSection("competitive")
       showScreenNotice(`Entraste na fila competitiva (${maxPlayers} jogadores).`)
     } catch (error) {
+      const friendlyMessage = getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")
+
       setMultiplayerJoinedRoomId(null)
       setMultiplayerRoom(null)
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online."))
-      showScreenNotice("Competitivo indisponivel sem Firebase RTDB online.")
+      setMultiplayerError(friendlyMessage)
+      showScreenNotice(friendlyMessage)
     } finally {
       setMultiplayerBusy(false)
     }
