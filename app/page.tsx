@@ -725,6 +725,28 @@ export default function PokemonAdventure() {
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
+  const withTimeout = useCallback(
+    async <T,>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> => {
+      let timeoutId: number | null = null
+
+      try {
+        return await Promise.race([
+          operation,
+          new Promise<T>((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+              reject(new Error(timeoutMessage))
+            }, timeoutMs)
+          }),
+        ])
+      } finally {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId)
+        }
+      }
+    },
+    [],
+  )
+
   const redirectToLogin = useCallback(() => {
     if (typeof window === "undefined") {
       return
@@ -1179,7 +1201,11 @@ export default function PokemonAdventure() {
 
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          targetRoomId = await findAvailableCompetitiveRoom(maxPlayers)
+          targetRoomId = await withTimeout(
+            findAvailableCompetitiveRoom(maxPlayers),
+            8000,
+            "A procura da fila competitiva demorou demasiado.",
+          )
         } catch (error) {
           targetRoomId = null
         }
@@ -1188,11 +1214,15 @@ export default function PokemonAdventure() {
           break
         }
 
-        const joinResult = await joinMultiplayerRoom({
-          roomId: targetRoomId,
-          userId: accountUserId,
-          displayName: accountName,
-        })
+        const joinResult = await withTimeout(
+          joinMultiplayerRoom({
+            roomId: targetRoomId,
+            userId: accountUserId,
+            displayName: accountName,
+          }),
+          10000,
+          "A entrada na fila competitiva demorou demasiado.",
+        )
 
         if (joinResult.ok) {
           joinedExisting = true
@@ -1203,13 +1233,17 @@ export default function PokemonAdventure() {
       }
 
       if (!joinedExisting) {
-        const room = await createMultiplayerRoom({
-          hostUserId: accountUserId,
-          hostDisplayName: accountName,
-          maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
+        const room = await withTimeout(
+          createMultiplayerRoom({
+            hostUserId: accountUserId,
+            hostDisplayName: accountName,
+            maxPlayers,
+            mode: "competitive",
+            visibility: "private",
+          }),
+          10000,
+          "A criacao da sala competitiva demorou demasiado.",
+        )
 
         targetRoomId = room.id
         setMultiplayerRoom(room)
@@ -1227,13 +1261,13 @@ export default function PokemonAdventure() {
       setMultiplayerIsCasual(false)
       setMultiplayerSection("competitive")
       setMultiplayerError(
-        `${getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")} O competitivo precisa do Firebase RTDB online para juntar varias contas na mesma fila.`,
+        `${getMultiplayerErrorMessage(error, "Falha ao entrar no competitivo online.")} O competitivo precisa do Firebase RTDB online para juntar varias contas na mesma fila. Se o botao ficar cinzento por muito tempo, tenta novamente.`,
       )
       showScreenNotice("Competitivo indisponivel sem Firebase RTDB online.")
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice, withTimeout])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
