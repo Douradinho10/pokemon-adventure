@@ -6,7 +6,8 @@
     "build": "node -e \"require('fs').rmSync('.local/next',{ recursive:true, force:true })\" && next build",
     "dev": "next dev -p 5000 -H 0.0.0.0",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "socket:server": "node server/socket-server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -62,6 +63,8 @@
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
