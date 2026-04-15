@@ -687,12 +687,49 @@ export async function joinCompetitiveQueue(params: {
   userId: string
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
-  try {
-    return await joinCompetitiveQueueUsingSlot(params, `${COMPETITIVE_QUEUE_ROOT}/${params.maxPlayers}`)
-  } catch {
-    // Deterministic fallback under rooms path for projects with strict rules that block /competitiveQueue.
-    return joinCompetitiveQueueUsingSlot(params, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
+
+    if (!availableRoomId) {
+      const createdRoom = await createMultiplayerRoom({
+        hostUserId: params.userId,
+        hostDisplayName: params.displayName,
+        maxPlayers: params.maxPlayers,
+        mode: "competitive",
+        visibility: "private",
+      })
+
+      return { ok: true, room: createdRoom }
+    }
+
+    const joinResult = await joinMultiplayerRoom({
+      roomId: availableRoomId,
+      userId: params.userId,
+      displayName: params.displayName,
+    })
+
+    if (joinResult.ok) {
+      const joinedRoom = joinResult.room || (await getRoomById(availableRoomId))
+      if (joinedRoom) {
+        return { ok: true, room: joinedRoom }
+      }
+    }
+
+    // Race-safe retry: if another client filled/started/deleted this room, re-scan and try again.
+    await sleep(80)
   }
+
+  const createdRoom = await createMultiplayerRoom({
+    hostUserId: params.userId,
+    hostDisplayName: params.displayName,
+    maxPlayers: params.maxPlayers,
+    mode: "competitive",
+    visibility: "private",
+  })
+
+  return { ok: true, room: createdRoom }
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
