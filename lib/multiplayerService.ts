@@ -325,18 +325,26 @@ export async function joinMultiplayerRoom(params: {
     }
 
     const players = current.players || {}
+    const playerIds = Object.keys(players)
+    const normalizedHostUserId = players[current.hostUserId] ? current.hostUserId : playerIds[0] || params.userId
+    const normalizedHostDisplayName = players[normalizedHostUserId]?.displayName || current.hostDisplayName || params.displayName
+    const normalizedCurrent: MultiplayerRoom = {
+      ...current,
+      hostUserId: normalizedHostUserId,
+      hostDisplayName: normalizedHostDisplayName,
+    }
     const currentCount = Object.keys(players).length
 
-    if (current.status !== "waiting") {
-      return current
+    if (normalizedCurrent.status !== "waiting") {
+      return normalizedCurrent
     }
 
     if (players[params.userId]) {
-      return current
+      return normalizedCurrent
     }
 
-    if (currentCount >= current.maxPlayers) {
-      return current
+    if (currentCount >= normalizedCurrent.maxPlayers) {
+      return normalizedCurrent
     }
 
     const nextPlayers: Record<string, MultiplayerRoomPlayer> = {
@@ -350,10 +358,10 @@ export async function joinMultiplayerRoom(params: {
     }
 
     const nextCount = Object.keys(nextPlayers).length
-    const shouldAutoStartCompetitive = current.mode === "competitive" && nextCount >= current.maxPlayers
+    const shouldAutoStartCompetitive = normalizedCurrent.mode === "competitive" && nextCount >= normalizedCurrent.maxPlayers
 
     return {
-      ...current,
+      ...normalizedCurrent,
       status: shouldAutoStartCompetitive ? "active" : current.status,
       startedAt: shouldAutoStartCompetitive ? Date.now() : current.startedAt,
       players: shouldAutoStartCompetitive
@@ -550,23 +558,33 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
       return current
     }
 
-    if (current.hostUserId !== hostUserId) {
-      return current
+    const players = current.players || {}
+    const playerIds = Object.keys(players)
+    const normalizedHostUserId = players[current.hostUserId] ? current.hostUserId : playerIds[0] || hostUserId
+    const normalizedHostDisplayName = players[normalizedHostUserId]?.displayName || current.hostDisplayName
+    const normalizedCurrent: MultiplayerRoom = {
+      ...current,
+      hostUserId: normalizedHostUserId,
+      hostDisplayName: normalizedHostDisplayName,
     }
 
-    const players = current.players || {}
+    if (normalizedCurrent.mode !== "competitive" && normalizedCurrent.hostUserId !== hostUserId) {
+      return normalizedCurrent
+    }
+
     const count = Object.keys(players).length
 
-    if (current.status !== "waiting") {
-      return current
+    if (normalizedCurrent.status !== "waiting") {
+      return normalizedCurrent
     }
 
-    if (count < 2) {
-      return current
+    const minimumPlayers = normalizedCurrent.mode === "competitive" ? normalizedCurrent.maxPlayers : 2
+    if (count < minimumPlayers) {
+      return normalizedCurrent
     }
 
     return {
-      ...current,
+      ...normalizedCurrent,
       status: "active" as const,
       startedAt: Date.now(),
       players: Object.fromEntries(
@@ -592,12 +610,16 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
   }
 
   if (room.status !== "active") {
-    if (room.hostUserId !== hostUserId) {
+    if (room.mode !== "competitive" && room.hostUserId !== hostUserId) {
       return { ok: false, message: "Apenas o host pode iniciar" }
     }
 
-    if (Object.keys(room.players || {}).length < 2) {
-      return { ok: false, message: "Precisas de pelo menos 2 jogadores" }
+    const minPlayers = room.mode === "competitive" ? room.maxPlayers : 2
+    if (Object.keys(room.players || {}).length < minPlayers) {
+      return {
+        ok: false,
+        message: room.mode === "competitive" ? `Precisas de ${room.maxPlayers} jogadores para iniciar` : "Precisas de pelo menos 2 jogadores",
+      }
     }
 
     return { ok: false, message: "Sala nao foi iniciada" }

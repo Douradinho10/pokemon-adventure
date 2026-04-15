@@ -1451,10 +1451,6 @@ export default function PokemonAdventure() {
       return
     }
 
-    if (!accountUserId || multiplayerRoom.hostUserId !== accountUserId) {
-      return
-    }
-
     if (autoActivatedCompetitiveRoomRef.current === multiplayerJoinedRoomId) {
       return
     }
@@ -3369,7 +3365,12 @@ export default function PokemonAdventure() {
     const roomPlayers = multiplayerRoom
       ? Object.values(multiplayerRoom.players || {}).sort((a, b) => b.bestWave - a.bestWave)
       : []
-    const isHost = Boolean(multiplayerRoom && accountUserId && multiplayerRoom.hostUserId === accountUserId)
+    const derivedHostUserId = multiplayerRoom
+      ? multiplayerRoom.players?.[multiplayerRoom.hostUserId]
+        ? multiplayerRoom.hostUserId
+        : Object.keys(multiplayerRoom.players || {})[0] || null
+      : null
+    const isHost = Boolean(multiplayerRoom && accountUserId && derivedHostUserId === accountUserId)
     const lockCompetitiveTabs = Boolean(multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive")
 
     return (
@@ -3532,7 +3533,7 @@ export default function PokemonAdventure() {
                   <div key={player.userId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-slate-50 px-3 py-2">
                     <span className="text-sm font-semibold text-slate-900">
                       {index + 1}. {player.displayName}
-                      {multiplayerRoom.hostUserId === player.userId ? " (Host)" : ""}
+                      {derivedHostUserId === player.userId ? " (Host)" : ""}
                     </span>
                     <span className="text-xs font-black text-slate-700">Wave {player.bestWave}</span>
                   </div>
