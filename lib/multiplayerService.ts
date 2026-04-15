@@ -55,7 +55,6 @@ export interface PublicCasualLobbySummary {
 }
 
 const ROOM_ROOT = "multiplayer/rooms"
-const COMPETITIVE_OPEN_LOBBY_ROOT = "multiplayer/openCompetitiveLobbies"
 const LEADERBOARD_ROOT = "multiplayer/leaderboards"
 const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
@@ -422,19 +421,67 @@ export async function joinCompetitiveQueue(params: {
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-  const openLobbyRef = ref(db, `${COMPETITIVE_OPEN_LOBBY_ROOT}/${params.maxPlayers}`)
-  const markerStaleMs = 2000
 
-  const fallbackScanJoinOrCreate = async (): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> => {
-    for (let pass = 0; pass < 8; pass++) {
-      const roomsSnapshot = await get(ref(db, ROOM_ROOT))
-      const now = Date.now()
-      const rooms = (roomsSnapshot.val() as Record<string, MultiplayerRoom>) || {}
+  for (let pass = 0; pass < 12; pass++) {
+    const roomsSnapshot = await get(ref(db, ROOM_ROOT))
+    const now = Date.now()
+    const rooms = (roomsSnapshot.val() as Record<string, MultiplayerRoom>) || {}
 
-      const candidates = Object.values(rooms)
+    const candidates = Object.values(rooms)
+      .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
+      .filter(({ room, playersCount }) => {
+        const isFresh = now - (room.createdAt || 0) <= LOBBY_STALE_MS
+        return (
+          room.mode === "competitive" &&
+          room.maxPlayers === params.maxPlayers &&
+          room.status === "waiting" &&
+          playersCount < room.maxPlayers &&
+          isFresh
+        )
+      })
+      .sort((a, b) => {
+        if (b.playersCount !== a.playersCount) {
+          return b.playersCount - a.playersCount
+        }
+        return (a.room.createdAt || 0) - (b.room.createdAt || 0)
+      })
+
+    for (const candidate of candidates) {
+      const joinResult = await joinMultiplayerRoom({
+        roomId: candidate.room.id,
+        userId: params.userId,
+        displayName: params.displayName,
+      })
+
+      if (joinResult.ok) {
+        const joinedRoom = joinResult.room || (await getRoomById(candidate.room.id))
+        if (joinedRoom) {
+          return { ok: true, room: joinedRoom }
+        }
+      }
+
+      const joinMessage = (joinResult.message || "").toLowerCase()
+      const retryable =
+        joinMessage.includes("sala cheia") ||
+        joinMessage.includes("ja foi iniciada") ||
+        joinMessage.includes("sala nao encontrada") ||
+        joinMessage.includes("nao foi possivel entrar na sala")
+
+      if (!retryable) {
+        return { ok: false, message: joinResult.message || "Nao foi possivel entrar na fila competitiva" }
+      }
+    }
+
+    if (candidates.length === 0) {
+      await sleep(120)
+
+      const recheckSnapshot = await get(ref(db, ROOM_ROOT))
+      const recheckRooms = (recheckSnapshot.val() as Record<string, MultiplayerRoom>) || {}
+      const recheckNow = Date.now()
+      const recheckCandidates = Object.values(recheckRooms)
         .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
         .filter(({ room, playersCount }) => {
-          const isFresh = now - (room.createdAt || 0) <= LOBBY_STALE_MS
+          const isFresh = recheckNow - (room.createdAt || 0) <= LOBBY_STALE_MS
           return (
             room.mode === "competitive" &&
             room.maxPlayers === params.maxPlayers &&
@@ -450,33 +497,18 @@ export async function joinCompetitiveQueue(params: {
           return (a.room.createdAt || 0) - (b.room.createdAt || 0)
         })
 
-      for (const candidate of candidates) {
-        const joinResult = await joinMultiplayerRoom({
-          roomId: candidate.room.id,
+      if (recheckCandidates.length > 0) {
+        const targetRoom = recheckCandidates[0].room
+        const retryJoin = await joinMultiplayerRoom({
+          roomId: targetRoom.id,
           userId: params.userId,
           displayName: params.displayName,
         })
 
-        if (joinResult.ok) {
-          const joinedRoom = joinResult.room || (await getRoomById(candidate.room.id))
-          if (joinedRoom) {
-            return { ok: true, room: joinedRoom }
-          }
+        if (retryJoin.ok) {
+          return { ok: true, room: retryJoin.room || targetRoom }
         }
-
-        const joinMessage = (joinResult.message || "").toLowerCase()
-        const retryable =
-          joinMessage.includes("sala cheia") ||
-          joinMessage.includes("ja foi iniciada") ||
-          joinMessage.includes("sala nao encontrada") ||
-          joinMessage.includes("nao foi possivel entrar na sala")
-
-        if (!retryable) {
-          return { ok: false, message: joinResult.message || "Nao foi possivel entrar na fila competitiva" }
-        }
-      }
-
-      if (candidates.length === 0) {
+      } else {
         const createdRoom = await createMultiplayerRoom({
           hostUserId: params.userId,
           hostDisplayName: params.displayName,
@@ -487,171 +519,12 @@ export async function joinCompetitiveQueue(params: {
 
         return { ok: true, room: createdRoom }
       }
-
-      await sleep(90)
     }
-
-    return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
-  }
-  try {
-    for (let attempt = 0; attempt < 24; attempt++) {
-    const marker = `creating:${params.userId}:${Date.now()}:${attempt}`
-
-    const pointerTx = await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-      const currentRoomId = (current?.roomId || "").trim()
-      if (currentRoomId) {
-        return current
-      }
-
-      return {
-        roomId: marker,
-        updatedAt: Date.now(),
-      }
-    })
-
-    let pointerState = (pointerTx.snapshot.val() as { roomId?: string; updatedAt?: number } | null) || null
-    if (!pointerState) {
-      const pointerSnapshot = await get(openLobbyRef)
-      pointerState = pointerSnapshot.exists()
-        ? ((pointerSnapshot.val() as { roomId?: string; updatedAt?: number }) || null)
-        : null
-    }
-
-    if (!pointerState) {
-      await sleep(80)
-      continue
-    }
-
-    const pointerRoomId = (pointerState?.roomId || "").trim()
-    const pointerUpdatedAt = Number(pointerState?.updatedAt || 0)
-    const pointerAge = pointerUpdatedAt > 0 ? Date.now() - pointerUpdatedAt : Number.POSITIVE_INFINITY
-
-    if (!pointerRoomId) {
-      await sleep(80)
-      continue
-    }
-
-    // The client that reserved the marker must be allowed to create the room.
-    if (pointerRoomId === marker) {
-      try {
-        const createdRoom = await createMultiplayerRoom({
-          hostUserId: params.userId,
-          hostDisplayName: params.displayName,
-          maxPlayers: params.maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
-
-        await set(openLobbyRef, {
-          roomId: createdRoom.id,
-          updatedAt: Date.now(),
-        })
-
-        return { ok: true, room: createdRoom }
-      } catch (error) {
-        await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-          if ((current?.roomId || "") !== marker) {
-            return current
-          }
-
-          return {
-            roomId: "",
-            updatedAt: Date.now(),
-          }
-        })
-
-        const message = error instanceof Error ? error.message : String(error || "")
-        return { ok: false, message: message || "Falha ao criar sala competitiva" }
-      }
-    }
-
-    if (pointerRoomId.startsWith("creating:")) {
-      if (pointerAge <= markerStaleMs) {
-        await sleep(140)
-        continue
-      }
-
-      await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-        const currentRoomId = (current?.roomId || "").trim()
-        const currentUpdatedAt = Number(current?.updatedAt || 0)
-        const currentAge = currentUpdatedAt > 0 ? Date.now() - currentUpdatedAt : Number.POSITIVE_INFINITY
-
-        if (!currentRoomId.startsWith("creating:")) {
-          return current
-        }
-
-        if (currentAge <= markerStaleMs) {
-          return current
-        }
-
-        return {
-          roomId: "",
-          updatedAt: Date.now(),
-        }
-      })
-
-      await sleep(120)
-      continue
-    }
-
-    const joinResult = await joinMultiplayerRoom({
-      roomId: pointerRoomId,
-      userId: params.userId,
-      displayName: params.displayName,
-    })
-
-    if (joinResult.ok) {
-      const joinedRoom = joinResult.room || (await getRoomById(pointerRoomId))
-      if (joinedRoom) {
-        const joinedCount = Object.keys(joinedRoom.players || {}).length
-        if (joinedRoom.status !== "waiting" || joinedCount >= joinedRoom.maxPlayers) {
-          await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-            if ((current?.roomId || "") !== pointerRoomId) {
-              return current
-            }
-
-            return {
-              roomId: "",
-              updatedAt: Date.now(),
-            }
-          })
-        }
-
-        return { ok: true, room: joinedRoom }
-      }
-
-      return { ok: false, message: "Sala nao encontrada" }
-    }
-
-    const message = (joinResult.message || "").toLowerCase()
-    const retryable =
-      message.includes("sala cheia") ||
-      message.includes("ja foi iniciada") ||
-      message.includes("sala nao encontrada") ||
-      message.includes("nao foi possivel entrar na sala")
-
-    if (!retryable) {
-      return { ok: false, message: joinResult.message || "Nao foi possivel entrar na fila competitiva" }
-    }
-
-    await runTransaction(openLobbyRef, (current: { roomId?: string; updatedAt?: number } | null) => {
-      if ((current?.roomId || "") !== pointerRoomId) {
-        return current
-      }
-
-      return {
-        roomId: "",
-        updatedAt: Date.now(),
-      }
-    })
 
     await sleep(90)
-    }
-
-    return fallbackScanJoinOrCreate()
-  } catch {
-    return fallbackScanJoinOrCreate()
   }
+
+  return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
