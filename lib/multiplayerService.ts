@@ -55,7 +55,6 @@ export interface PublicCasualLobbySummary {
 }
 
 const ROOM_ROOT = "multiplayer/rooms"
-const COMPETITIVE_CREATE_LOCK_ROOT = "multiplayer/competitiveCreateLock"
 const LEADERBOARD_ROOT = "multiplayer/leaderboards"
 const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
@@ -391,9 +390,8 @@ export async function joinCompetitiveQueue(params: {
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
   const db = requireDatabase()
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-  const lockRef = ref(db, `${COMPETITIVE_CREATE_LOCK_ROOT}/${params.maxPlayers}`)
 
-  for (let pass = 0; pass < 5; pass++) {
+  for (let pass = 0; pass < 4; pass++) {
     const roomsSnapshot = await get(ref(db, ROOM_ROOT))
     const now = Date.now()
     const rooms = (roomsSnapshot.val() as Record<string, MultiplayerRoom>) || {}
@@ -446,72 +444,7 @@ export async function joinCompetitiveQueue(params: {
     }
 
     if (candidates.length === 0) {
-      const now = Date.now()
-      const myLockId = `${params.userId}-${now}`
-      const lockTx = await runTransaction(
-        lockRef,
-        (current: { owner?: string; createdAt?: number } | null) => {
-          const lockAge = current?.createdAt ? now - current.createdAt : Number.POSITIVE_INFINITY
-          const lockIsStale = lockAge > 8000
-
-          if (current?.owner && !lockIsStale) {
-            return current
-          }
-
-          return {
-            owner: myLockId,
-            createdAt: now,
-          }
-        },
-      )
-
-      const lockState = (lockTx.snapshot.val() as { owner?: string; createdAt?: number } | null) || null
-      const iOwnLock = lockTx.committed && lockState?.owner === myLockId
-
-      if (!iOwnLock) {
-        await sleep(250)
-        continue
-      }
-
       try {
-        // Re-scan once while holding the lock to avoid duplicate room creation races.
-        const freshSnapshot = await get(ref(db, ROOM_ROOT))
-        const freshRooms = (freshSnapshot.val() as Record<string, MultiplayerRoom>) || {}
-        const freshCandidates = Object.values(freshRooms)
-          .map((room) => ({ room, playersCount: Object.keys(room.players || {}).length }))
-          .filter(({ room, playersCount }) => {
-            const isFresh = Date.now() - (room.createdAt || 0) <= LOBBY_STALE_MS
-            return (
-              room.mode === "competitive" &&
-              room.maxPlayers === params.maxPlayers &&
-              room.status === "waiting" &&
-              playersCount < room.maxPlayers &&
-              isFresh
-            )
-          })
-          .sort((a, b) => {
-            if (b.playersCount !== a.playersCount) {
-              return b.playersCount - a.playersCount
-            }
-            return (a.room.createdAt || 0) - (b.room.createdAt || 0)
-          })
-
-        if (freshCandidates.length > 0) {
-          const target = freshCandidates[0].room
-          const joinResult = await joinMultiplayerRoom({
-            roomId: target.id,
-            userId: params.userId,
-            displayName: params.displayName,
-          })
-
-          if (joinResult.ok) {
-            const joinedRoom = await getRoomById(target.id)
-            if (joinedRoom) {
-              return { ok: true, room: joinedRoom }
-            }
-          }
-        }
-
         const createdRoom = await createMultiplayerRoom({
           hostUserId: params.userId,
           hostDisplayName: params.displayName,
@@ -524,12 +457,10 @@ export async function joinCompetitiveQueue(params: {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error || "")
         return { ok: false, message: message || "Falha ao criar sala competitiva" }
-      } finally {
-        await set(lockRef, null)
       }
     }
 
-    await sleep(200)
+    await sleep(120)
   }
 
   return { ok: false, message: "Nao foi possivel entrar na fila competitiva" }

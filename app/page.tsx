@@ -1259,15 +1259,11 @@ export default function PokemonAdventure() {
     setMultiplayerError(null)
 
     try {
-      const queueResult = await withTimeout(
-        joinCompetitiveQueue({
-          maxPlayers,
-          userId: accountUserId,
-          displayName: accountName,
-        }),
-        22000,
-        "A entrada na fila competitiva demorou demasiado.",
-      )
+      const queueResult = await joinCompetitiveQueue({
+        maxPlayers,
+        userId: accountUserId,
+        displayName: accountName,
+      })
 
       if (!queueResult.ok || !queueResult.room) {
         throw new Error(queueResult.message || "Nao foi possivel entrar na fila competitiva.")
@@ -1292,7 +1288,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice, withTimeout])
+  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
