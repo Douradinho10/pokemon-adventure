@@ -721,6 +721,7 @@ export default function PokemonAdventure() {
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
   const latestGameStateRef = useRef(gameState)
+  const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
@@ -1356,7 +1357,7 @@ export default function PokemonAdventure() {
 
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
-      return
+      return false
     }
 
     setMultiplayerBusy(true)
@@ -1366,22 +1367,59 @@ export default function PokemonAdventure() {
       if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
         setMultiplayerRoom((prev) => (prev ? { ...prev, status: "active", startedAt: Date.now() } : prev))
         showScreenNotice("Disputa local iniciada!")
-        return
+        return true
       }
 
       const result = await startMultiplayerRoom(multiplayerJoinedRoomId, accountUserId)
       if (!result.ok) {
         setMultiplayerError(result.message || "Nao foi possivel iniciar a sala.")
-        return
+        return false
       }
 
       showScreenNotice("Disputa iniciada! Cada jogador pode comecar a run multiplayer.")
+      return true
     } catch {
       setMultiplayerError("Erro ao iniciar a sala.")
+      return false
     } finally {
       setMultiplayerBusy(false)
     }
   }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
+
+  useEffect(() => {
+    if (!multiplayerRoom || !multiplayerJoinedRoomId) {
+      autoActivatedCompetitiveRoomRef.current = null
+      return
+    }
+
+    if (multiplayerRoom.mode !== "competitive") {
+      autoActivatedCompetitiveRoomRef.current = null
+      return
+    }
+
+    const playersCount = Object.keys(multiplayerRoom.players || {}).length
+    const lobbyIsFull = playersCount >= multiplayerRoom.maxPlayers
+
+    if (multiplayerRoom.status !== "waiting" || !lobbyIsFull) {
+      autoActivatedCompetitiveRoomRef.current = null
+      return
+    }
+
+    if (!accountUserId || multiplayerRoom.hostUserId !== accountUserId) {
+      return
+    }
+
+    if (autoActivatedCompetitiveRoomRef.current === multiplayerJoinedRoomId) {
+      return
+    }
+
+    autoActivatedCompetitiveRoomRef.current = multiplayerJoinedRoomId
+    void handleStartMultiplayerRoom().then((started) => {
+      if (!started) {
+        autoActivatedCompetitiveRoomRef.current = null
+      }
+    })
+  }, [accountUserId, handleStartMultiplayerRoom, multiplayerJoinedRoomId, multiplayerRoom])
 
   const handleStartMultiplayerRun = useCallback(() => {
     if (!multiplayerRoom || multiplayerRoom.status !== "active") {
@@ -1418,7 +1456,10 @@ export default function PokemonAdventure() {
       return
     }
 
-    if (multiplayerRoom.mode !== "competitive" || multiplayerRoom.status !== "active") {
+    const playersCount = Object.keys(multiplayerRoom.players || {}).length
+    const lobbyIsFull = playersCount >= multiplayerRoom.maxPlayers
+
+    if (multiplayerRoom.mode !== "competitive" || multiplayerRoom.status !== "active" || !lobbyIsFull) {
       return
     }
 
@@ -3698,10 +3739,18 @@ export default function PokemonAdventure() {
         </Button>
       </div>
       <Button
-        onClick={returnToMenu}
+        onClick={() => {
+          if (multiplayerMode) {
+            showScreenNotice("🏳️ Desististe da run multiplayer.")
+            handleGameOver()
+            return
+          }
+
+          returnToMenu()
+        }}
         className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
       >
-        🏠 Voltar ao Menu
+        {multiplayerMode ? "🏳️ Desistir da Run" : "🏠 Voltar ao Menu"}
       </Button>
     </div>
   )
