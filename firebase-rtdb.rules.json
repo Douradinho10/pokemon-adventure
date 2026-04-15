@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "multiplayer": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "rooms": {
+        "$roomId": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      },
+      "leaderboards": {
+        "$month": {
+          "$runId": {
+            ".read": "auth != null",
+            ".write": "auth != null && (!data.exists() ? newData.child('userId').val() == auth.uid : data.child('userId').val() == auth.uid)"
+          }
+        }
+      },
+      "solo-farthest": {
+        "$runId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() ? newData.child('userId').val() == auth.uid : data.child('userId').val() == auth.uid)"
+        }
+      }
+    },
+    "games": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "gameSaves": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}
