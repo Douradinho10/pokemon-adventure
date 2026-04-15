@@ -792,7 +792,7 @@ export default function PokemonAdventure() {
     }
 
     if (normalized.includes("indisponivel") || normalized.includes("database") || normalized.includes("config")) {
-      return "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* no deploy."
+      return "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* e se os dois dispositivos estao no mesmo projeto Firebase com regras publicadas."
     }
 
     if (normalized.includes("network") || normalized.includes("offline") || normalized.includes("timeout")) {
@@ -3396,6 +3396,7 @@ export default function PokemonAdventure() {
       ? Object.values(multiplayerRoom.players || {}).sort((a, b) => b.bestWave - a.bestWave)
       : []
     const isHost = Boolean(multiplayerRoom && accountUserId && multiplayerRoom.hostUserId === accountUserId)
+    const lockCompetitiveTabs = Boolean(multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive")
 
     return (
       <div className="space-y-4">
@@ -3405,19 +3406,21 @@ export default function PokemonAdventure() {
             Escolhe entre competitivo e casual. No competitivo, entra na fila sem codigo; no casual, hosteia por codigo.
           </p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className={`mt-4 grid gap-2 ${lockCompetitiveTabs ? "grid-cols-1" : "grid-cols-2"}`}>
             <Button
               onClick={() => setMultiplayerSection("competitive")}
               className={`pixel-menu-button h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
             >
               Competitivo
             </Button>
-            <Button
-              onClick={() => setMultiplayerSection("casual")}
-              className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
-            >
-              Casual
-            </Button>
+            {!lockCompetitiveTabs && (
+              <Button
+                onClick={() => setMultiplayerSection("casual")}
+                className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+              >
+                Casual
+              </Button>
+            )}
           </div>
 
           {!multiplayerJoinedRoomId && (
