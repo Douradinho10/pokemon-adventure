@@ -1244,15 +1244,11 @@ export default function PokemonAdventure() {
       let joinedExisting = false
 
       for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          targetRoomId = await withTimeout(
-            findAvailableCompetitiveRoom(maxPlayers),
-            8000,
-            "A procura da fila competitiva demorou demasiado.",
-          )
-        } catch (error) {
-          targetRoomId = null
-        }
+        targetRoomId = await withTimeout(
+          findAvailableCompetitiveRoom(maxPlayers),
+          8000,
+          "A procura da fila competitiva demorou demasiado.",
+        )
 
         if (!targetRoomId) {
           break
@@ -1271,6 +1267,13 @@ export default function PokemonAdventure() {
         if (joinResult.ok) {
           joinedExisting = true
           break
+        }
+
+        const joinMessage = (joinResult.message || "").toLowerCase()
+        const canRetryAnotherRoom = joinMessage.includes("sala cheia") || joinMessage.includes("ja foi iniciada")
+
+        if (!canRetryAnotherRoom) {
+          throw new Error(joinResult.message || "Nao foi possivel entrar na fila competitiva.")
         }
 
         targetRoomId = null
