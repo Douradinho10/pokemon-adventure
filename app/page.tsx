@@ -696,7 +696,6 @@ export default function PokemonAdventure() {
   const [accountName, setAccountName] = useState("Treinador")
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
-  const [competitiveRoomCodeInput, setCompetitiveRoomCodeInput] = useState("")
   const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
   const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("public")
   const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
@@ -724,7 +723,6 @@ export default function PokemonAdventure() {
   const latestGameStateRef = useRef(gameState)
   const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
-  const multiplayerBusyTimeoutRef = useRef<number | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
   const withTimeout = useCallback(
@@ -954,33 +952,6 @@ export default function PokemonAdventure() {
   }, [accountEmail])
 
   useEffect(() => {
-    if (!multiplayerBusy) {
-      if (multiplayerBusyTimeoutRef.current) {
-        window.clearTimeout(multiplayerBusyTimeoutRef.current)
-        multiplayerBusyTimeoutRef.current = null
-      }
-      return
-    }
-
-    if (multiplayerBusyTimeoutRef.current) {
-      window.clearTimeout(multiplayerBusyTimeoutRef.current)
-    }
-
-    multiplayerBusyTimeoutRef.current = window.setTimeout(() => {
-      setMultiplayerBusy(false)
-      setMultiplayerError("A operacao multiplayer demorou demasiado e foi cancelada. Tenta novamente.")
-      multiplayerBusyTimeoutRef.current = null
-    }, 15000)
-
-    return () => {
-      if (multiplayerBusyTimeoutRef.current) {
-        window.clearTimeout(multiplayerBusyTimeoutRef.current)
-        multiplayerBusyTimeoutRef.current = null
-      }
-    }
-  }, [multiplayerBusy])
-
-  useEffect(() => {
     return () => {
       if (screenNoticeTimeoutRef.current) {
         window.clearTimeout(screenNoticeTimeoutRef.current)
@@ -996,9 +967,6 @@ export default function PokemonAdventure() {
       }
       if (loginRedirectTimeoutRef.current) {
         window.clearTimeout(loginRedirectTimeoutRef.current)
-      }
-      if (multiplayerBusyTimeoutRef.current) {
-        window.clearTimeout(multiplayerBusyTimeoutRef.current)
       }
     }
   }, [])
@@ -1293,48 +1261,6 @@ export default function PokemonAdventure() {
       setMultiplayerBusy(false)
     }
   }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
-
-  const handleJoinCompetitiveByCode = useCallback(async () => {
-    if (!accountUserId) {
-      setMultiplayerError("Faz login para entrar em competitivo.")
-      return
-    }
-
-    const roomCode = competitiveRoomCodeInput.trim().toUpperCase()
-    if (!roomCode) {
-      setMultiplayerError("Introduz o codigo do lobby competitivo.")
-      return
-    }
-
-    setMultiplayerBusy(true)
-    setMultiplayerError(null)
-
-    try {
-      const result = await joinMultiplayerRoom({
-        roomId: roomCode,
-        userId: accountUserId,
-        displayName: accountName,
-      })
-
-      if (!result.ok) {
-        setMultiplayerError(result.message || "Nao foi possivel entrar no lobby competitivo.")
-        return
-      }
-
-      setMultiplayerJoinedRoomId(roomCode)
-      if (result.room) {
-        setMultiplayerRoom(result.room)
-      }
-      setMultiplayerMode(false)
-      setMultiplayerIsCasual(false)
-      setMultiplayerSection("competitive")
-      showScreenNotice("Entraste no lobby competitivo por codigo!")
-    } catch (error) {
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no lobby competitivo por codigo."))
-    } finally {
-      setMultiplayerBusy(false)
-    }
-  }, [accountName, accountUserId, competitiveRoomCodeInput, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
@@ -3473,22 +3399,6 @@ export default function PokemonAdventure() {
                   >
                     Entrar na Fila Competitiva ({competitiveQueueSize})
                   </Button>
-                  <div className="space-y-2 rounded-xl border-2 border-slate-700 bg-white/70 p-3">
-                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Entrar por codigo competitivo</label>
-                    <input
-                      value={competitiveRoomCodeInput}
-                      onChange={(event) => setCompetitiveRoomCodeInput(event.target.value.toUpperCase())}
-                      placeholder="Ex: A7K2M"
-                      className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                    <Button
-                      onClick={handleJoinCompetitiveByCode}
-                      disabled={multiplayerBusy}
-                      className="pixel-menu-button h-10 w-full bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                    >
-                      Entrar no Lobby por Codigo
-                    </Button>
-                  </div>
                   <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-xs text-slate-700">
                     Sem codigo: quem entra primeiro ocupa vagas na fila escolhida.
                   </p>
