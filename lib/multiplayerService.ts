@@ -61,7 +61,7 @@ const SOLO_LEADERBOARD_ROOT = "multiplayer/solo-farthest"
 const SOLO_LEADERBOARD_LEGACY_MONTHLY_ROOT = "multiplayer/solo-farthest-monthly"
 const SOLO_LOCAL_FALLBACK_KEY = "pokemon-adventure:solo-runs-fallback"
 const LOBBY_STALE_MS = 30 * 60 * 1000
-const COMPETITIVE_QUEUE_LOCK_STALE_MS = 30 * 1000
+const COMPETITIVE_QUEUE_LOCK_STALE_MS = 8 * 1000
 const ROOM_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const ROOM_ID_LENGTH = 5
 
@@ -493,7 +493,7 @@ async function joinCompetitiveQueueUsingSlot(
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
   const slotRef = ref(db, slotRefPath)
 
-  for (let pass = 0; pass < 100; pass++) {
+  for (let pass = 0; pass < 40; pass++) {
     const slotSnapshot = await get(slotRef)
     const slot = (slotSnapshot.val() as CompetitiveQueueSlot | null) || null
     const slotRoomId = slot?.roomId || ""
@@ -539,6 +539,23 @@ async function joinCompetitiveQueueUsingSlot(
     const someoneElseCreating = slotRoomId.startsWith("creating:") && slotOwner && slotOwner !== params.userId && !lockIsStale
 
     if (someoneElseCreating) {
+      // If another client is creating, opportunistically join any waiting room already visible.
+      const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
+      if (availableRoomId) {
+        const joinResult = await joinMultiplayerRoom({
+          roomId: availableRoomId,
+          userId: params.userId,
+          displayName: params.displayName,
+        })
+
+        if (joinResult.ok) {
+          const joinedRoom = joinResult.room || (await getRoomById(availableRoomId))
+          if (joinedRoom) {
+            return { ok: true, room: joinedRoom }
+          }
+        }
+      }
+
       await sleep(140)
       continue
     }

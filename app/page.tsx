@@ -820,7 +820,7 @@ export default function PokemonAdventure() {
       setMultiplayerBusy(false)
       setMultiplayerError((prev) => prev || "A operacao multiplayer demorou demasiado. Tenta novamente.")
       multiplayerBusyTimeoutRef.current = null
-    }, 15000)
+    }, 35000)
 
     return () => {
       if (multiplayerBusyTimeoutRef.current) {
