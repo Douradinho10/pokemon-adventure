@@ -688,165 +688,133 @@ export async function joinCompetitiveQueue(params: {
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
   const db = requireDatabase()
-  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-  const slotRef = ref(db, `${ROOM_ROOT}/__queue_slot_${params.maxPlayers}`)
+  const roomId = `__competitive_queue_${params.maxPlayers}`
+  const roomRef = ref(db, `${ROOM_ROOT}/${roomId}`)
 
-  for (let pass = 0; pass < 160; pass++) {
-    const marker = `creating:${params.userId}:${Date.now()}`
+  const transaction = await runTransaction(roomRef, (current: MultiplayerRoom | null) => {
+    const now = Date.now()
 
-    const slotTx = await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-      const now = Date.now()
-      const currentRoomId = current?.roomId || ""
-      const currentOwner = current?.ownerUserId || ""
-      const currentUpdatedAt = Number(current?.updatedAt || 0)
-      const currentStale = now - currentUpdatedAt > COMPETITIVE_QUEUE_LOCK_STALE_MS
-
-      if (!current) {
-        return {
-          roomId: marker,
-          ownerUserId: params.userId,
-          updatedAt: now,
-        }
-      }
-
-      if (currentRoomId.startsWith("creating:")) {
-        if (currentOwner === params.userId || currentStale) {
-          return {
-            roomId: marker,
-            ownerUserId: params.userId,
-            updatedAt: now,
-          }
-        }
-      }
-
-      return current
-    })
-
-    const slot = (slotTx.snapshot.val() as CompetitiveQueueSlot | null) || null
-    const slotRoomId = slot?.roomId || ""
-    const slotOwner = slot?.ownerUserId || ""
-
-    if (!slotRoomId) {
-      await sleep(80)
-      continue
-    }
-
-    if (slotRoomId.startsWith("creating:")) {
-      if (slotOwner !== params.userId) {
-        await sleep(120)
-        continue
-      }
-
-      const availableRoomId = await findAvailableCompetitiveRoom(params.maxPlayers)
-      if (availableRoomId) {
-        const joinExisting = await joinMultiplayerRoom({
-          roomId: availableRoomId,
-          userId: params.userId,
-          displayName: params.displayName,
-        })
-
-        if (joinExisting.ok) {
-          const joinedRoom = joinExisting.room || (await getRoomById(availableRoomId))
-          if (joinedRoom) {
-            await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-              if (!current || current.roomId !== slotRoomId || current.ownerUserId !== params.userId) {
-                return current
-              }
-
-              return {
-                roomId: joinedRoom.id,
-                ownerUserId: params.userId,
-                updatedAt: Date.now(),
-              }
-            })
-
-            return { ok: true, room: joinedRoom }
-          }
-        }
-      }
-
-      try {
-        const createdRoom = await createMultiplayerRoom({
-          hostUserId: params.userId,
-          hostDisplayName: params.displayName,
-          maxPlayers: params.maxPlayers,
-          mode: "competitive",
-          visibility: "private",
-        })
-
-        await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-          if (!current || current.roomId !== slotRoomId || current.ownerUserId !== params.userId) {
-            return current
-          }
-
-          return {
-            roomId: createdRoom.id,
-            ownerUserId: params.userId,
-            updatedAt: Date.now(),
-          }
-        })
-
-        return { ok: true, room: createdRoom }
-      } catch {
-        await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-          if (!current || current.roomId !== slotRoomId || current.ownerUserId !== params.userId) {
-            return current
-          }
-          return null
-        })
-
-        await sleep(120)
-        continue
+    if (!current) {
+      return {
+        id: roomId,
+        hostUserId: params.userId,
+        hostDisplayName: params.displayName,
+        mode: "competitive" as const,
+        visibility: "private" as const,
+        maxPlayers: params.maxPlayers,
+        status: "waiting" as const,
+        createdAt: now,
+        players: {
+          [params.userId]: {
+            userId: params.userId,
+            displayName: params.displayName,
+            joinedAt: now,
+            bestWave: 0,
+          },
+        },
       }
     }
 
-    const joinResult = await joinMultiplayerRoom({
-      roomId: slotRoomId,
-      userId: params.userId,
-      displayName: params.displayName,
-    })
+    const normalizedPlayers = current.players || {}
+    const normalizedHostUserId = normalizedPlayers[current.hostUserId] ? current.hostUserId : Object.keys(normalizedPlayers)[0] || params.userId
+    const normalizedHostDisplayName = normalizedPlayers[normalizedHostUserId]?.displayName || current.hostDisplayName || params.displayName
+    const normalizedCurrent: MultiplayerRoom = {
+      ...current,
+      hostUserId: normalizedHostUserId,
+      hostDisplayName: normalizedHostDisplayName,
+    }
 
-    if (joinResult.ok) {
-      const joinedRoom = joinResult.room || (await getRoomById(slotRoomId))
-      if (joinedRoom) {
-        return { ok: true, room: joinedRoom }
+    const roomAge = now - (normalizedCurrent.startedAt || normalizedCurrent.createdAt || now)
+    const shouldResetRoom =
+      normalizedCurrent.status === "finished" ||
+      (normalizedCurrent.status === "active" && Object.keys(normalizedPlayers).length < normalizedCurrent.maxPlayers) ||
+      (normalizedCurrent.status !== "waiting" && roomAge > LOBBY_STALE_MS)
+
+    if (shouldResetRoom) {
+      return {
+        id: roomId,
+        hostUserId: params.userId,
+        hostDisplayName: params.displayName,
+        mode: "competitive" as const,
+        visibility: "private" as const,
+        maxPlayers: params.maxPlayers,
+        status: "waiting" as const,
+        createdAt: now,
+        players: {
+          [params.userId]: {
+            userId: params.userId,
+            displayName: params.displayName,
+            joinedAt: now,
+            bestWave: 0,
+          },
+        },
       }
     }
 
-    const joinMessage = (joinResult.message || "").toLowerCase()
-    const shouldRecycleSlot =
-      joinMessage.includes("sala cheia") ||
-      joinMessage.includes("ja foi iniciada") ||
-      joinMessage.includes("sala nao encontrada")
-
-    if (shouldRecycleSlot) {
-      const roomState = await getRoomById(slotRoomId)
-      const roomIsInvalid =
-        !roomState || roomState.status !== "waiting" || Object.keys(roomState.players || {}).length >= roomState.maxPlayers
-
-      if (!roomIsInvalid) {
-        await sleep(120)
-        continue
-      }
-
-      const recycleMarker = `creating:${params.userId}:${Date.now()}`
-      await runTransaction(slotRef, (current: CompetitiveQueueSlot | null) => {
-        if (!current || current.roomId !== slotRoomId) {
-          return current
-        }
-
-        return {
-          roomId: recycleMarker,
-          ownerUserId: params.userId,
-          updatedAt: Date.now(),
-        }
-      })
+    if (normalizedCurrent.mode !== "competitive" || normalizedCurrent.maxPlayers !== params.maxPlayers) {
+      return normalizedCurrent
     }
 
-    await sleep(90)
+    if (normalizedPlayers[params.userId]) {
+      return normalizedCurrent
+    }
+
+    const currentCount = Object.keys(normalizedPlayers).length
+    if (currentCount >= normalizedCurrent.maxPlayers) {
+      return normalizedCurrent
+    }
+
+    const nextPlayers: Record<string, MultiplayerRoomPlayer> = {
+      ...normalizedPlayers,
+      [params.userId]: {
+        userId: params.userId,
+        displayName: params.displayName,
+        joinedAt: now,
+        bestWave: 0,
+      },
+    }
+
+    const nextCount = Object.keys(nextPlayers).length
+    const shouldAutoStart = nextCount >= normalizedCurrent.maxPlayers
+
+    return {
+      ...normalizedCurrent,
+      status: shouldAutoStart ? "active" : "waiting",
+      startedAt: shouldAutoStart ? now : normalizedCurrent.startedAt,
+      players: shouldAutoStart
+        ? Object.fromEntries(
+            Object.entries(nextPlayers).map(([id, player]) => [
+              id,
+              {
+                ...player,
+                bestWave: 0,
+                finishedAt: undefined,
+              },
+            ]),
+          )
+        : nextPlayers,
+    }
+  })
+
+  if (!transaction.committed) {
+    return { ok: false, message: "Nao foi possivel entrar na fila competitiva." }
   }
 
-  return joinCompetitiveQueueLegacy(params)
+  const room = transaction.snapshot.val() as MultiplayerRoom | null
+  if (!room) {
+    return { ok: false, message: "Sala nao encontrada" }
+  }
+
+  const players = room.players || {}
+  if (!players[params.userId]) {
+    if (room.status === "waiting" && Object.keys(players).length < room.maxPlayers) {
+      return joinCompetitiveQueue(params)
+    }
+
+    return { ok: false, message: room.status === "active" ? "A sala ja foi iniciada" : "Sala cheia" }
+  }
+
+  return { ok: true, room }
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
