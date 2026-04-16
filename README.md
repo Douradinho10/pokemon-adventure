@@ -27,6 +27,8 @@ Continue building your app on:
 `pnpm dev` now starts both the Next.js app and the Socket.io server together.
 If you need them separately, use `pnpm run dev:web` or `pnpm run dev:socket`.
 
+For production multiplayer rooms, set `NEXT_PUBLIC_SOCKET_SERVER_URL` to a live Socket.io server. If that is not available, the app falls back to Firebase RTDB rooms.
+
 ## How It Works
 
 1. Create and modify your project using [v0.app](https://v0.app)

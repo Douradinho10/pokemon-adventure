@@ -29,6 +29,10 @@ function isLocalDevelopmentHost() {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.endsWith(".local")
 }
 
+function canUseSocketTransport() {
+  return Boolean(resolveSocketServerUrl())
+}
+
 function resolveSocketServerUrl() {
   if (SOCKET_SERVER_URL) {
     return SOCKET_SERVER_URL
@@ -59,7 +63,7 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
     return { ok: false, message: "Socket disponivel apenas no browser" }
   }
 
-  if (!isLocalDevelopmentHost()) {
+  if (!canUseSocketTransport()) {
     return await joinLegacyCompetitiveQueue(params)
   }
 
@@ -80,9 +84,29 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
     let resolved = false
     let matchId: string | null = null
     let role: SocketRole | null = null
+    let fallbackStarted = false
     const failSafeTimeoutId = window.setTimeout(() => {
-      finish({ ok: false, message: "WebSocket indisponivel" })
+      void fallbackToLegacy()
     }, 12000)
+
+    const fallbackToLegacy = async () => {
+      if (resolved || fallbackStarted) {
+        return
+      }
+
+      fallbackStarted = true
+      window.clearTimeout(failSafeTimeoutId)
+      socket.disconnect()
+
+      try {
+        resolve(await joinLegacyCompetitiveQueue(params))
+      } catch (error) {
+        resolve({
+          ok: false,
+          message: error instanceof Error ? error.message : "Falha ao entrar na fila competitiva",
+        })
+      }
+    }
 
     const finish = (result: SocketQueueResult) => {
       if (resolved) {
@@ -163,11 +187,16 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
     })
 
     socket.on("competitive:error", (payload: { message?: string }) => {
+      if (payload?.message && payload.message.toLowerCase().includes("indispon")) {
+        void fallbackToLegacy()
+        return
+      }
+
       finish({ ok: false, message: payload?.message || "Erro de matchmaking websocket" })
     })
 
     socket.on("connect_error", () => {
-      finish({ ok: false, message: "WebSocket indisponivel" })
+      void fallbackToLegacy()
     })
   })
 }

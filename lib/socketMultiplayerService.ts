@@ -79,7 +79,19 @@ function resolveSocketServerUrl() {
 }
 
 function canUseSocketTransport() {
-  return isLocalDevelopmentHost()
+  return Boolean(resolveSocketServerUrl())
+}
+
+function isSocketConnectionError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || "").toLowerCase()
+  return (
+    message.includes("timeout") ||
+    message.includes("connect_error") ||
+    message.includes("websocket") ||
+    message.includes("network") ||
+    message.includes("socket.io indisponivel") ||
+    message.includes("failed to fetch")
+  )
 }
 
 let socketInstance: Socket | null = null
@@ -178,25 +190,31 @@ export async function createMultiplayerRoom(params: {
   mode: MultiplayerRoomMode
   visibility?: MultiplayerRoomVisibility
 }): Promise<MultiplayerRoom> {
-  if (!canUseSocketTransport()) {
-    return await createLegacyMultiplayerRoom(params)
+  if (canUseSocketTransport()) {
+    try {
+      const response = normalizeRoomResponse(
+        await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:create", {
+          hostUserId: params.hostUserId,
+          hostDisplayName: params.hostDisplayName,
+          maxPlayers: params.maxPlayers,
+          mode: params.mode,
+          visibility: normalizeRoomVisibility(params.visibility),
+        }),
+      )
+
+      if (!response.ok || !response.room) {
+        throw new Error(response.message || "Nao foi possivel criar a sala")
+      }
+
+      return response.room
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  const response = normalizeRoomResponse(
-    await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:create", {
-      hostUserId: params.hostUserId,
-      hostDisplayName: params.hostDisplayName,
-      maxPlayers: params.maxPlayers,
-      mode: params.mode,
-      visibility: normalizeRoomVisibility(params.visibility),
-    }),
-  )
-
-  if (!response.ok || !response.room) {
-    throw new Error(response.message || "Nao foi possivel criar a sala")
-  }
-
-  return response.room
+  return await createLegacyMultiplayerRoom(params)
 }
 
 export async function joinMultiplayerRoom(params: {
@@ -204,42 +222,60 @@ export async function joinMultiplayerRoom(params: {
   userId: string
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
-  if (!canUseSocketTransport()) {
-    return await joinLegacyMultiplayerRoom(params)
+  if (canUseSocketTransport()) {
+    try {
+      const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:join", {
+        roomId: params.roomId.trim(),
+        userId: params.userId,
+        displayName: params.displayName,
+      })
+
+      return normalizeRoomResponse(response)
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:join", {
-    roomId: params.roomId.trim(),
-    userId: params.userId,
-    displayName: params.displayName,
-  })
-
-  return normalizeRoomResponse(response)
+  return await joinLegacyMultiplayerRoom(params)
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
-  if (!canUseSocketTransport()) {
-    await leaveLegacyMultiplayerRoom(roomId, userId)
-    return
+  if (canUseSocketTransport()) {
+    try {
+      await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:leave", {
+        roomId: roomId.trim(),
+        userId,
+      })
+      return
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:leave", {
-    roomId: roomId.trim(),
-    userId,
-  })
+  await leaveLegacyMultiplayerRoom(roomId, userId)
 }
 
 export async function startMultiplayerRoom(roomId: string, hostUserId: string): Promise<{ ok: boolean; message?: string }> {
-  if (!canUseSocketTransport()) {
-    return await startLegacyMultiplayerRoom(roomId, hostUserId)
+  if (canUseSocketTransport()) {
+    try {
+      const response = await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:start", {
+        roomId: roomId.trim(),
+        hostUserId,
+      })
+
+      return normalizeRoomResponse(response)
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  const response = await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:start", {
-    roomId: roomId.trim(),
-    hostUserId,
-  })
-
-  return normalizeRoomResponse(response)
+  return await startLegacyMultiplayerRoom(roomId, hostUserId)
 }
 
 export async function updateMultiplayerPlayerWave(params: {
@@ -248,17 +284,23 @@ export async function updateMultiplayerPlayerWave(params: {
   displayName: string
   wave: number
 }): Promise<void> {
-  if (!canUseSocketTransport()) {
-    await updateLegacyMultiplayerPlayerWave(params)
-    return
+  if (canUseSocketTransport()) {
+    try {
+      await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:update-wave", {
+        roomId: params.roomId.trim(),
+        userId: params.userId,
+        displayName: params.displayName,
+        wave: Math.max(0, params.wave),
+      })
+      return
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:update-wave", {
-    roomId: params.roomId.trim(),
-    userId: params.userId,
-    displayName: params.displayName,
-    wave: Math.max(0, params.wave),
-  })
+  await updateLegacyMultiplayerPlayerWave(params)
 }
 
 export async function markMultiplayerPlayerFinished(params: {
@@ -266,16 +308,22 @@ export async function markMultiplayerPlayerFinished(params: {
   userId: string
   wave: number
 }): Promise<void> {
-  if (!canUseSocketTransport()) {
-    await markLegacyMultiplayerPlayerFinished(params)
-    return
+  if (canUseSocketTransport()) {
+    try {
+      await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:finish-player", {
+        roomId: params.roomId.trim(),
+        userId: params.userId,
+        wave: Math.max(0, params.wave),
+      })
+      return
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:finish-player", {
-    roomId: params.roomId.trim(),
-    userId: params.userId,
-    wave: Math.max(0, params.wave),
-  })
+  await markLegacyMultiplayerPlayerFinished(params)
 }
 
 export function subscribeMultiplayerRoom(
@@ -287,9 +335,16 @@ export function subscribeMultiplayerRoom(
     return subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
   }
 
-  const socket = getSocket()
+  let socket: Socket
+  try {
+    socket = getSocket()
+  } catch (error) {
+    return subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
+  }
+
   const normalizedRoomId = roomId.trim()
   let active = true
+  let legacyUnsubscribe: (() => void) | null = null
 
   const handleRoomUpdate = (payload: { roomId?: string; room?: MultiplayerRoom | null }) => {
     if (!active || payload.roomId !== normalizedRoomId) {
@@ -326,9 +381,21 @@ export function subscribeMultiplayerRoom(
       onRoomUpdate(response.room || null)
     })
     .catch((error) => {
-      if (active) {
-        onError?.(error)
+      if (!active) {
+        return
       }
+
+      if (isSocketConnectionError(error)) {
+        socket.off("multiplayer:room:update", handleRoomUpdate)
+        socket.off("multiplayer:room:deleted", handleRoomDeleted)
+        socket.emit("multiplayer:room:unsubscribe", {
+          roomId: normalizedRoomId,
+        })
+        legacyUnsubscribe = subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
+        return
+      }
+
+      onError?.(error)
     })
 
   return () => {
@@ -338,26 +405,33 @@ export function subscribeMultiplayerRoom(
     socket.emit("multiplayer:room:unsubscribe", {
       roomId: normalizedRoomId,
     })
+    legacyUnsubscribe?.()
   }
 }
 
 export async function getPublicCasualLobbies(limitCount = 30): Promise<PublicCasualLobbySummary[]> {
-  if (!canUseSocketTransport()) {
-    return await getLegacyPublicCasualLobbies(limitCount)
+  if (canUseSocketTransport()) {
+    try {
+      const response = await emitWithAck<{ ok: boolean; lobbies?: PublicCasualLobbySummary[]; message?: string }>(
+        "multiplayer:lobbies:list",
+        {
+          limitCount,
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(response.message || "Nao foi possivel carregar os grupos publicos")
+      }
+
+      return response.lobbies || []
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  const response = await emitWithAck<{ ok: boolean; lobbies?: PublicCasualLobbySummary[]; message?: string }>(
-    "multiplayer:lobbies:list",
-    {
-      limitCount,
-    },
-  )
-
-  if (!response.ok) {
-    throw new Error(response.message || "Nao foi possivel carregar os grupos publicos")
-  }
-
-  return response.lobbies || []
+  return await getLegacyPublicCasualLobbies(limitCount)
 }
 
 export async function joinCompetitiveQueue(params: {
@@ -365,18 +439,24 @@ export async function joinCompetitiveQueue(params: {
   userId: string
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
-  if (!canUseSocketTransport()) {
-    return await joinLegacyCompetitiveQueue(params)
+  if (canUseSocketTransport()) {
+    try {
+      const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>(
+        "multiplayer:competitive:join",
+        {
+          maxPlayers: params.maxPlayers,
+          userId: params.userId,
+          displayName: params.displayName,
+        },
+      )
+
+      return normalizeRoomResponse(response)
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
   }
 
-  const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>(
-    "multiplayer:competitive:join",
-    {
-      maxPlayers: params.maxPlayers,
-      userId: params.userId,
-      displayName: params.displayName,
-    },
-  )
-
-  return normalizeRoomResponse(response)
+  return await joinLegacyCompetitiveQueue(params)
 }
