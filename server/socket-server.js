@@ -1,7 +1,7 @@
 const { createServer } = require("http")
 const { Server } = require("socket.io")
 
-const PORT = Number(process.env.SOCKET_SERVER_PORT || 4001)
+const PORT = Number(process.env.PORT || process.env.SOCKET_SERVER_PORT || 4001)
 const ORIGIN = process.env.SOCKET_SERVER_ORIGIN || "*"
 
 const ROOM_STALE_MS = 30 * 60 * 1000

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pokemon-adventure-socket
+    env: node
+    plan: starter
+    buildCommand: pnpm install --frozen-lockfile
+    startCommand: node server/socket-server.js
+    envVars:
+      - key: SOCKET_SERVER_ORIGIN
+        value: "*"

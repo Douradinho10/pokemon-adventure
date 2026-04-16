@@ -27,7 +27,13 @@ Continue building your app on:
 `pnpm dev` now starts both the Next.js app and the Socket.io server together.
 If you need them separately, use `pnpm run dev:web` or `pnpm run dev:socket`.
 
-For production multiplayer rooms, set `NEXT_PUBLIC_SOCKET_SERVER_URL` to a live Socket.io server. If that is not available, the app falls back to Firebase RTDB rooms.
+## Production Socket.io
+
+Socket.io rooms need a live Node server. `render.yaml` is included for a standalone Socket.io service.
+
+Deploy `server/socket-server.js` to a host that keeps Node processes alive, then set `NEXT_PUBLIC_SOCKET_SERVER_URL` in the Vercel app to that public URL.
+
+If the socket URL is not configured, the app falls back to Firebase RTDB rooms.
 
 ## How It Works
 
