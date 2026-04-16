@@ -44,7 +44,7 @@ prisma/        - Database schema (SQLite, dev.db)
 ```bash
 pnpm install
 npx prisma db push   # Set up SQLite database
-pnpm run dev         # Starts on http://0.0.0.0:5000
+pnpm run dev         # Starts Next on :5000 and Socket.io on :4001
 ```
 
 ## Environment Variables (Optional)
@@ -61,7 +61,7 @@ Without Firebase config, game saves to localStorage only.
 
 ## Key Configuration
 
-- **Port**: 5000 (configured in package.json dev script)
+- **Port**: 5000 for Next.js, 4001 for Socket.io (configured in package.json dev script)
 - **Host**: 0.0.0.0 (required for Replit proxy)
 - **PostCSS**: Uses `@tailwindcss/postcss` (Tailwind v4 requirement)
 - **Deployment**: Autoscale with `pnpm run build` + `pnpm run start`

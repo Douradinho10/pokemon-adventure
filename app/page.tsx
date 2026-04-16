@@ -3854,6 +3854,7 @@ export default function PokemonAdventure() {
           : "Finalizada"
       : "Sem sala ativa"
     const inviteUrl = multiplayerRoom ? buildMultiplayerInviteUrl(multiplayerRoom.id) : ""
+    const activeRoom = multiplayerRoom!
 
     return (
       <div className="space-y-4">
@@ -4069,7 +4070,7 @@ export default function PokemonAdventure() {
                       <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala ligada</h3>
                     </div>
                     <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
-                      {multiplayerRoom.mode === "casual" ? "Grupo" : "Sala"}
+                      {activeRoom.mode === "casual" ? "Grupo" : "Sala"}
                     </Badge>
                   </div>
 
@@ -4077,7 +4078,7 @@ export default function PokemonAdventure() {
                     {inviteUrl}
                   </div>
 
-                  {multiplayerRoom.mode === "casual" && (
+                  {activeRoom.mode === "casual" && (
                     <Button
                       onClick={() => void handleShareMultiplayerInvite()}
                       disabled={multiplayerBusy}
@@ -4092,7 +4093,7 @@ export default function PokemonAdventure() {
                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Sala</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900 break-all">{multiplayerJoinedRoomId}</p>
                       <p className="mt-1 text-xs text-slate-600">
-                        {multiplayerRoom.mode === "casual" ? "Grupo casual" : "Competitivo"} · {roomSize}/{multiplayerRoom.maxPlayers}
+                        {activeRoom.mode === "casual" ? "Grupo casual" : "Competitivo"} · {roomSize}/{activeRoom.maxPlayers}
                       </p>
                     </div>
                     <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
@@ -4110,10 +4111,10 @@ export default function PokemonAdventure() {
                     >
                       Sair do Grupo
                     </Button>
-                    {multiplayerRoom.mode === "casual" && (
+                    {activeRoom.mode === "casual" && (
                       <Button
                         onClick={handleStartMultiplayerRoom}
-                        disabled={multiplayerBusy || !isHost || multiplayerRoom.status !== "waiting"}
+                        disabled={multiplayerBusy || !isHost || activeRoom.status !== "waiting"}
                         className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                       >
                         Iniciar Grupo
@@ -4121,7 +4122,7 @@ export default function PokemonAdventure() {
                     )}
                     <Button
                       onClick={handleStartMultiplayerRun}
-                      disabled={multiplayerBusy || multiplayerRoom.status !== "active"}
+                      disabled={multiplayerBusy || activeRoom.status !== "active"}
                       className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                     >
                       Jogar Run Multiplayer

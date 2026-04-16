@@ -22,6 +22,11 @@ Continue building your app on:
 
 **[https://v0.app/chat/ePr08YMQL82](https://v0.app/chat/ePr08YMQL82)**
 
+## Local Dev
+
+`pnpm dev` now starts both the Next.js app and the Socket.io server together.
+If you need them separately, use `pnpm run dev:web` or `pnpm run dev:socket`.
+
 ## How It Works
 
 1. Create and modify your project using [v0.app](https://v0.app)

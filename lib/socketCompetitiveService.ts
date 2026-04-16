@@ -1,7 +1,7 @@
 "use client"
 
 import { io } from "socket.io-client"
-import { createMultiplayerRoom, joinMultiplayerRoom, type MultiplayerRoom } from "./multiplayerService"
+import { createMultiplayerRoom, joinMultiplayerRoom, type MultiplayerRoom } from "./socketMultiplayerService"
 
 interface SocketQueueParams {
   maxPlayers: 2 | 3
@@ -17,7 +17,22 @@ interface SocketQueueResult {
   message?: string
 }
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:4001"
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || ""
+
+function resolveSocketServerUrl() {
+  if (SOCKET_SERVER_URL) {
+    return SOCKET_SERVER_URL
+  }
+
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:4001"
+  }
+
+  const currentPort = Number(window.location.port)
+  const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
+  const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+  return `${window.location.protocol}//${hostname}:${socketPort}`
+}
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => {
@@ -31,8 +46,8 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
   }
 
   return new Promise<SocketQueueResult>((resolve) => {
-    const socket = io(SOCKET_SERVER_URL, {
-      transports: ["websocket", "polling"],
+    const socket = io(resolveSocketServerUrl(), {
+      transports: ["polling", "websocket"],
       timeout: 5000,
       reconnection: true,
       reconnectionAttempts: 2,

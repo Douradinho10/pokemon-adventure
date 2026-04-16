@@ -1,6 +1,17 @@
 "use client"
 
 import { io, type Socket } from "socket.io-client"
+import {
+  createMultiplayerRoom as createLegacyMultiplayerRoom,
+  getPublicCasualLobbies as getLegacyPublicCasualLobbies,
+  joinCompetitiveQueue as joinLegacyCompetitiveQueue,
+  joinMultiplayerRoom as joinLegacyMultiplayerRoom,
+  leaveMultiplayerRoom as leaveLegacyMultiplayerRoom,
+  markMultiplayerPlayerFinished as markLegacyMultiplayerPlayerFinished,
+  startMultiplayerRoom as startLegacyMultiplayerRoom,
+  subscribeMultiplayerRoom as subscribeLegacyMultiplayerRoom,
+  updateMultiplayerPlayerWave as updateLegacyMultiplayerPlayerWave,
+} from "./multiplayerService"
 
 export type MultiplayerRoomStatus = "waiting" | "active" | "finished"
 export type MultiplayerRoomMode = "competitive" | "casual"
@@ -36,16 +47,35 @@ export interface PublicCasualLobbySummary {
   createdAt: number
 }
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:4001"
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || ""
 const SOCKET_TIMEOUT_MS = 10000
+
+function resolveSocketServerUrl() {
+  if (SOCKET_SERVER_URL) {
+    return SOCKET_SERVER_URL
+  }
+
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:4001"
+  }
+
+  const currentPort = Number(window.location.port)
+  const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
+  const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+  return `${window.location.protocol}//${hostname}:${socketPort}`
+}
+
+function canUseSocketTransport() {
+  return Boolean(resolveSocketServerUrl())
+}
 
 let socketInstance: Socket | null = null
 
 function getSocket(): Socket {
   if (!socketInstance) {
-    socketInstance = io(SOCKET_SERVER_URL, {
+    socketInstance = io(resolveSocketServerUrl(), {
       autoConnect: false,
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       timeout: SOCKET_TIMEOUT_MS,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -130,6 +160,10 @@ export async function createMultiplayerRoom(params: {
   mode: MultiplayerRoomMode
   visibility?: MultiplayerRoomVisibility
 }): Promise<MultiplayerRoom> {
+  if (!canUseSocketTransport()) {
+    return await createLegacyMultiplayerRoom(params)
+  }
+
   const response = normalizeRoomResponse(
     await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:create", {
       hostUserId: params.hostUserId,
@@ -152,6 +186,10 @@ export async function joinMultiplayerRoom(params: {
   userId: string
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
+  if (!canUseSocketTransport()) {
+    return await joinLegacyMultiplayerRoom(params)
+  }
+
   const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:join", {
     roomId: params.roomId.trim(),
     userId: params.userId,
@@ -162,6 +200,11 @@ export async function joinMultiplayerRoom(params: {
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
+  if (!canUseSocketTransport()) {
+    await leaveLegacyMultiplayerRoom(roomId, userId)
+    return
+  }
+
   await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:leave", {
     roomId: roomId.trim(),
     userId,
@@ -169,6 +212,10 @@ export async function leaveMultiplayerRoom(roomId: string, userId: string): Prom
 }
 
 export async function startMultiplayerRoom(roomId: string, hostUserId: string): Promise<{ ok: boolean; message?: string }> {
+  if (!canUseSocketTransport()) {
+    return await startLegacyMultiplayerRoom(roomId, hostUserId)
+  }
+
   const response = await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:start", {
     roomId: roomId.trim(),
     hostUserId,
@@ -183,6 +230,11 @@ export async function updateMultiplayerPlayerWave(params: {
   displayName: string
   wave: number
 }): Promise<void> {
+  if (!canUseSocketTransport()) {
+    await updateLegacyMultiplayerPlayerWave(params)
+    return
+  }
+
   await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:update-wave", {
     roomId: params.roomId.trim(),
     userId: params.userId,
@@ -196,6 +248,11 @@ export async function markMultiplayerPlayerFinished(params: {
   userId: string
   wave: number
 }): Promise<void> {
+  if (!canUseSocketTransport()) {
+    await markLegacyMultiplayerPlayerFinished(params)
+    return
+  }
+
   await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:finish-player", {
     roomId: params.roomId.trim(),
     userId: params.userId,
@@ -208,6 +265,10 @@ export function subscribeMultiplayerRoom(
   onRoomUpdate: (room: MultiplayerRoom | null) => void,
   onError?: (error: unknown) => void,
 ): () => void {
+  if (!canUseSocketTransport()) {
+    return subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
+  }
+
   const socket = getSocket()
   const normalizedRoomId = roomId.trim()
   let active = true
@@ -263,6 +324,10 @@ export function subscribeMultiplayerRoom(
 }
 
 export async function getPublicCasualLobbies(limitCount = 30): Promise<PublicCasualLobbySummary[]> {
+  if (!canUseSocketTransport()) {
+    return await getLegacyPublicCasualLobbies(limitCount)
+  }
+
   const response = await emitWithAck<{ ok: boolean; lobbies?: PublicCasualLobbySummary[]; message?: string }>(
     "multiplayer:lobbies:list",
     {
@@ -282,6 +347,10 @@ export async function joinCompetitiveQueue(params: {
   userId: string
   displayName: string
 }): Promise<{ ok: boolean; room?: MultiplayerRoom; message?: string }> {
+  if (!canUseSocketTransport()) {
+    return await joinLegacyCompetitiveQueue(params)
+  }
+
   const response = await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>(
     "multiplayer:competitive:join",
     {

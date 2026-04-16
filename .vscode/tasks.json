@@ -34,13 +34,15 @@
 		{
 			"label": "run-site",
 			"type": "shell",
-			"command": "npx",
+			"command": "pnpm",
 			"args": [
-				"next",
 				"dev",
-				"-p",
+				"--",
+				"--port",
 				"3001",
-				"-H",
+				"--socket-port",
+				"4001",
+				"--host",
 				"0.0.0.0"
 			],
 			"isBackground": true,
@@ -74,7 +76,7 @@
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"$conns = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} }"
+				"$ports = 3001,4001; foreach ($port in $ports) { $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} } }"
 			],
 			"isBackground": false
 		},
@@ -85,7 +87,7 @@
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"if (Test-Path .next) { Remove-Item -Recurse -Force .next }; npx next dev -p 3002 -H 0.0.0.0"
+				"$ports = 3002,4002; foreach ($port in $ports) { $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} } }; if (Test-Path .next) { Remove-Item -Recurse -Force .next }; pnpm dev -- --port 3002 --socket-port 4002"
 			],
 			"isBackground": true
 		},
@@ -105,12 +107,13 @@
 			"type": "shell",
 			"command": "pnpm",
 			"args": [
-				"exec",
-				"next",
 				"dev",
-				"-p",
+				"--",
+				"--port",
 				"3002",
-				"-H",
+				"--socket-port",
+				"4002",
+				"--host",
 				"0.0.0.0"
 			],
 			"isBackground": true
@@ -144,7 +147,7 @@
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"$conns = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} }; if (Test-Path .next) { Remove-Item -Recurse -Force .next }; npx next dev -p 3001 -H 0.0.0.0"
+				"$ports = 3001,4001; foreach ($port in $ports) { $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; foreach ($c in $conns) { try { Stop-Process -Id $c.OwningProcess -ErrorAction Stop } catch {} } }; if (Test-Path .next) { Remove-Item -Recurse -Force .next }; pnpm dev -- --port 3001 --socket-port 4001"
 			],
 			"isBackground": true
 		},
