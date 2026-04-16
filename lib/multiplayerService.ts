@@ -808,7 +808,18 @@ export async function joinCompetitiveQueue(params: {
   const players = room.players || {}
   if (!players[params.userId]) {
     if (room.status === "waiting" && Object.keys(players).length < room.maxPlayers) {
-      return joinCompetitiveQueue(params)
+      const retryJoin = await joinMultiplayerRoom({
+        roomId,
+        userId: params.userId,
+        displayName: params.displayName,
+      })
+
+      if (retryJoin.ok) {
+        const retryRoom = retryJoin.room || (await getRoomById(roomId))
+        if (retryRoom) {
+          return { ok: true, room: retryRoom }
+        }
+      }
     }
 
     return { ok: false, message: room.status === "active" ? "A sala ja foi iniciada" : "Sala cheia" }
