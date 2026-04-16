@@ -758,6 +758,7 @@ export default function PokemonAdventure() {
   const hasAutoRoutedAfterAuthRef = useRef(false)
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
+  const previousAccountUserIdRef = useRef<string | null>(null)
   const latestGameStateRef = useRef(gameState)
   const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
@@ -814,7 +815,45 @@ export default function PokemonAdventure() {
     pendingInviteRetryCountRef.current = 0
   }, [])
 
-  const joinMultiplayerRoomWithTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 12000) => {
+  const leaveCurrentMultiplayerRoomIfNeeded = useCallback(
+    async (targetRoomId?: string) => {
+      if (!multiplayerJoinedRoomId || !accountUserId) {
+        return
+      }
+
+      if (targetRoomId && multiplayerJoinedRoomId === targetRoomId) {
+        return
+      }
+
+      clearPendingInviteJoin()
+
+      if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        setMultiplayerJoinedRoomId(null)
+        setMultiplayerRoom(null)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(false)
+        setMultiplayerBusy(false)
+        setMultiplayerError(null)
+        return
+      }
+
+      try {
+        await leaveMultiplayerRoom(multiplayerJoinedRoomId, accountUserId)
+      } catch {
+        // Ignore best-effort cleanup failures so the new join can continue.
+      }
+
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerBusy(false)
+      setMultiplayerError(null)
+    },
+    [accountUserId, clearPendingInviteJoin, multiplayerJoinedRoomId],
+  )
+
+  const joinMultiplayerRoomWithTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 30000) => {
     if (typeof window === "undefined") {
       return promise
     }
@@ -887,6 +926,8 @@ export default function PokemonAdventure() {
       const isInviteAutoJoin = options?.autoRetry === true && pendingInviteRoomIdRef.current === roomCode
       const maxInviteAttempts = 6
 
+      await leaveCurrentMultiplayerRoomIfNeeded(roomCode)
+
       setMultiplayerBusy(true)
       setMultiplayerError(null)
 
@@ -945,7 +986,7 @@ export default function PokemonAdventure() {
         setMultiplayerBusy(false)
       }
     },
-    [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, showScreenNotice],
+    [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, showScreenNotice],
   )
 
   const handleShareMultiplayerInvite = useCallback(async () => {
@@ -1131,6 +1172,13 @@ export default function PokemonAdventure() {
     }
 
     if (previousAccountEmailRef.current && previousAccountEmailRef.current !== accountEmail) {
+      const previousUserId = previousAccountUserIdRef.current
+      const previousRoomId = multiplayerJoinedRoomId
+
+      if (previousUserId && previousRoomId && !previousRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        void leaveMultiplayerRoom(previousRoomId, previousUserId).catch(() => {})
+      }
+
       hasAutoRoutedAfterAuthRef.current = false
       previousAccountEmailRef.current = accountEmail
       clearPendingInviteJoin()
@@ -1150,7 +1198,11 @@ export default function PokemonAdventure() {
       hasAutoRoutedAfterAuthRef.current = false
       previousAccountEmailRef.current = accountEmail
     }
-  }, [accountEmail])
+  }, [accountEmail, clearPendingInviteJoin, leaveMultiplayerRoom, multiplayerJoinedRoomId])
+
+  useEffect(() => {
+    previousAccountUserIdRef.current = accountUserId
+  }, [accountUserId])
 
   useEffect(() => {
     return () => {
@@ -1320,6 +1372,8 @@ export default function PokemonAdventure() {
         return
       }
 
+      await leaveCurrentMultiplayerRoomIfNeeded()
+
       clearPendingInviteJoin()
 
       setMultiplayerBusy(true)
@@ -1379,7 +1433,7 @@ export default function PokemonAdventure() {
         setMultiplayerBusy(false)
       }
     },
-    [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice],
+    [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, showScreenNotice],
   )
 
   const handleJoinMultiplayerRoom = useCallback(async () => {
@@ -1404,6 +1458,8 @@ export default function PokemonAdventure() {
       setMultiplayerError("Faz login para entrar em competitivo.")
       return
     }
+
+    await leaveCurrentMultiplayerRoomIfNeeded()
 
     clearPendingInviteJoin()
 
@@ -1440,7 +1496,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, showScreenNotice])
+  }, [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
@@ -1505,6 +1561,8 @@ export default function PokemonAdventure() {
         return
       }
 
+      await leaveCurrentMultiplayerRoomIfNeeded(roomId)
+
       setMultiplayerBusy(true)
       setMultiplayerError(null)
 
@@ -1538,7 +1596,7 @@ export default function PokemonAdventure() {
         setMultiplayerBusy(false)
       }
     },
-    [accountName, accountUserId, getMultiplayerErrorMessage, refreshPublicCasualLobbies, showScreenNotice],
+    [accountName, accountUserId, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, refreshPublicCasualLobbies, showScreenNotice],
   )
 
   const handleLeaveMultiplayerRoom = useCallback(async () => {
