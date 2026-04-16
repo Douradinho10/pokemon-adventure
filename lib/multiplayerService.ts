@@ -398,12 +398,19 @@ export async function joinMultiplayerRoom(params: {
 
   const players = room.players || {}
   if (!players[params.userId]) {
-    if (room.status !== "waiting") {
-      return { ok: false, message: "A sala ja foi iniciada" }
+    const freshRoom = await getRoomById(params.roomId)
+    if (freshRoom?.players?.[params.userId]) {
+      return { ok: true, room: freshRoom }
     }
 
-    if (Object.keys(players).length >= room.maxPlayers) {
-      return { ok: false, message: "Sala cheia" }
+    if (freshRoom) {
+      if (freshRoom.status !== "waiting") {
+        return { ok: false, message: "A sala ja foi iniciada" }
+      }
+
+      if (Object.keys(freshRoom.players || {}).length >= freshRoom.maxPlayers) {
+        return { ok: false, message: "Sala cheia" }
+      }
     }
 
     return { ok: false, message: "Nao foi possivel entrar na sala" }

@@ -814,6 +814,27 @@ export default function PokemonAdventure() {
     pendingInviteRetryCountRef.current = 0
   }, [])
 
+  const joinMultiplayerRoomWithTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 12000) => {
+    if (typeof window === "undefined") {
+      return promise
+    }
+
+    let timeoutId: number | null = null
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error("O Firebase demorou demasiado a responder."))
+      }, timeoutMs)
+    })
+
+    try {
+      return await Promise.race([promise, timeoutPromise])
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [])
+
   const getMultiplayerErrorMessage = useCallback((error: unknown, fallbackMessage: string) => {
     const code =
       error && typeof error === "object"
@@ -870,11 +891,13 @@ export default function PokemonAdventure() {
       setMultiplayerError(null)
 
       try {
-        const result = await joinMultiplayerRoom({
-          roomId: roomCode,
-          userId: accountUserId,
-          displayName: accountName,
-        })
+        const result = await joinMultiplayerRoomWithTimeout(
+          joinMultiplayerRoom({
+            roomId: roomCode,
+            userId: accountUserId,
+            displayName: accountName,
+          }),
+        )
 
         if (!result.ok) {
           if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts - 1) {
@@ -1104,6 +1127,22 @@ export default function PokemonAdventure() {
 
   useEffect(() => {
     if (forceMainMenuAfterPerfilRef.current) {
+      return
+    }
+
+    if (previousAccountEmailRef.current && previousAccountEmailRef.current !== accountEmail) {
+      hasAutoRoutedAfterAuthRef.current = false
+      previousAccountEmailRef.current = accountEmail
+      clearPendingInviteJoin()
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+      setMultiplayerBusy(false)
+      setMultiplayerError(null)
+      setMultiplayerRoomCodeInput("")
+      setCurrentScreen("main-menu")
+      setMultiplayerSection("competitive")
       return
     }
 
@@ -1470,11 +1509,13 @@ export default function PokemonAdventure() {
       setMultiplayerError(null)
 
       try {
-        const result = await joinMultiplayerRoom({
-          roomId,
-          userId: accountUserId,
-          displayName: accountName,
-        })
+        const result = await joinMultiplayerRoomWithTimeout(
+          joinMultiplayerRoom({
+            roomId,
+            userId: accountUserId,
+            displayName: accountName,
+          }),
+        )
 
         if (!result.ok) {
           setMultiplayerError(result.message || "Nao foi possivel entrar no grupo publico.")
@@ -1492,6 +1533,7 @@ export default function PokemonAdventure() {
         showScreenNotice("Entraste num grupo publico!")
       } catch (error) {
         setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo publico."))
+        refreshPublicCasualLobbies()
       } finally {
         setMultiplayerBusy(false)
       }
