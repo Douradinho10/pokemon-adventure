@@ -59,7 +59,7 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
     return { ok: false, message: "Socket disponivel apenas no browser" }
   }
 
-  if (!SOCKET_SERVER_URL && !isLocalDevelopmentHost()) {
+  if (!isLocalDevelopmentHost()) {
     return await joinLegacyCompetitiveQueue(params)
   }
 

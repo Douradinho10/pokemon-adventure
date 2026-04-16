@@ -79,7 +79,7 @@ function resolveSocketServerUrl() {
 }
 
 function canUseSocketTransport() {
-  return Boolean(SOCKET_SERVER_URL || isLocalDevelopmentHost())
+  return isLocalDevelopmentHost()
 }
 
 let socketInstance: Socket | null = null
