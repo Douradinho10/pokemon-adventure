@@ -5,7 +5,7 @@ import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trophy, User, Users } from "lucide-react"
+import { Link2, MessageSquare, ShieldCheck, Sparkles, Trophy, User, Users } from "lucide-react"
 import { onAuthStateChanged } from "firebase/auth"
 import { useLocalGameState } from "../hooks/useLocalGameState"
 import {
@@ -38,27 +38,29 @@ import { AnimatedSprite } from "../components/AnimatedSprite"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { saveGameToFirebase } from "../lib/firebaseRtdbService"
 import {
-  createMultiplayerRoom,
   getAvailableLeaderboardMonths,
   getCurrentMonthKey,
   getMonthlyLeaderboard,
-  getPublicCasualLobbies,
   getSoloFarthestLeaderboard,
+  submitMonthlyLeaderboardScore,
+  submitSoloFarthestRun,
+  type MonthlyLeaderboardEntry,
+  type SoloLeaderboardEntry,
+} from "../lib/multiplayerService"
+import {
+  createMultiplayerRoom,
+  getPublicCasualLobbies,
   joinCompetitiveQueue,
   joinMultiplayerRoom,
   leaveMultiplayerRoom,
   markMultiplayerPlayerFinished,
   startMultiplayerRoom,
-  submitMonthlyLeaderboardScore,
-  submitSoloFarthestRun,
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
-  type MonthlyLeaderboardEntry,
   type MultiplayerRoom,
   type MultiplayerRoomVisibility,
   type PublicCasualLobbySummary,
-  type SoloLeaderboardEntry,
-} from "../lib/multiplayerService"
+} from "../lib/socketMultiplayerService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import type { StatusCondition } from "../hooks/useGameState"
 
@@ -853,27 +855,6 @@ export default function PokemonAdventure() {
     [accountUserId, clearPendingInviteJoin, multiplayerJoinedRoomId],
   )
 
-  const joinMultiplayerRoomWithTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 30000) => {
-    if (typeof window === "undefined") {
-      return promise
-    }
-
-    let timeoutId: number | null = null
-    const timeoutPromise = new Promise<T>((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        reject(new Error("O Firebase demorou demasiado a responder."))
-      }, timeoutMs)
-    })
-
-    try {
-      return await Promise.race([promise, timeoutPromise])
-    } finally {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }, [])
-
   const getMultiplayerErrorMessage = useCallback((error: unknown, fallbackMessage: string) => {
     const code =
       error && typeof error === "object"
@@ -889,12 +870,12 @@ export default function PokemonAdventure() {
     const withDetail = (message: string) => (technicalDetail ? `${message} [detalhe: ${technicalDetail}]` : message)
 
     if (normalized.includes("permission") || normalized.includes("denied") || normalized.includes("unauthorized")) {
-      return withDetail("Firebase bloqueou o multiplayer (PERMISSION_DENIED). Verifica regras do RTDB para /multiplayer.")
+      return withDetail("O servidor Socket.io recusou a operacao. Confirma que o multiplayer esta online.")
     }
 
     if (normalized.includes("indisponivel") || normalized.includes("database") || normalized.includes("config")) {
       return withDetail(
-        "RTDB indisponivel para multiplayer. Confirma NEXT_PUBLIC_FIREBASE_* e se os dois dispositivos estao no mesmo projeto Firebase com regras publicadas.",
+        "Socket.io indisponivel para multiplayer. Confirma NEXT_PUBLIC_SOCKET_SERVER_URL e se o servidor Socket.io esta a correr.",
       )
     }
 
@@ -904,7 +885,7 @@ export default function PokemonAdventure() {
       normalized.includes("timeout") ||
       normalized.includes("demorou")
     ) {
-      return withDetail("Falha de rede no multiplayer. Tenta novamente em alguns segundos.")
+      return withDetail("Falha de rede no multiplayer Socket.io. Tenta novamente em alguns segundos.")
     }
 
     return withDetail(fallbackMessage)
@@ -932,13 +913,11 @@ export default function PokemonAdventure() {
       setMultiplayerError(null)
 
       try {
-        const result = await joinMultiplayerRoomWithTimeout(
-          joinMultiplayerRoom({
-            roomId: roomCode,
-            userId: accountUserId,
-            displayName: accountName,
-          }),
-        )
+        const result = await joinMultiplayerRoom({
+          roomId: roomCode,
+          userId: accountUserId,
+          displayName: accountName,
+        })
 
         if (!result.ok) {
           if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts - 1) {
@@ -1567,13 +1546,11 @@ export default function PokemonAdventure() {
       setMultiplayerError(null)
 
       try {
-        const result = await joinMultiplayerRoomWithTimeout(
-          joinMultiplayerRoom({
-            roomId,
-            userId: accountUserId,
-            displayName: accountName,
-          }),
-        )
+        const result = await joinMultiplayerRoom({
+          roomId,
+          userId: accountUserId,
+          displayName: accountName,
+        })
 
         if (!result.ok) {
           setMultiplayerError(result.message || "Nao foi possivel entrar no grupo publico.")
@@ -3857,6 +3834,417 @@ export default function PokemonAdventure() {
     )
   }
 
+  const renderMultiplayerHubScreen = () => {
+    const roomPlayers = multiplayerRoom
+      ? Object.values(multiplayerRoom.players || {}).sort((a, b) => b.bestWave - a.bestWave)
+      : []
+    const derivedHostUserId = multiplayerRoom
+      ? multiplayerRoom.players?.[multiplayerRoom.hostUserId]
+        ? multiplayerRoom.hostUserId
+        : Object.keys(multiplayerRoom.players || {})[0] || null
+      : null
+    const isHost = Boolean(multiplayerRoom && accountUserId && derivedHostUserId === accountUserId)
+    const lockCompetitiveTabs = Boolean(multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive")
+    const roomSize = multiplayerRoom ? Object.keys(multiplayerRoom.players || {}).length : 0
+    const roomStatusLabel = multiplayerRoom
+      ? multiplayerRoom.status === "waiting"
+        ? "A aguardar jogadores"
+        : multiplayerRoom.status === "active"
+          ? "A decorrer"
+          : "Finalizada"
+      : "Sem sala ativa"
+    const inviteUrl = multiplayerRoom ? buildMultiplayerInviteUrl(multiplayerRoom.id) : ""
+
+    return (
+      <div className="space-y-4">
+        <div className="overflow-hidden rounded-[28px] border-4 border-slate-900 bg-[linear-gradient(135deg,#ecfeff_0%,#ecfdf5_46%,#fff7ed_100%)] shadow-[10px_10px_0_rgba(15,23,42,0.16)]">
+          <div className="border-b-4 border-slate-900 px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="max-w-3xl space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-900">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Socket.io
+                </div>
+                <h2 className="font-pixel text-2xl leading-tight text-slate-900 sm:text-4xl">Arena Multiplayer</h2>
+                <p className="max-w-2xl text-sm leading-relaxed text-slate-700">
+                  Cria grupos, partilha convites e entra por link sem lobbies presos. O Socket.io mantém a sala viva em tempo real.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#10b981_0%,#10b981_50%,#059669_50%,#059669_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
+                  {multiplayerBusy ? "A sincronizar" : "Ligado"}
+                </Badge>
+                <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
+                  {roomStatusLabel}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                onClick={() => setMultiplayerSection("competitive")}
+                className={`pixel-menu-button h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+              >
+                Competitivo
+              </Button>
+              {!lockCompetitiveTabs && (
+                <Button
+                  onClick={() => setMultiplayerSection("casual")}
+                  className={`pixel-menu-button h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                >
+                  Casual
+                </Button>
+              )}
+              {multiplayerRoom && (
+                <Badge className="pixel-badge border-2 border-slate-900 bg-white/90 px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
+                  <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                  {multiplayerRoom.mode === "casual" ? "Grupo ativo" : "Sala competitiva"}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+            <div className="space-y-4">
+              {!multiplayerJoinedRoomId ? (
+                multiplayerSection === "competitive" ? (
+                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Matchmaking automático</p>
+                        <h3 className="mt-1 font-pixel text-sm text-slate-900">Fila competitiva</h3>
+                      </div>
+                      <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%)] px-3 py-1 text-white">
+                        Socket.io
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => setCompetitiveQueueSize(2)}
+                        className={`pixel-menu-button h-10 ${competitiveQueueSize === 2 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        Fila 2 Jogadores
+                      </Button>
+                      <Button
+                        onClick={() => setCompetitiveQueueSize(3)}
+                        className={`pixel-menu-button h-10 ${competitiveQueueSize === 3 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        Fila 3 Jogadores
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={() => handleEnterCompetitiveMatch(competitiveQueueSize)}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button mt-3 h-12 w-full bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Entrar na Fila Competitiva ({competitiveQueueSize})
+                    </Button>
+
+                    <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      Sem código: o servidor junta-te à melhor sala competitiva disponível e ativa-a quando encher.
+                    </p>
+                  </section>
+                ) : (
+                  <>
+                    <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Tipo de grupo</p>
+                          <h3 className="mt-1 font-pixel text-sm text-slate-900">Cria um grupo</h3>
+                        </div>
+                        <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800">
+                          {casualLobbyVisibility === "public" ? "Público" : "Privado"}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => setCasualLobbyVisibility("public")}
+                          className={`pixel-menu-button h-10 ${casualLobbyVisibility === "public" ? "bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                        >
+                          Grupo Público
+                        </Button>
+                        <Button
+                          onClick={() => setCasualLobbyVisibility("private")}
+                          className={`pixel-menu-button h-10 ${casualLobbyVisibility === "private" ? "bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                        >
+                          Grupo Privado
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Button
+                          onClick={() => handleCreateMultiplayerRoom(2, casualLobbyVisibility)}
+                          disabled={multiplayerBusy}
+                          className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                        >
+                          Criar Grupo (2)
+                        </Button>
+                        <Button
+                          onClick={() => handleCreateMultiplayerRoom(3, casualLobbyVisibility)}
+                          disabled={multiplayerBusy}
+                          className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                        >
+                          Criar Grupo (3)
+                        </Button>
+                      </div>
+                    </section>
+
+                    <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Lobbies em tempo real</p>
+                          <h3 className="mt-1 font-pixel text-sm text-slate-900">Grupos públicos</h3>
+                        </div>
+                        <Button
+                          onClick={refreshPublicCasualLobbies}
+                          disabled={multiplayerBusy || publicCasualLoading}
+                          className="pixel-menu-button h-8 px-3 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
+                        >
+                          Atualizar
+                        </Button>
+                      </div>
+
+                      {publicCasualLobbies.length === 0 ? (
+                        <div className="mt-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-600">
+                          Sem grupos públicos abertos no momento.
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {publicCasualLobbies.map((lobby) => (
+                            <div key={lobby.id} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                              <div className="text-xs text-slate-800">
+                                <div className="font-bold">Host: {lobby.hostDisplayName}</div>
+                                <div className="opacity-80">Jogadores: {lobby.playersCount}/{lobby.maxPlayers}</div>
+                              </div>
+                              <Button
+                                onClick={() => handleJoinPublicCasualLobby(lobby.id)}
+                                disabled={multiplayerBusy}
+                                className="pixel-menu-button h-8 px-3 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
+                              >
+                                Entrar
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-slate-700" />
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Convite direto</p>
+                          <h3 className="mt-1 font-pixel text-sm text-slate-900">Entrar por link ou código</h3>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Link ou código do grupo</label>
+                        <input
+                          value={multiplayerRoomCodeInput}
+                          onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
+                          placeholder="Ex: https://site/?room=ABC12"
+                          className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                        />
+                        <Button
+                          onClick={handleJoinMultiplayerRoom}
+                          disabled={multiplayerBusy}
+                          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                        >
+                          Entrar no Grupo
+                        </Button>
+                      </div>
+                    </section>
+                  </>
+                )
+              ) : (
+                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Convite ativo</p>
+                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala ligada</h3>
+                    </div>
+                    <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
+                      {multiplayerRoom.mode === "casual" ? "Grupo" : "Sala"}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 break-all rounded-2xl border-2 border-slate-900 bg-slate-50 p-3 text-xs text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                    {inviteUrl}
+                  </div>
+
+                  {multiplayerRoom.mode === "casual" && (
+                    <Button
+                      onClick={() => void handleShareMultiplayerInvite()}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button mt-3 h-10 w-full bg-[linear-gradient(180deg,#25d366_0%,#25d366_50%,#128c7e_50%,#128c7e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Partilhar convite
+                    </Button>
+                  )}
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Sala</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900 break-all">{multiplayerJoinedRoomId}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {multiplayerRoom.mode === "casual" ? "Grupo casual" : "Competitivo"} · {roomSize}/{multiplayerRoom.maxPlayers}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">{roomStatusLabel}</p>
+                      <p className="mt-1 text-xs text-slate-600">{isHost ? "Tu és o host" : "Ligado como convidado"}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleLeaveMultiplayerRoom}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Sair do Grupo
+                    </Button>
+                    {multiplayerRoom.mode === "casual" && (
+                      <Button
+                        onClick={handleStartMultiplayerRoom}
+                        disabled={multiplayerBusy || !isHost || multiplayerRoom.status !== "waiting"}
+                        className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      >
+                        Iniciar Grupo
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleStartMultiplayerRun}
+                      disabled={multiplayerBusy || multiplayerRoom.status !== "active"}
+                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Jogar Run Multiplayer
+                    </Button>
+                  </div>
+                </section>
+              )}
+
+              {multiplayerError && (
+                <p className="rounded-2xl border-2 border-red-700 bg-red-100 px-4 py-3 text-xs font-semibold text-red-900 shadow-[4px_4px_0_rgba(185,28,28,0.14)]">
+                  {multiplayerError}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {multiplayerRoom ? (
+                <>
+                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Pessoas online</p>
+                        <h3 className="mt-1 font-pixel text-sm text-slate-900">Membros do grupo</h3>
+                      </div>
+                      <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800">
+                        {roomSize}/{multiplayerRoom.maxPlayers}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {roomPlayers.map((player, index) => (
+                        <div key={player.userId} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">
+                              {index + 1}. {player.displayName}
+                              {derivedHostUserId === player.userId ? " (Host)" : ""}
+                            </div>
+                            <div className="text-[11px] text-slate-600">Entrou há {Math.max(0, Math.round((Date.now() - player.joinedAt) / 1000))}s</div>
+                          </div>
+                          <span className="rounded-full border-2 border-slate-900 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                            Wave {player.bestWave}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#ffffff_0%,#ecfeff_100%)] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-slate-700" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado do grupo</p>
+                        <h3 className="mt-1 font-pixel text-sm text-slate-900">Pronto para jogar</h3>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">1</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">Partilhar link</p>
+                        <p className="mt-1 text-xs text-slate-600">O grupo abre por convite ou código.</p>
+                      </div>
+                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">2</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">Entrar e sincronizar</p>
+                        <p className="mt-1 text-xs text-slate-600">O Socket.io envia o estado da sala em tempo real.</p>
+                      </div>
+                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">3</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">Começar a run</p>
+                        <p className="mt-1 text-xs text-slate-600">Quando a sala estiver pronta, a partida arranca.</p>
+                      </div>
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-5 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-slate-700" />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Guia rápido</p>
+                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Como funciona</h3>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">1</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">Cria ou encontra um grupo</p>
+                      <p className="mt-1 text-xs text-slate-600">Casual para convidar amigos, competitivo para fila automática.</p>
+                    </div>
+                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">2</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">Partilha o link</p>
+                      <p className="mt-1 text-xs text-slate-600">Quem recebe o convite entra com um toque.</p>
+                    </div>
+                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">3</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">Sincroniza a run</p>
+                      <p className="mt-1 text-xs text-slate-600">O estado da sala mantém-se actualizado sem refresh manual.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border-2 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#ecfeff_100%)] p-4 text-sm text-slate-700">
+                    O Socket.io substitui a fila frágil e as salas presas. Cada grupo é autoritativo no servidor e os jogadores entram pela mesma fonte de verdade.
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleExitMultiplayerToMainMenu}
+          disabled={multiplayerBusy}
+          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        >
+          Voltar ao Menu Principal
+        </Button>
+      </div>
+    )
+  }
+
   const renderLeaderboardsScreen = () => {
     const selectedEntries = leaderboardViewMode === "solo" ? soloLeaderboardEntries : leaderboardEntries
     const playerPlacementIndex = accountUserId
@@ -5413,7 +5801,7 @@ export default function PokemonAdventure() {
           {currentScreen === "leaderboards" && renderLeaderboardsScreen()}
           {currentScreen === "select-slot" && renderSelectSlotScreen()}
           {currentScreen === "select-continue" && renderSelectContinueScreen()}
-          {currentScreen === "multiplayer" && renderMultiplayerScreen()}
+          {currentScreen === "multiplayer" && renderMultiplayerHubScreen()}
           {currentScreen === "menu" && renderGameMenu()}
           {currentScreen === "battle" && renderBattleScreen()}
           {currentScreen === "shop" && renderShop()}
