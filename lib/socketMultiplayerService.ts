@@ -50,13 +50,26 @@ export interface PublicCasualLobbySummary {
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || ""
 const SOCKET_TIMEOUT_MS = 10000
 
+function isLocalDevelopmentHost() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  const hostname = window.location.hostname.toLowerCase()
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.endsWith(".local")
+}
+
 function resolveSocketServerUrl() {
   if (SOCKET_SERVER_URL) {
     return SOCKET_SERVER_URL
   }
 
   if (typeof window === "undefined") {
-    return "http://127.0.0.1:4001"
+    return ""
+  }
+
+  if (!isLocalDevelopmentHost()) {
+    return ""
   }
 
   const currentPort = Number(window.location.port)
@@ -66,14 +79,19 @@ function resolveSocketServerUrl() {
 }
 
 function canUseSocketTransport() {
-  return Boolean(resolveSocketServerUrl())
+  return Boolean(SOCKET_SERVER_URL || isLocalDevelopmentHost())
 }
 
 let socketInstance: Socket | null = null
 
 function getSocket(): Socket {
+  const socketServerUrl = resolveSocketServerUrl()
+  if (!socketServerUrl) {
+    throw new Error("Socket.io indisponivel neste ambiente")
+  }
+
   if (!socketInstance) {
-    socketInstance = io(resolveSocketServerUrl(), {
+    socketInstance = io(socketServerUrl, {
       autoConnect: false,
       transports: ["polling", "websocket"],
       timeout: SOCKET_TIMEOUT_MS,

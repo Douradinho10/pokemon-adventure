@@ -2,6 +2,7 @@
 
 import { io } from "socket.io-client"
 import { createMultiplayerRoom, joinMultiplayerRoom, type MultiplayerRoom } from "./socketMultiplayerService"
+import { joinCompetitiveQueue as joinLegacyCompetitiveQueue } from "./multiplayerService"
 
 interface SocketQueueParams {
   maxPlayers: 2 | 3
@@ -19,13 +20,26 @@ interface SocketQueueResult {
 
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || ""
 
+function isLocalDevelopmentHost() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  const hostname = window.location.hostname.toLowerCase()
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.endsWith(".local")
+}
+
 function resolveSocketServerUrl() {
   if (SOCKET_SERVER_URL) {
     return SOCKET_SERVER_URL
   }
 
   if (typeof window === "undefined") {
-    return "http://127.0.0.1:4001"
+    return ""
+  }
+
+  if (!isLocalDevelopmentHost()) {
+    return ""
   }
 
   const currentPort = Number(window.location.port)
@@ -45,8 +59,18 @@ export async function joinCompetitiveQueueWithSocket(params: SocketQueueParams):
     return { ok: false, message: "Socket disponivel apenas no browser" }
   }
 
+  if (!SOCKET_SERVER_URL && !isLocalDevelopmentHost()) {
+    return await joinLegacyCompetitiveQueue(params)
+  }
+
   return new Promise<SocketQueueResult>((resolve) => {
-    const socket = io(resolveSocketServerUrl(), {
+    const socketServerUrl = resolveSocketServerUrl()
+    if (!socketServerUrl) {
+      resolve({ ok: false, message: "Socket.io indisponivel neste ambiente" })
+      return
+    }
+
+    const socket = io(socketServerUrl, {
       transports: ["polling", "websocket"],
       timeout: 5000,
       reconnection: true,
