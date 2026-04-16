@@ -32,27 +32,44 @@ export default function LoginPage() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
   const gameRedirectTimeoutRef = useRef<number | null>(null)
 
+  const getSafeNextPath = useCallback(() => {
+    if (typeof window === "undefined") {
+      return "/"
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    const nextPath = params.get("next") || "/"
+
+    if (!nextPath.startsWith("/") || nextPath.startsWith("//") || nextPath.includes("://")) {
+      return "/"
+    }
+
+    return nextPath
+  }, [])
+
   const redirectToGame = useCallback(() => {
     if (typeof window === "undefined") {
       return
     }
 
-    if (window.location.pathname === "/") {
+    const nextPath = getSafeNextPath()
+
+    if (window.location.pathname === "/" && nextPath === "/") {
       return
     }
 
-    window.location.replace("/")
+    window.location.replace(nextPath)
 
     if (gameRedirectTimeoutRef.current) {
       window.clearTimeout(gameRedirectTimeoutRef.current)
     }
 
     gameRedirectTimeoutRef.current = window.setTimeout(() => {
-      if (window.location.pathname !== "/") {
-        window.location.replace("/")
+      if (window.location.pathname !== nextPath) {
+        window.location.replace(nextPath)
       }
     }, 250)
-  }, [])
+  }, [getSafeNextPath])
 
   useEffect(() => {
     initializeFirebase()

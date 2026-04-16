@@ -258,6 +258,44 @@ const statusLabels: Record<StatusCondition, string> = {
   confused: "Confuso",
 }
 
+function normalizeMultiplayerRoomCode(rawValue: string): string {
+  const trimmed = rawValue.trim()
+  if (!trimmed) {
+    return ""
+  }
+
+  if (/^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed)) {
+    try {
+      const parsedUrl = new URL(trimmed)
+      const roomParam = parsedUrl.searchParams.get("room")?.trim()
+      if (roomParam) {
+        return roomParam
+      }
+    } catch {
+      // Fall through to the generic room extractor.
+    }
+  }
+
+  const roomMatch = trimmed.match(/[?&]room=([^&#]+)/i)
+  if (roomMatch?.[1]) {
+    return decodeURIComponent(roomMatch[1]).trim()
+  }
+
+  return trimmed
+}
+
+function buildMultiplayerInviteUrl(roomId: string): string {
+  if (typeof window === "undefined") {
+    return roomId
+  }
+
+  const inviteUrl = new URL(window.location.href)
+  inviteUrl.searchParams.set("room", roomId)
+  inviteUrl.searchParams.delete("from")
+  inviteUrl.hash = ""
+  return inviteUrl.toString()
+}
+
 const getEffectiveSpeed = (speed = 50, statusCondition?: StatusCondition | null) => {
   if (statusCondition === "paralyzed") {
     return Math.max(1, Math.floor(speed * 0.25))
@@ -697,7 +735,7 @@ export default function PokemonAdventure() {
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
   const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
-  const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("public")
+  const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("private")
   const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
   const [publicCasualLobbies, setPublicCasualLobbies] = useState<PublicCasualLobbySummary[]>([])
   const [publicCasualLoading, setPublicCasualLoading] = useState(false)
@@ -723,6 +761,9 @@ export default function PokemonAdventure() {
   const latestGameStateRef = useRef(gameState)
   const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
+  const pendingInviteRoomIdRef = useRef<string | null>(null)
+  const pendingInviteRetryCountRef = useRef(0)
+  const pendingInviteRetryTimeoutRef = useRef<number | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
 
   const delay = useCallback((ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)), [])
@@ -736,7 +777,8 @@ export default function PokemonAdventure() {
       return
     }
 
-    window.location.replace("/login")
+    const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash || ""}`
+    window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`)
 
     if (loginRedirectTimeoutRef.current) {
       window.clearTimeout(loginRedirectTimeoutRef.current)
@@ -760,6 +802,16 @@ export default function PokemonAdventure() {
       setScreenNotice(null)
       screenNoticeTimeoutRef.current = null
     }, duration)
+  }, [])
+
+  const clearPendingInviteJoin = useCallback(() => {
+    if (pendingInviteRetryTimeoutRef.current !== null) {
+      window.clearTimeout(pendingInviteRetryTimeoutRef.current)
+      pendingInviteRetryTimeoutRef.current = null
+    }
+
+    pendingInviteRoomIdRef.current = null
+    pendingInviteRetryCountRef.current = 0
   }, [])
 
   const getMultiplayerErrorMessage = useCallback((error: unknown, fallbackMessage: string) => {
@@ -797,6 +849,115 @@ export default function PokemonAdventure() {
 
     return withDetail(fallbackMessage)
   }, [])
+
+  const joinMultiplayerRoomByCode = useCallback(
+    async (rawRoomCode: string, options?: { autoRetry?: boolean }) => {
+      if (!accountUserId) {
+        setMultiplayerError("Faz login para entrar num grupo multiplayer.")
+        return false
+      }
+
+      const roomCode = normalizeMultiplayerRoomCode(rawRoomCode)
+      if (!roomCode) {
+        setMultiplayerError("Indica um codigo ou link de grupo.")
+        return false
+      }
+
+      const isInviteAutoJoin = options?.autoRetry === true && pendingInviteRoomIdRef.current === roomCode
+      const maxInviteAttempts = 6
+
+      setMultiplayerBusy(true)
+      setMultiplayerError(null)
+
+      try {
+        const result = await joinMultiplayerRoom({
+          roomId: roomCode,
+          userId: accountUserId,
+          displayName: accountName,
+        })
+
+        if (!result.ok) {
+          if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts - 1) {
+            pendingInviteRetryCountRef.current += 1
+
+            if (pendingInviteRetryTimeoutRef.current !== null) {
+              window.clearTimeout(pendingInviteRetryTimeoutRef.current)
+            }
+
+            pendingInviteRetryTimeoutRef.current = window.setTimeout(() => {
+              pendingInviteRetryTimeoutRef.current = null
+              void joinMultiplayerRoomByCode(roomCode, { autoRetry: true })
+            }, 700)
+
+            return false
+          }
+
+          if (isInviteAutoJoin) {
+            pendingInviteRoomIdRef.current = null
+            pendingInviteRetryCountRef.current = 0
+          }
+
+          setMultiplayerError(result.message || "Nao foi possivel entrar no grupo.")
+          return false
+        }
+
+        if (isInviteAutoJoin) {
+          clearPendingInviteJoin()
+        }
+
+        setMultiplayerJoinedRoomId(roomCode)
+        if (result.room) {
+          setMultiplayerRoom(result.room)
+        }
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(true)
+        setMultiplayerSection("casual")
+        setMultiplayerRoomCodeInput(roomCode)
+        showScreenNotice("Entraste no grupo por convite!")
+        return true
+      } catch (error) {
+        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo."))
+        return false
+      } finally {
+        setMultiplayerBusy(false)
+      }
+    },
+    [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, showScreenNotice],
+  )
+
+  const handleShareMultiplayerInvite = useCallback(async () => {
+    if (!multiplayerRoom) {
+      return
+    }
+
+    const inviteUrl = buildMultiplayerInviteUrl(multiplayerRoom.id)
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: "Pokemon Adventure",
+          text: `Entra no meu grupo multiplayer: ${inviteUrl}`,
+          url: inviteUrl,
+        })
+        showScreenNotice("Convite partilhado.")
+        return
+      }
+
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteUrl)
+        showScreenNotice("Link do grupo copiado.")
+        return
+      }
+
+      setMultiplayerError("O navegador nao suporta partilhar este convite.")
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return
+      }
+
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel partilhar o convite."))
+    }
+  }, [getMultiplayerErrorMessage, multiplayerRoom, showScreenNotice])
 
   useEffect(() => {
     latestGameStateRef.current = gameState
@@ -853,6 +1014,29 @@ export default function PokemonAdventure() {
 
     const cleanUrl = `${window.location.pathname}${window.location.hash || ""}`
     window.history.replaceState({}, "", cleanUrl)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    const inviteRoom = normalizeMultiplayerRoomCode(params.get("room") || "")
+
+    if (!inviteRoom) {
+      return
+    }
+
+    pendingInviteRoomIdRef.current = inviteRoom
+    pendingInviteRetryCountRef.current = 0
+    if (pendingInviteRetryTimeoutRef.current !== null) {
+      window.clearTimeout(pendingInviteRetryTimeoutRef.current)
+      pendingInviteRetryTimeoutRef.current = null
+    }
+    setMultiplayerRoomCodeInput(inviteRoom)
+    setMultiplayerSection("casual")
+    setCurrentScreen("multiplayer")
   }, [])
 
   useEffect(() => {
@@ -975,7 +1159,7 @@ export default function PokemonAdventure() {
         setMultiplayerError(null)
         setMultiplayerRoom(room)
 
-        if (accountUserId && !room.players?.[accountUserId]) {
+        if (accountUserId && room.status === "finished" && !room.players?.[accountUserId]) {
           setMultiplayerJoinedRoomId(null)
           setMultiplayerMode(false)
         }
@@ -1093,9 +1277,11 @@ export default function PokemonAdventure() {
   const handleCreateMultiplayerRoom = useCallback(
     async (maxPlayers: 2 | 3, visibility: MultiplayerRoomVisibility = "public") => {
       if (!accountUserId) {
-        setMultiplayerError("Faz login para criar uma sala multiplayer.")
+        setMultiplayerError("Faz login para criar um grupo multiplayer.")
         return
       }
+
+      clearPendingInviteJoin()
 
       setMultiplayerBusy(true)
       setMultiplayerError(null)
@@ -1114,11 +1300,11 @@ export default function PokemonAdventure() {
         setMultiplayerRoomCodeInput(room.id)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
-        showScreenNotice(`Sala criada! Codigo: ${room.id}`)
+        showScreenNotice(`Grupo criado! Convite: ${room.id}`)
       } catch (error) {
         if (visibility === "public") {
           setMultiplayerError(
-            getMultiplayerErrorMessage(error, "Nao foi possivel hostear lobby publico agora. Verifica o Firebase e tenta novamente."),
+            getMultiplayerErrorMessage(error, "Nao foi possivel criar o grupo publico agora. Verifica o Firebase e tenta novamente."),
           )
           return
         }
@@ -1148,8 +1334,8 @@ export default function PokemonAdventure() {
         setMultiplayerRoomCodeInput(localCode)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
-        setMultiplayerError("Sala criada em modo local. O realtime do Firebase esta indisponivel agora.")
-        showScreenNotice(`Sala local criada! Codigo: ${localCode}`)
+        setMultiplayerError("Grupo criado em modo local. O realtime do Firebase esta indisponivel agora.")
+        showScreenNotice(`Grupo local criado! Codigo: ${localCode}`)
       } finally {
         setMultiplayerBusy(false)
       }
@@ -1159,51 +1345,28 @@ export default function PokemonAdventure() {
 
   const handleJoinMultiplayerRoom = useCallback(async () => {
     if (!accountUserId) {
-      setMultiplayerError("Faz login para entrar numa sala multiplayer.")
+      setMultiplayerError("Faz login para entrar num grupo multiplayer.")
       return
     }
 
     const roomCode = multiplayerRoomCodeInput.trim()
     if (!roomCode) {
-      setMultiplayerError("Introduz o codigo da sala.")
+      setMultiplayerError("Introduz o codigo ou link do grupo.")
       return
     }
 
-    setMultiplayerBusy(true)
-    setMultiplayerError(null)
+    clearPendingInviteJoin()
 
-    try {
-      const result = await joinMultiplayerRoom({
-        roomId: roomCode,
-        userId: accountUserId,
-        displayName: accountName,
-      })
-
-      if (!result.ok) {
-        setMultiplayerError(result.message || "Nao foi possivel entrar na sala.")
-        return
-      }
-
-      setMultiplayerJoinedRoomId(roomCode)
-      if (result.room) {
-        setMultiplayerRoom(result.room)
-      }
-      setMultiplayerMode(false)
-      setMultiplayerIsCasual(true)
-      setMultiplayerSection("casual")
-      showScreenNotice("Entraste na sala casual por codigo!")
-    } catch (error) {
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar na sala."))
-    } finally {
-      setMultiplayerBusy(false)
-    }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, multiplayerRoomCodeInput, showScreenNotice])
+    void joinMultiplayerRoomByCode(roomCode)
+  }, [accountUserId, clearPendingInviteJoin, joinMultiplayerRoomByCode, multiplayerRoomCodeInput])
 
   const handleEnterCompetitiveMatch = useCallback(async (maxPlayers: 2 | 3) => {
     if (!accountUserId) {
       setMultiplayerError("Faz login para entrar em competitivo.")
       return
     }
+
+    clearPendingInviteJoin()
 
     setMultiplayerBusy(true)
     setMultiplayerError(null)
@@ -1238,7 +1401,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountName, accountUserId, getMultiplayerErrorMessage, showScreenNotice])
+  }, [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, showScreenNotice])
 
   const refreshPublicCasualLobbies = useCallback(async () => {
     setPublicCasualLoading(true)
@@ -1250,7 +1413,7 @@ export default function PokemonAdventure() {
       }
     } catch (error) {
       setPublicCasualLobbies([])
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel carregar os lobbies publicos agora."))
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel carregar os grupos publicos agora."))
     } finally {
       setPublicCasualLoading(false)
     }
@@ -1271,10 +1434,35 @@ export default function PokemonAdventure() {
     }
   }, [currentScreen, multiplayerJoinedRoomId, multiplayerSection, refreshPublicCasualLobbies])
 
+  useEffect(() => {
+    const pendingInviteRoomId = pendingInviteRoomIdRef.current
+    if (!pendingInviteRoomId || isAuthChecking || !accountUserId) {
+      return
+    }
+
+    if (pendingInviteRetryTimeoutRef.current !== null || pendingInviteRetryCountRef.current > 0) {
+      return
+    }
+
+    setCurrentScreen("multiplayer")
+    setMultiplayerSection("casual")
+    setMultiplayerRoomCodeInput(pendingInviteRoomId)
+    void joinMultiplayerRoomByCode(pendingInviteRoomId, { autoRetry: true })
+  }, [accountUserId, isAuthChecking, joinMultiplayerRoomByCode])
+
+  useEffect(() => {
+    return () => {
+      if (pendingInviteRetryTimeoutRef.current !== null) {
+        window.clearTimeout(pendingInviteRetryTimeoutRef.current)
+        pendingInviteRetryTimeoutRef.current = null
+      }
+    }
+  }, [])
+
   const handleJoinPublicCasualLobby = useCallback(
     async (roomId: string) => {
       if (!accountUserId) {
-        setMultiplayerError("Faz login para entrar numa sala multiplayer.")
+        setMultiplayerError("Faz login para entrar num grupo multiplayer.")
         return
       }
 
@@ -1289,7 +1477,7 @@ export default function PokemonAdventure() {
         })
 
         if (!result.ok) {
-          setMultiplayerError(result.message || "Nao foi possivel entrar na sala publica.")
+          setMultiplayerError(result.message || "Nao foi possivel entrar no grupo publico.")
           refreshPublicCasualLobbies()
           return
         }
@@ -1301,9 +1489,9 @@ export default function PokemonAdventure() {
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
         setMultiplayerSection("casual")
-        showScreenNotice("Entraste numa sala casual publica!")
+        showScreenNotice("Entraste num grupo publico!")
       } catch (error) {
-        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar na sala publica."))
+        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo publico."))
       } finally {
         setMultiplayerBusy(false)
       }
@@ -1315,6 +1503,8 @@ export default function PokemonAdventure() {
     if (!multiplayerJoinedRoomId || !accountUserId) {
       return
     }
+
+    clearPendingInviteJoin()
 
     setMultiplayerBusy(true)
     setMultiplayerError(null)
@@ -1340,9 +1530,11 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
+  }, [accountUserId, clearPendingInviteJoin, multiplayerJoinedRoomId, showScreenNotice])
 
   const handleExitMultiplayerToMainMenu = useCallback(async () => {
+    clearPendingInviteJoin()
+
     if (multiplayerJoinedRoomId) {
       await handleLeaveMultiplayerRoom()
       setMultiplayerJoinedRoomId(null)
@@ -1352,7 +1544,7 @@ export default function PokemonAdventure() {
     }
 
     setCurrentScreen("main-menu")
-  }, [handleLeaveMultiplayerRoom, multiplayerJoinedRoomId])
+  }, [clearPendingInviteJoin, handleLeaveMultiplayerRoom, multiplayerJoinedRoomId])
 
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
@@ -3331,7 +3523,7 @@ export default function PokemonAdventure() {
         <div className="pixel-window bg-[#f8f4dc] p-5">
           <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Arena Multiplayer</h2>
           <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700">
-            Escolhe entre competitivo e casual. No competitivo, entra na fila sem codigo; no casual, hosteia por codigo.
+            No estilo WhatsApp: cria um grupo, partilha o convite e entra por link. O competitivo continua a ser uma fila automática.
           </p>
 
           <div className={`mt-4 grid gap-2 ${lockCompetitiveTabs ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -3388,13 +3580,13 @@ export default function PokemonAdventure() {
                       onClick={() => setCasualLobbyVisibility("public")}
                       className={`pixel-menu-button h-10 ${casualLobbyVisibility === "public" ? "bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
                     >
-                      Lobby Publico
+                      Grupo Publico
                     </Button>
                     <Button
                       onClick={() => setCasualLobbyVisibility("private")}
                       className={`pixel-menu-button h-10 ${casualLobbyVisibility === "private" ? "bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
                     >
-                      Lobby Privado
+                      Grupo Privado
                     </Button>
                   </div>
 
@@ -3404,20 +3596,20 @@ export default function PokemonAdventure() {
                       disabled={multiplayerBusy}
                       className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                     >
-                      Hostear {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (2)
+                      Criar Grupo {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (2)
                     </Button>
                     <Button
                       onClick={() => handleCreateMultiplayerRoom(3, casualLobbyVisibility)}
                       disabled={multiplayerBusy}
                       className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                     >
-                      Hostear {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (3)
+                      Criar Grupo {casualLobbyVisibility === "public" ? "Publico" : "Privado"} (3)
                     </Button>
                   </div>
 
                   <div className="space-y-2 rounded-xl border-2 border-slate-700 bg-white/70 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">Lobbies Publicos</p>
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">Grupos Publicos</p>
                       <Button
                         onClick={refreshPublicCasualLobbies}
                         disabled={multiplayerBusy || publicCasualLoading}
@@ -3428,7 +3620,7 @@ export default function PokemonAdventure() {
                     </div>
 
                     {publicCasualLobbies.length === 0 && (
-                      <p className="text-xs text-slate-700">Sem lobbies publicos abertos no momento.</p>
+                      <p className="text-xs text-slate-700">Sem grupos publicos abertos no momento.</p>
                     )}
 
                     <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
@@ -3451,11 +3643,11 @@ export default function PokemonAdventure() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Codigo da sala privada</label>
+                    <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Link ou codigo do grupo</label>
                     <input
                       value={multiplayerRoomCodeInput}
                       onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
-                      placeholder="Ex: -OKVbm1fX23"
+                      placeholder="Ex: https://site/?room=ABC12"
                       className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
                     />
                     <Button
@@ -3463,7 +3655,7 @@ export default function PokemonAdventure() {
                       disabled={multiplayerBusy}
                       className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                     >
-                      Entrar na Sala Privada
+                      Entrar no Grupo
                     </Button>
                   </div>
                 </>
@@ -3474,12 +3666,32 @@ export default function PokemonAdventure() {
           {multiplayerJoinedRoomId && multiplayerRoom && (
             <div className="mt-4 space-y-3 rounded-xl border-4 border-slate-800 bg-white/80 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-pixel text-xs text-slate-900 sm:text-sm">Sala: {multiplayerJoinedRoomId}</p>
+                <p className="font-pixel text-xs text-slate-900 sm:text-sm">
+                  {multiplayerRoom.mode === "casual" ? "Grupo" : "Sala"}: {multiplayerJoinedRoomId}
+                </p>
                 <Badge className="pixel-badge bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
                   {multiplayerRoom.status === "waiting" ? "Aguardando" : multiplayerRoom.status === "active" ? "Ativa" : "Finalizada"}
                 </Badge>
               </div>
               <p className="text-xs font-semibold text-slate-600">Modo da disputa: {multiplayerRoom.mode === "casual" ? "Casual" : "Competitivo"}</p>
+
+              {multiplayerRoom.mode === "casual" && (
+                <div className="rounded-xl border-2 border-emerald-700 bg-emerald-50 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-800">Convite do grupo</p>
+                      <p className="mt-1 break-all text-xs text-slate-700">{buildMultiplayerInviteUrl(multiplayerRoom.id)}</p>
+                    </div>
+                    <Button
+                      onClick={() => void handleShareMultiplayerInvite()}
+                      disabled={multiplayerBusy}
+                      className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#25d366_0%,#25d366_50%,#128c7e_50%,#128c7e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
+                    >
+                      Partilhar convite
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {roomPlayers.map((player, index) => (
@@ -3508,7 +3720,7 @@ export default function PokemonAdventure() {
                     disabled={multiplayerBusy || !isHost || multiplayerRoom.status !== "waiting"}
                     className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                   >
-                    Iniciar Disputa
+                    Iniciar Grupo
                   </Button>
 
                   <Button
