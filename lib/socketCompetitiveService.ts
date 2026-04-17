@@ -18,7 +18,8 @@ interface SocketQueueResult {
   message?: string
 }
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || ""
+const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure.onrender.com"
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 
 function isLocalDevelopmentHost() {
   if (typeof window === "undefined") {
@@ -34,22 +35,18 @@ function canUseSocketTransport() {
 }
 
 function resolveSocketServerUrl() {
-  if (SOCKET_SERVER_URL) {
+  if (typeof window === "undefined") {
     return SOCKET_SERVER_URL
   }
 
-  if (typeof window === "undefined") {
-    return ""
+  if (isLocalDevelopmentHost()) {
+    const currentPort = Number(window.location.port)
+    const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
+    const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+    return `${window.location.protocol}//${hostname}:${socketPort}`
   }
 
-  if (!isLocalDevelopmentHost()) {
-    return ""
-  }
-
-  const currentPort = Number(window.location.port)
-  const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
-  const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
-  return `${window.location.protocol}//${hostname}:${socketPort}`
+  return SOCKET_SERVER_URL
 }
 
 function delay(ms: number) {
