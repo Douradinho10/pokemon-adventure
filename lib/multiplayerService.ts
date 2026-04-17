@@ -493,8 +493,7 @@ export async function joinMultiplayerRoom(params: {
       },
     }
 
-    const nextCount = Object.keys(nextPlayers).length
-    const shouldAutoStartCompetitive = normalizedCurrent.mode === "competitive" && nextCount >= normalizedCurrent.maxPlayers
+    const shouldAutoStartCompetitive = false
 
     return {
       ...normalizedCurrent,
@@ -509,7 +508,7 @@ export async function joinMultiplayerRoom(params: {
                 bestWave: 0,
                 finishedAt: undefined,
                 forfeitAt: undefined,
-                ready: true,
+                ready: false,
               },
             ]),
           )
@@ -847,7 +846,7 @@ export async function joinCompetitiveQueue(params: {
             displayName: params.displayName,
             joinedAt: now,
             bestWave: 0,
-            ready: true,
+            ready: false,
           },
         },
       }
@@ -884,7 +883,7 @@ export async function joinCompetitiveQueue(params: {
             displayName: params.displayName,
             joinedAt: now,
             bestWave: 0,
-            ready: true,
+            ready: false,
           },
         },
       }
@@ -910,12 +909,11 @@ export async function joinCompetitiveQueue(params: {
         displayName: params.displayName,
         joinedAt: now,
         bestWave: 0,
-        ready: true,
+        ready: false,
       },
     }
 
-    const nextCount = Object.keys(nextPlayers).length
-    const shouldAutoStart = nextCount >= normalizedCurrent.maxPlayers
+    const shouldAutoStart = false
 
     return {
       ...normalizedCurrent,
@@ -930,7 +928,7 @@ export async function joinCompetitiveQueue(params: {
                 bestWave: 0,
                 finishedAt: undefined,
                 forfeitAt: undefined,
-                ready: true,
+                ready: false,
               },
             ]),
           )

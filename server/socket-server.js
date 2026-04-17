@@ -56,10 +56,6 @@ function areAllPlayersResolved(players) {
 }
 
 function areAllPlayersReady(room) {
-  if (room.mode === "competitive") {
-    return true
-  }
-
   const players = Object.values(room.players || {})
   return players.length >= 2 && players.every((player) => player.ready !== false)
 }
@@ -336,11 +332,11 @@ function addPlayerToRoom(roomId, userId, displayName) {
       displayName,
       joinedAt: Date.now(),
       bestWave: 0,
-      ready: room.mode === "competitive",
+      ready: false,
     },
   }
 
-  const shouldAutoStart = room.mode === "competitive" && Object.keys(nextPlayers).length >= room.maxPlayers
+  const shouldAutoStart = false
   const nextRoom = {
     ...room,
     status: shouldAutoStart ? "active" : room.status,
@@ -391,7 +387,7 @@ function createRoom(params) {
           displayName: params.hostDisplayName,
           joinedAt: now,
           bestWave: 0,
-          ready: params.mode === "competitive",
+          ready: false,
         },
       },
     }
