@@ -117,7 +117,7 @@ export const BattleArena = memo(
   const battlefieldPalette = environmentStyles[environment]
 
   return (
-    <GlassCard className={`relative overflow-hidden border-slate-800 bg-[#f8f4dc] p-2.5 sm:p-3 min-h-[clamp(340px,58dvh,560px)] shadow-[0_18px_60px_rgba(22,51,77,0.25)] ${className}`}>
+    <GlassCard className={`relative overflow-hidden border-slate-800 bg-[#f8f4dc] p-2 sm:p-3 min-h-[clamp(260px,44dvh,420px)] sm:min-h-[clamp(340px,58dvh,560px)] shadow-[0_18px_60px_rgba(22,51,77,0.25)] ${className}`}>
       {attackAnimation && (
         <motion.div
           key={`attack-banner-${attackAnimation.attacker}-${attackAnimation.moveName}`}
@@ -211,7 +211,7 @@ export const BattleArena = memo(
           </motion.div>
         </div>
 
-        <div className="relative z-0 -mt-3 flex min-h-[clamp(190px,27dvh,280px)] flex-1 justify-between gap-2 px-2 pt-1 sm:-mt-4 sm:px-4 sm:pt-2">
+        <div className="relative z-0 -mt-3 flex min-h-[clamp(150px,22dvh,240px)] flex-1 justify-between gap-2 px-2 pt-1 sm:-mt-4 sm:min-h-[clamp(190px,27dvh,280px)] sm:px-4 sm:pt-2">
           {attackAnimation && (
             <>
               <motion.div

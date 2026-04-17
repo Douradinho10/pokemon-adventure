@@ -5073,7 +5073,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       : "from-white to-slate-300"
 
     return (
-      <div className="relative flex min-h-[calc(100dvh-10rem)] max-h-[calc(100dvh-8.5rem)] flex-col gap-2 overflow-hidden">
+      <div className="relative flex h-full min-h-0 flex-col gap-2 overflow-hidden pb-[env(safe-area-inset-bottom)]">
         {attackAnimation && (
           <div key={attackAnimation.id} className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
             <div className={`battle-attack-flash absolute inset-0 bg-gradient-to-r ${overlayGradient} opacity-35`} />
@@ -5107,24 +5107,24 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           className="flex-1 min-h-0"
         />
 
-        <div className="grid grid-cols-2 gap-2 shrink-0 sm:grid-cols-2">
+        <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-2">
           <Button
             onClick={() => setShowModal("attacks")}
-            className="h-10 sm:h-11 bg-gradient-to-r from-red-500 to-red-600 text-xs font-semibold"
+            className="h-11 bg-gradient-to-r from-red-500 to-red-600 text-[11px] font-semibold sm:h-11 sm:text-xs"
             disabled={isAnimating}
           >
             ⚔️ Atacar
           </Button>
           <Button
             onClick={() => setShowModal("capture")}
-            className="h-10 sm:h-11 bg-gradient-to-r from-blue-500 to-blue-600 text-xs font-semibold"
+            className="h-11 bg-gradient-to-r from-blue-500 to-blue-600 text-[11px] font-semibold sm:h-11 sm:text-xs"
             disabled={isAnimating}
           >
             🎯 Capturar
           </Button>
           <Button
             onClick={() => setShowModal("switch")}
-            className="h-10 sm:h-11 bg-gradient-to-r from-green-500 to-green-600 text-xs font-semibold"
+            className="h-11 bg-gradient-to-r from-green-500 to-green-600 text-[11px] font-semibold sm:h-11 sm:text-xs"
             disabled={isAnimating}
           >
             🔄 Trocar
@@ -5172,7 +5172,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 enemyAttack()
               }
             }}
-            className="h-10 sm:h-11 bg-gradient-to-r from-gray-500 to-gray-600 text-xs font-semibold"
+            className="h-11 bg-gradient-to-r from-gray-500 to-gray-600 text-[11px] font-semibold sm:h-11 sm:text-xs"
             disabled={isAnimating}
           >
             🏃 Fugir
@@ -6335,7 +6335,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   }
 
   return (
-    <div className={`min-h-dvh text-slate-900 ${currentScreen === "main-menu" ? "h-dvh overflow-hidden p-2 md:p-2" : "p-3 md:p-4"}`}>
+    <div className={`min-h-dvh text-slate-900 ${currentScreen === "main-menu" ? "h-dvh overflow-hidden p-2 md:p-2" : "p-2 sm:p-3 md:p-4"}`}>
       
       <AnimatePresence>
         {captureThrowAnimation && (

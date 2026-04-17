@@ -118,11 +118,19 @@
       repeating-linear-gradient(0deg, rgba(34,197,94,0.09) 0 3px, rgba(0,0,0,0) 3px 6px) 0 100% / 100% 58%,
       linear-gradient(180deg, #8fcbff 0%, #8fcbff 18%, #aedeff 18%, #aedeff 32%, #d6efff 32%, #d6efff 42%, #dcefb2 42%, #dcefb2 54%, #9ae06e 54%, #9ae06e 70%, #74c952 70%, #74c952 84%, #58a63e 84%, #58a63e 100%);
     color: #16334d;
-    min-height: 100vh;
+    min-height: 100dvh;
     font-family: var(--font-ui), "Noto Sans", "Segoe UI", sans-serif;
     text-rendering: geometricPrecision;
     background-attachment: fixed;
     image-rendering: pixelated;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  @media (max-width: 768px) {
+    body {
+      background-attachment: scroll;
+    }
   }
 
   * {
