@@ -57,6 +57,7 @@ import {
   markMultiplayerPlayerFinished,
   requestMultiplayerRematch,
   startMultiplayerRoom,
+  setMultiplayerStarterMode,
   setMultiplayerPlayerReady,
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
@@ -750,6 +751,7 @@ export default function PokemonAdventure() {
   const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
   const [multiplayerBusy, setMultiplayerBusy] = useState(false)
   const [multiplayerError, setMultiplayerError] = useState<string | null>(null)
+  const [starterRouletteChoice, setStarterRouletteChoice] = useState<string | null>(null)
   const [leaderboardMonth, setLeaderboardMonth] = useState(getCurrentMonthKey())
   const [leaderboardViewMode, setLeaderboardViewMode] = useState<"solo" | "multiplayer">("solo")
   const [leaderboardMonths, setLeaderboardMonths] = useState<string[]>([getCurrentMonthKey()])
@@ -760,6 +762,8 @@ export default function PokemonAdventure() {
   const defeatHideTimeoutRef = useRef<number | null>(null)
   const captureThrowTimeoutRef = useRef<number | null>(null)
   const loginRedirectTimeoutRef = useRef<number | null>(null)
+  const starterRouletteIntervalRef = useRef<number | null>(null)
+  const starterRouletteTimeoutRef = useRef<number | null>(null)
   const hasAutoRoutedAfterAuthRef = useRef(false)
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
@@ -1399,6 +1403,7 @@ export default function PokemonAdventure() {
           maxPlayers,
           status: "waiting",
           createdAt,
+          starterMode: "manual",
           players: {
             [accountUserId]: {
               userId: accountUserId,
@@ -1665,6 +1670,55 @@ export default function PokemonAdventure() {
     }
   }, [accountUserId, getMultiplayerErrorMessage, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
 
+  const handleToggleMultiplayerStarterMode = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
+      return
+    }
+
+    if (multiplayerRoom.mode !== "casual" || multiplayerRoom.status !== "waiting") {
+      return
+    }
+
+    if (multiplayerRoom.hostUserId !== accountUserId) {
+      setMultiplayerError("Apenas o host pode mudar a roleta inicial.")
+      return
+    }
+
+    const nextStarterMode = (multiplayerRoom.starterMode || "manual") === "roulette" ? "manual" : "roulette"
+
+    if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+      setMultiplayerRoom((prev) => {
+        if (!prev) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          starterMode: nextStarterMode,
+        }
+      })
+
+      showScreenNotice(nextStarterMode === "roulette" ? "Roleta inicial ativada." : "Roleta inicial desativada.")
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      await setMultiplayerStarterMode({
+        roomId: multiplayerJoinedRoomId,
+        userId: accountUserId,
+        starterMode: nextStarterMode,
+      })
+      showScreenNotice(nextStarterMode === "roulette" ? "Roleta inicial ativada." : "Roleta inicial desativada.")
+    } catch (error) {
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel alterar a roleta inicial."))
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, getMultiplayerErrorMessage, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
+
   const handleRequestMultiplayerRematch = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
       return
@@ -1674,7 +1728,7 @@ export default function PokemonAdventure() {
       return
     }
 
-    if (multiplayerRoom.hostUserId !== accountUserId) {
+    if (multiplayerRoom.mode !== "competitive" && multiplayerRoom.hostUserId !== accountUserId) {
       setMultiplayerError("Apenas o host pode preparar a revanche.")
       return
     }
@@ -2063,9 +2117,10 @@ export default function PokemonAdventure() {
   }, [gameState.playerTeam, updatePokemon, clearPokemonStatus, addLog])
 
   const handleGameOver = useCallback(
-    (options?: { silent?: boolean; forfeit?: boolean }) => {
+    (options?: { silent?: boolean; forfeit?: boolean; victory?: boolean }) => {
       const finalWave = Math.max(0, latestGameStateRef.current.battles)
       const shouldForfeit = Boolean(options?.forfeit)
+      const shouldVictory = Boolean(options?.victory)
       const isRankedMultiplayer = Boolean(
         multiplayerMode &&
           accountUserId &&
@@ -2112,6 +2167,23 @@ export default function PokemonAdventure() {
                   ready: false,
                 },
               }
+
+                  if (shouldForfeit) {
+                    const winnerPlayer =
+                      Object.values(nextPlayers).find((player) => player.userId !== accountUserId && !player.forfeitAt) ||
+                      Object.values(nextPlayers).find((player) => player.userId !== accountUserId) ||
+                      null
+
+                    return {
+                      ...prev,
+                      players: nextPlayers,
+                      status: "finished",
+                      finishedAt: now,
+                      winnerUserId: winnerPlayer?.userId,
+                      winnerDisplayName: winnerPlayer?.displayName,
+                      winnerReason: "forfeit",
+                    }
+                  }
 
               const allResolved = Object.values(nextPlayers).every(
                 (player) => typeof player.finishedAt === "number" || typeof player.forfeitAt === "number",
@@ -2160,7 +2232,9 @@ export default function PokemonAdventure() {
 
         setDefeatAnimationVisible(false)
         setScreenNotice(
-          shouldForfeit
+          shouldVictory
+            ? "🏆 O adversário desistiu. Venceste a ronda!"
+            : shouldForfeit
             ? "🏳️ A tua partida terminou. A sala continua aberta."
             : `🏁 Ficaste pela wave ${finalWave}. A sala continua aberta.`,
         )
@@ -2281,6 +2355,28 @@ export default function PokemonAdventure() {
       window.removeEventListener("beforeunload", handlePageExit)
     }
   }, [accountUserId, handleGameOver, multiplayerJoinedRoomId, multiplayerMode])
+
+  useEffect(() => {
+    if (!multiplayerRoom || !multiplayerJoinedRoomId || !multiplayerMode || !accountUserId) {
+      return
+    }
+
+    const currentPlayer = multiplayerRoom.players?.[accountUserId]
+    if (
+      multiplayerRoom.status !== "finished" ||
+      !currentPlayer ||
+      currentPlayer.finishedAt ||
+      currentPlayer.forfeitAt
+    ) {
+      return
+    }
+
+    if (multiplayerResultSubmittedRef.current === multiplayerJoinedRoomId) {
+      return
+    }
+
+    void handleGameOver({ victory: true })
+  }, [accountUserId, handleGameOver, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
 
   const handlePlayerKnockout = (pokemonName: string, nextHP = 0) => {
     const alivePokemon = Object.keys(gameState.playerTeam).filter((name) => {
@@ -2625,6 +2721,74 @@ export default function PokemonAdventure() {
     },
     [updateGameState, addLog],
   )
+
+  useEffect(() => {
+    const roomStarterMode = multiplayerRoom?.starterMode || (multiplayerRoom?.mode === "competitive" ? "roulette" : "manual")
+
+    if (showModal !== "starter" || roomStarterMode !== "roulette") {
+      if (starterRouletteIntervalRef.current !== null) {
+        window.clearInterval(starterRouletteIntervalRef.current)
+        starterRouletteIntervalRef.current = null
+      }
+
+      if (starterRouletteTimeoutRef.current !== null) {
+        window.clearTimeout(starterRouletteTimeoutRef.current)
+        starterRouletteTimeoutRef.current = null
+      }
+
+      setStarterRouletteChoice(null)
+      return
+    }
+
+    const starterNames = Object.keys(starterPokemon)
+    if (starterNames.length === 0) {
+      return
+    }
+
+    let cursor = 0
+    const pickNextStarter = () => {
+      const starterName = starterNames[cursor % starterNames.length]
+      cursor += 1
+      return starterName
+    }
+
+    setStarterRouletteChoice(pickNextStarter())
+
+    if (starterRouletteIntervalRef.current !== null) {
+      window.clearInterval(starterRouletteIntervalRef.current)
+    }
+
+    if (starterRouletteTimeoutRef.current !== null) {
+      window.clearTimeout(starterRouletteTimeoutRef.current)
+    }
+
+    starterRouletteIntervalRef.current = window.setInterval(() => {
+      setStarterRouletteChoice(pickNextStarter())
+    }, 120)
+
+    starterRouletteTimeoutRef.current = window.setTimeout(() => {
+      if (starterRouletteIntervalRef.current !== null) {
+        window.clearInterval(starterRouletteIntervalRef.current)
+        starterRouletteIntervalRef.current = null
+      }
+
+      const finalStarter = starterNames[Math.floor(Math.random() * starterNames.length)]
+      setStarterRouletteChoice(finalStarter)
+      chooseStarter(finalStarter)
+    }, 1500)
+
+    return () => {
+      if (starterRouletteIntervalRef.current !== null) {
+        window.clearInterval(starterRouletteIntervalRef.current)
+        starterRouletteIntervalRef.current = null
+      }
+
+      if (starterRouletteTimeoutRef.current !== null) {
+        window.clearTimeout(starterRouletteTimeoutRef.current)
+        starterRouletteTimeoutRef.current = null
+      }
+    }
+  }, [chooseStarter, multiplayerRoom?.mode, multiplayerRoom?.starterMode, showModal])
 
   const startBattle = useCallback(() => {
     if (!gameState.activePokemon) {
@@ -3660,34 +3824,103 @@ export default function PokemonAdventure() {
   }, [currentScreen, gameState, vendorLastBattleRoll, moveVendorOffer, showModal, random, addLog])
 
   const renderStarterModal = () => (
-    <div>
-      <div className="pixel-band mb-6 bg-[linear-gradient(90deg,#6b7280_0%,#6b7280_30%,#94a3b8_30%,#94a3b8_60%,#7c8b73_60%,#7c8b73_100%)] px-4 py-3 text-center">
-        <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">Escolhe O Pokémon Inicial</h3>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {Object.entries(starterPokemon).map(([name, pokemon]) => (
-          <div
-            key={name}
-            className="cursor-pointer transform transition-all duration-300 hover:scale-105"
-            onClick={() => chooseStarter(name)}
-          >
-            <PokemonCard
-              name={name}
-              pokemon={pokemon}
-              onClick={() => chooseStarter(name)}
-              showStats={true}
-              className="h-full"
-            />
+    (() => {
+      const roomStarterMode = multiplayerRoom?.starterMode || (multiplayerRoom?.mode === "competitive" ? "roulette" : "manual")
+
+      if (roomStarterMode === "roulette") {
+        const rouletteStarterName = starterRouletteChoice || Object.keys(starterPokemon)[0] || ""
+        const rouletteStarter = rouletteStarterName ? starterPokemon[rouletteStarterName] : null
+
+        return (
+          <div className="space-y-4">
+            <div className="pixel-band bg-[linear-gradient(90deg,#8b5cf6_0%,#8b5cf6_30%,#c084fc_30%,#c084fc_60%,#f59e0b_60%,#f59e0b_100%)] px-4 py-3 text-center shadow-[6px_6px_0_rgba(15,23,42,0.18)]">
+              <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">Roleta do Pokémon Inicial</h3>
+            </div>
+
+            <div className="rounded-[28px] border-4 border-slate-900 bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_100%)] p-5 shadow-[8px_8px_0_rgba(15,23,42,0.16)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Starter automático</p>
+                  <h4 className="mt-1 font-pixel text-sm text-slate-900">
+                    {multiplayerRoom?.mode === "competitive" ? "Competitivo" : "Ativada pelo host"}
+                  </h4>
+                </div>
+                <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
+                  A girar
+                </Badge>
+              </div>
+
+              {rouletteStarter && (
+                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)] lg:items-center">
+                  <div className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Selecionando</p>
+                    <h4 className="mt-2 font-pixel text-2xl text-slate-900 sm:text-3xl">{rouletteStarterName}</h4>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">
+                      A roleta está a escolher o teu companheiro inicial.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {Object.keys(starterPokemon).map((name) => (
+                        <span
+                          key={name}
+                          className={`rounded-full border-2 border-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                            name === rouletteStarterName
+                              ? "bg-violet-200 text-violet-900"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {rouletteStarter && (
+                    <div className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#ecfeff_100%)] p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                      <PokemonCard name={rouletteStarterName} pokemon={rouletteStarter} showStats className="h-full" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="mt-4 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                Aguarda um instante. O sistema vai escolher e arrancar a run com esse starter.
+              </p>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="mt-6 text-center">
-        <p className="border-4 border-slate-800 bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">
-          Escolhe sabiamente. Este será o teu companheiro inicial.
-        </p>
-        <p className="mt-3 pixel-text text-[10px] leading-relaxed text-white/90">Clica num cartão para escolher</p>
-      </div>
-    </div>
+        )
+      }
+
+      return (
+        <div>
+          <div className="pixel-band mb-6 bg-[linear-gradient(90deg,#6b7280_0%,#6b7280_30%,#94a3b8_30%,#94a3b8_60%,#7c8b73_60%,#7c8b73_100%)] px-4 py-3 text-center">
+            <h3 className="font-pixel text-xs leading-relaxed text-slate-900 sm:text-sm">Escolhe O Pokémon Inicial</h3>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {Object.entries(starterPokemon).map(([name, pokemon]) => (
+              <div
+                key={name}
+                className="cursor-pointer transform transition-all duration-300 hover:scale-105"
+                onClick={() => chooseStarter(name)}
+              >
+                <PokemonCard
+                  name={name}
+                  pokemon={pokemon}
+                  onClick={() => chooseStarter(name)}
+                  showStats={true}
+                  className="h-full"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 text-center">
+            <p className="border-4 border-slate-800 bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">
+              Escolhe sabiamente. Este será o teu companheiro inicial.
+            </p>
+            <p className="mt-3 pixel-text text-[10px] leading-relaxed text-white/90">Clica num cartão para escolher</p>
+          </div>
+        </div>
+      )
+    })()
   )
 
   const renderSelectSlotModal = () => (
@@ -4020,7 +4253,7 @@ export default function PokemonAdventure() {
                   <div key={player.userId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-slate-50 px-3 py-2">
                     <span className="text-sm font-semibold text-slate-900">
                       {index + 1}. {player.displayName}
-                      {derivedHostUserId === player.userId ? " (Host)" : ""}
+                      {multiplayerRoom.mode === "casual" && derivedHostUserId === player.userId ? " (Host)" : ""}
                     </span>
                     <span className="text-xs font-black text-slate-700">Wave {player.bestWave}</span>
                   </div>
@@ -4101,11 +4334,14 @@ export default function PokemonAdventure() {
     const currentPlayerRoundPoints = currentRoomPlayer
       ? calculateMultiplayerPoints({ wave: currentRoomPlayer.bestWave, forfeit: Boolean(currentRoomPlayer.forfeitAt) })
       : 0
+    const roomStarterMode = multiplayerRoom?.starterMode || (multiplayerRoom?.mode === "competitive" ? "roulette" : "manual")
     const roomWinnerPlayer = multiplayerRoom?.winnerUserId ? multiplayerRoom.players?.[multiplayerRoom.winnerUserId] || null : null
     const roomWinnerDisplayName = roomWinnerPlayer?.displayName || multiplayerRoom?.winnerDisplayName || null
     const roomStatusLabel = multiplayerRoom
       ? multiplayerRoom.status === "waiting"
-        ? allPlayersReady
+        ? roomSize < 2
+          ? "A aguardar jogadores"
+          : allPlayersReady
           ? "Todos prontos"
           : "A aguardar pronto"
         : multiplayerRoom.status === "active"
@@ -4116,8 +4352,13 @@ export default function PokemonAdventure() {
             ? `Venceu ${roomWinnerDisplayName}`
             : "Finalizada"
       : "Sem sala ativa"
-    const canOpenRematch = Boolean(multiplayerRoom && multiplayerRoom.status === "finished" && isHost && roomSize >= 2)
-    const roomActionGridClass = multiplayerRoom && multiplayerRoom.status === "waiting" ? (isHost ? "sm:grid-cols-3" : "sm:grid-cols-2") : "sm:grid-cols-1"
+    const canOpenRematch = Boolean(
+      multiplayerRoom &&
+        multiplayerRoom.status === "finished" &&
+        roomSize >= 2 &&
+        (multiplayerRoom.mode === "competitive" || isHost),
+    )
+    const roomActionGridClass = multiplayerRoom && multiplayerRoom.status === "waiting" ? (multiplayerRoom.mode === "casual" && isHost ? "sm:grid-cols-3" : "sm:grid-cols-2") : "sm:grid-cols-1"
     const inviteUrl = multiplayerRoom ? buildMultiplayerInviteUrl(multiplayerRoom.id) : ""
     const activeRoom = multiplayerRoom!
 
@@ -4303,12 +4544,40 @@ export default function PokemonAdventure() {
                     <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{roomStatusLabel}</p>
-                      <p className="mt-1 text-xs text-slate-600">{isHost ? "Tu és o host" : "Ligado como convidado"}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {activeRoom.mode === "competitive"
+                          ? "Lobby automático"
+                          : isHost
+                            ? "Tu és o host"
+                            : "Ligado como convidado"}
+                      </p>
                       <p className="mt-1 text-xs font-semibold text-slate-600">
                         {`${roomReadyCount}/${roomSize} prontos`}
                       </p>
                     </div>
                   </div>
+
+                  {activeRoom.mode === "competitive" ? (
+                    <div className="mt-3 rounded-2xl border-2 border-slate-900 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">
+                      Starter automático: roleta inicial para toda a sala.
+                    </div>
+                  ) : activeRoom.status === "waiting" && isHost ? (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-slate-900 bg-amber-50 px-3 py-2">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-800">Starter inicial</p>
+                        <p className="mt-1 text-xs font-semibold text-amber-900">
+                          {roomStarterMode === "roulette" ? "Roleta ativa" : "Escolha manual"}
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleToggleMultiplayerStarterMode}
+                        disabled={multiplayerBusy}
+                        className={`pixel-menu-button h-9 ${roomStarterMode === "roulette" ? "bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-3 text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        {roomStarterMode === "roulette" ? "Desligar roleta" : "Ativar roleta"}
+                      </Button>
+                    </div>
+                  ) : null}
 
                   <div className={`mt-4 grid gap-2 ${roomActionGridClass}`}>
                     <Button
@@ -4327,7 +4596,7 @@ export default function PokemonAdventure() {
                         {currentPlayerReady ? "Desmarcar pronto" : "Estou pronto"}
                       </Button>
                     )}
-                    {activeRoom.status === "waiting" && isHost && (
+                    {activeRoom.status === "waiting" && activeRoom.mode === "casual" && isHost && (
                       <Button
                         onClick={handleStartMultiplayerRoom}
                         disabled={multiplayerBusy || !allPlayersReady}

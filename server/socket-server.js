@@ -204,15 +204,12 @@ function finalizePlayerDeparture(room, userId, { forfeit = false } = {}) {
 
   const nextRoom = {
     ...room,
+    starterMode: room.starterMode || (room.mode === "competitive" ? "roulette" : "manual"),
     players: nextPlayers,
     ...normalizeRoomHost(room, nextPlayers),
   }
 
-  if (areAllPlayersResolved(nextPlayers)) {
-    return finalizeFinishedRoom(nextRoom, now)
-  }
-
-  return nextRoom
+  return finalizeFinishedRoom(nextRoom, now)
 }
 
 function saveRoom(room) {
@@ -339,6 +336,7 @@ function addPlayerToRoom(roomId, userId, displayName) {
   const shouldAutoStart = false
   const nextRoom = {
     ...room,
+    starterMode: room.starterMode || (room.mode === "competitive" ? "roulette" : "manual"),
     status: shouldAutoStart ? "active" : room.status,
     startedAt: shouldAutoStart ? Date.now() : room.startedAt,
     players: shouldAutoStart
@@ -381,6 +379,7 @@ function createRoom(params) {
       maxPlayers: params.maxPlayers,
       status: "waiting",
       createdAt: now,
+      starterMode: params.mode === "competitive" ? "roulette" : "manual",
       players: {
         [params.hostUserId]: {
           userId: params.hostUserId,
@@ -765,6 +764,46 @@ io.on("connection", (socket) => {
   )
 
   socket.on(
+    "multiplayer:room:set-starter-mode",
+    withAck((payload) => {
+      const roomId = String(payload?.roomId || "").trim()
+      const userId = String(payload?.userId || "").trim()
+      const starterMode = payload?.starterMode === "roulette" ? "roulette" : "manual"
+
+      if (!roomId || !userId) {
+        return { ok: false, message: "Dados invalidos para alterar a roleta inicial" }
+      }
+
+      const entry = getRoomEntry(roomId)
+      if (!entry?.room?.players?.[userId]) {
+        return { ok: false, message: "Jogador nao encontrado na sala" }
+      }
+
+      const room = entry.room
+      if (room.status !== "waiting") {
+        return { ok: false, message: "A sala ja comecou" }
+      }
+
+      if (room.mode !== "casual") {
+        return { ok: false, message: "A roleta inicial nao pode ser alterada neste modo" }
+      }
+
+      if (room.hostUserId !== userId) {
+        return { ok: false, message: "Apenas o host pode alterar a roleta inicial" }
+      }
+
+      const nextRoom = {
+        ...room,
+        starterMode,
+      }
+
+      saveRoom(nextRoom)
+      broadcastRoom(roomId)
+      return { ok: true, room: cloneRoom(nextRoom) }
+    }),
+  )
+
+  socket.on(
     "multiplayer:room:rematch",
     withAck((payload) => {
       const roomId = String(payload?.roomId || "").trim()
@@ -784,7 +823,7 @@ io.on("connection", (socket) => {
         return { ok: false, message: "A sala ainda nao terminou" }
       }
 
-      if (room.hostUserId !== hostUserId) {
+      if (room.mode !== "competitive" && room.hostUserId !== hostUserId) {
         return { ok: false, message: "Apenas o host pode preparar a revanche" }
       }
 

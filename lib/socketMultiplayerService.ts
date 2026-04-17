@@ -11,6 +11,7 @@ import {
   requestMultiplayerRematch as requestLegacyMultiplayerRematch,
   startMultiplayerRoom as startLegacyMultiplayerRoom,
   subscribeMultiplayerRoom as subscribeLegacyMultiplayerRoom,
+  setMultiplayerStarterMode as setLegacyMultiplayerStarterMode,
   setMultiplayerPlayerReady as setLegacyMultiplayerPlayerReady,
   updateMultiplayerPlayerWave as updateLegacyMultiplayerPlayerWave,
 } from "./multiplayerService"
@@ -40,6 +41,7 @@ export interface MultiplayerRoom {
   createdAt: number
   startedAt?: number
   finishedAt?: number
+  starterMode?: "manual" | "roulette"
   winnerUserId?: string
   winnerDisplayName?: string
   winnerReason?: "wave" | "forfeit" | "tie"
@@ -373,6 +375,29 @@ export async function setMultiplayerPlayerReady(params: {
   }
 
   await setLegacyMultiplayerPlayerReady(params)
+}
+
+export async function setMultiplayerStarterMode(params: {
+  roomId: string
+  userId: string
+  starterMode: "manual" | "roulette"
+}): Promise<void> {
+  if (canUseSocketTransport()) {
+    try {
+      await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:set-starter-mode", {
+        roomId: params.roomId.trim(),
+        userId: params.userId,
+        starterMode: params.starterMode,
+      })
+      return
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  await setLegacyMultiplayerStarterMode(params)
 }
 
 export function subscribeMultiplayerRoom(

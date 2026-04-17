@@ -7,6 +7,7 @@ export type MultiplayerRoomStatus = "waiting" | "active" | "finished"
 export type MultiplayerRoomMode = "competitive" | "casual"
 export type MultiplayerRoomVisibility = "public" | "private"
 export type MultiplayerMatchOutcome = "finished" | "forfeit"
+export type MultiplayerStarterMode = "manual" | "roulette"
 
 export interface MultiplayerRoomPlayer {
   userId: string
@@ -29,6 +30,7 @@ export interface MultiplayerRoom {
   createdAt: number
   startedAt?: number
   finishedAt?: number
+  starterMode?: MultiplayerStarterMode
   winnerUserId?: string
   winnerDisplayName?: string
   winnerReason?: "wave" | "forfeit" | "tie"
@@ -89,10 +91,6 @@ function areAllPlayersResolved(players: Record<string, MultiplayerRoomPlayer>): 
 }
 
 function areAllPlayersReady(room: MultiplayerRoom): boolean {
-  if (room.mode === "competitive") {
-    return true
-  }
-
   const players = Object.values(room.players || {})
   return players.length >= 2 && players.every((player) => player.ready !== false)
 }
@@ -343,6 +341,7 @@ export async function createMultiplayerRoom(params: {
       maxPlayers: params.maxPlayers,
       status: "waiting",
       createdAt,
+      starterMode: params.mode === "competitive" ? "roulette" : "manual",
       players: {
         [params.hostUserId]: {
           userId: params.hostUserId,
@@ -467,6 +466,7 @@ export async function joinMultiplayerRoom(params: {
       ...current,
       hostUserId: normalizedHostUserId,
       hostDisplayName: normalizedHostDisplayName,
+      starterMode: current.starterMode || "roulette",
     }
     const currentCount = Object.keys(players).length
 
@@ -499,6 +499,7 @@ export async function joinMultiplayerRoom(params: {
       ...normalizedCurrent,
       status: shouldAutoStartCompetitive ? "active" : current.status,
       startedAt: shouldAutoStartCompetitive ? Date.now() : current.startedAt,
+      starterMode: normalizedCurrent.starterMode || "roulette",
       players: shouldAutoStartCompetitive
         ? Object.fromEntries(
             Object.entries(nextPlayers).map(([id, player]) => [
@@ -840,6 +841,7 @@ export async function joinCompetitiveQueue(params: {
         maxPlayers: params.maxPlayers,
         status: "waiting" as const,
         createdAt: now,
+        starterMode: "roulette" as const,
         players: {
           [params.userId]: {
             userId: params.userId,
@@ -859,6 +861,7 @@ export async function joinCompetitiveQueue(params: {
       ...current,
       hostUserId: normalizedHostUserId,
       hostDisplayName: normalizedHostDisplayName,
+      starterMode: current.starterMode || "roulette",
     }
 
     const roomAge = now - (normalizedCurrent.startedAt || normalizedCurrent.createdAt || now)
@@ -877,6 +880,7 @@ export async function joinCompetitiveQueue(params: {
         maxPlayers: params.maxPlayers,
         status: "waiting" as const,
         createdAt: now,
+        starterMode: "roulette" as const,
         players: {
           [params.userId]: {
             userId: params.userId,
@@ -919,6 +923,7 @@ export async function joinCompetitiveQueue(params: {
       ...normalizedCurrent,
       status: shouldAutoStart ? "active" : "waiting",
       startedAt: shouldAutoStart ? now : normalizedCurrent.startedAt,
+      starterMode: normalizedCurrent.starterMode || "roulette",
       players: shouldAutoStart
         ? Object.fromEntries(
             Object.entries(nextPlayers).map(([id, player]) => [
@@ -1006,11 +1011,7 @@ export async function leaveMultiplayerRoom(roomId: string, userId: string): Prom
         nextRoom.hostDisplayName = nextHost.displayName
       }
 
-      if (areAllPlayersResolved(nextPlayers)) {
-        return finalizeFinishedRoom(nextRoom, now)
-      }
-
-      return nextRoom
+      return finalizeFinishedRoom(nextRoom, now)
     }
 
     const nextPlayers = { ...current.players }
@@ -1200,6 +1201,38 @@ export async function setMultiplayerPlayerReady(params: {
   })
 }
 
+export async function setMultiplayerStarterMode(params: {
+  roomId: string
+  userId: string
+  starterMode: MultiplayerStarterMode
+}): Promise<void> {
+  const db = requireDatabase()
+  const roomRef = ref(db, `${ROOM_ROOT}/${params.roomId}`)
+
+  await runTransaction(roomRef, (current: MultiplayerRoom | null) => {
+    if (!current) {
+      return current
+    }
+
+    if (current.status !== "waiting") {
+      return current
+    }
+
+    if (current.mode !== "casual") {
+      return current
+    }
+
+    if (current.hostUserId !== params.userId) {
+      return current
+    }
+
+    return {
+      ...current,
+      starterMode: params.starterMode,
+    }
+  })
+}
+
 export async function requestMultiplayerRematch(params: {
   roomId: string
   hostUserId: string
@@ -1226,7 +1259,7 @@ export async function requestMultiplayerRematch(params: {
       hostDisplayName: normalizedHostDisplayName,
     }
 
-    if (normalizedCurrent.hostUserId !== params.hostUserId) {
+    if (normalizedCurrent.mode !== "competitive" && normalizedCurrent.hostUserId !== params.hostUserId) {
       return normalizedCurrent
     }
 
