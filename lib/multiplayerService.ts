@@ -6,13 +6,16 @@ import { getFirebaseDb } from "./firebase"
 export type MultiplayerRoomStatus = "waiting" | "active" | "finished"
 export type MultiplayerRoomMode = "competitive" | "casual"
 export type MultiplayerRoomVisibility = "public" | "private"
+export type MultiplayerMatchOutcome = "finished" | "forfeit"
 
 export interface MultiplayerRoomPlayer {
   userId: string
   displayName: string
   joinedAt: number
   bestWave: number
+  ready?: boolean
   finishedAt?: number
+  forfeitAt?: number
 }
 
 export interface MultiplayerRoom {
@@ -26,6 +29,9 @@ export interface MultiplayerRoom {
   createdAt: number
   startedAt?: number
   finishedAt?: number
+  winnerUserId?: string
+  winnerDisplayName?: string
+  winnerReason?: "wave" | "forfeit" | "tie"
   players: Record<string, MultiplayerRoomPlayer>
 }
 
@@ -34,8 +40,11 @@ export interface MonthlyLeaderboardEntry {
   userId: string
   displayName: string
   wave: number
+  points?: number
   finishedAt: number
   roomId?: string
+  result?: MultiplayerMatchOutcome
+  matches?: number
 }
 
 export interface SoloLeaderboardEntry {
@@ -69,6 +78,123 @@ interface CompetitiveQueueSlot {
   roomId: string
   ownerUserId: string
   updatedAt: number
+}
+
+function hasPlayerResolved(player: MultiplayerRoomPlayer): boolean {
+  return typeof player.finishedAt === "number" || typeof player.forfeitAt === "number"
+}
+
+function areAllPlayersResolved(players: Record<string, MultiplayerRoomPlayer>): boolean {
+  return Object.values(players).every((player) => hasPlayerResolved(player))
+}
+
+function areAllPlayersReady(room: MultiplayerRoom): boolean {
+  if (room.mode === "competitive") {
+    return true
+  }
+
+  const players = Object.values(room.players || {})
+  return players.length >= 2 && players.every((player) => player.ready !== false)
+}
+
+function calculateRoomPoints(wave: number, outcome: MultiplayerMatchOutcome): number {
+  const safeWave = Math.max(0, Math.floor(wave))
+
+  if (outcome === "forfeit") {
+    return -(5 + Math.min(5, Math.floor(Math.max(0, 20 - safeWave) / 4)))
+  }
+
+  return 13 + Math.min(6, Math.floor(safeWave / 10))
+}
+
+export function calculateMultiplayerPoints(params: { wave: number; forfeit?: boolean }): number {
+  return calculateRoomPoints(params.wave, params.forfeit ? "forfeit" : "finished")
+}
+
+type RoomWinner = {
+  userId: string
+  displayName: string
+  reason: "wave" | "forfeit" | "tie"
+}
+
+function determineRoomWinner(players: Record<string, MultiplayerRoomPlayer>): RoomWinner | null {
+  const resolvedPlayers = Object.values(players || {})
+  if (resolvedPlayers.length === 0) {
+    return null
+  }
+
+  const sortedPlayers = [...resolvedPlayers].sort((left, right) => {
+    const leftForfeit = typeof left.forfeitAt === "number"
+    const rightForfeit = typeof right.forfeitAt === "number"
+
+    if (leftForfeit !== rightForfeit) {
+      return leftForfeit ? 1 : -1
+    }
+
+    const waveDelta = Math.max(0, right.bestWave || 0) - Math.max(0, left.bestWave || 0)
+    if (waveDelta !== 0) {
+      return waveDelta
+    }
+
+    const leftResolvedAt = left.finishedAt || left.forfeitAt || 0
+    const rightResolvedAt = right.finishedAt || right.forfeitAt || 0
+    if (leftResolvedAt !== rightResolvedAt) {
+      return leftResolvedAt - rightResolvedAt
+    }
+
+    return left.joinedAt - right.joinedAt
+  })
+
+  const winner = sortedPlayers[0]
+  if (!winner) {
+    return null
+  }
+
+  const anyForfeit = resolvedPlayers.some((player) => typeof player.forfeitAt === "number")
+  const tiedOnWave = sortedPlayers.length > 1 && Math.max(0, sortedPlayers[0].bestWave || 0) === Math.max(0, sortedPlayers[1].bestWave || 0)
+
+  return {
+    userId: winner.userId,
+    displayName: winner.displayName,
+    reason: anyForfeit ? "forfeit" : tiedOnWave ? "tie" : "wave",
+  }
+}
+
+function finalizeFinishedRoom(room: MultiplayerRoom, finishedAt = Date.now()): MultiplayerRoom {
+  const winner = determineRoomWinner(room.players || {})
+
+  return {
+    ...room,
+    status: "finished",
+    finishedAt,
+    winnerUserId: winner?.userId,
+    winnerDisplayName: winner?.displayName,
+    winnerReason: winner?.reason,
+  }
+}
+
+function resetRoomForRematch(room: MultiplayerRoom): MultiplayerRoom {
+  return {
+    ...room,
+    status: "waiting",
+    startedAt: undefined,
+    finishedAt: undefined,
+    winnerUserId: undefined,
+    winnerDisplayName: undefined,
+    winnerReason: undefined,
+    players: Object.fromEntries(
+      Object.entries(room.players || {}).map(([id, player]) => [
+        id,
+        {
+          ...player,
+          bestWave: 0,
+          finishedAt: undefined,
+          forfeitAt: undefined,
+          ready: false,
+        },
+      ]),
+    ),
+  }
 }
 
 function generateRoomId(length = ROOM_ID_LENGTH): string {
@@ -223,6 +349,7 @@ export async function createMultiplayerRoom(params: {
           displayName: params.hostDisplayName,
           joinedAt: createdAt,
           bestWave: 0,
+          ready: false,
         },
       },
     }
@@ -362,6 +489,7 @@ export async function joinMultiplayerRoom(params: {
         displayName: params.displayName,
         joinedAt: Date.now(),
         bestWave: 0,
+        ready: false,
       },
     }
 
@@ -380,6 +508,8 @@ export async function joinMultiplayerRoom(params: {
                 ...player,
                 bestWave: 0,
                 finishedAt: undefined,
+                forfeitAt: undefined,
+                ready: true,
               },
             ]),
           )
@@ -717,6 +847,7 @@ export async function joinCompetitiveQueue(params: {
             displayName: params.displayName,
             joinedAt: now,
             bestWave: 0,
+            ready: true,
           },
         },
       }
@@ -753,6 +884,7 @@ export async function joinCompetitiveQueue(params: {
             displayName: params.displayName,
             joinedAt: now,
             bestWave: 0,
+            ready: true,
           },
         },
       }
@@ -778,6 +910,7 @@ export async function joinCompetitiveQueue(params: {
         displayName: params.displayName,
         joinedAt: now,
         bestWave: 0,
+        ready: true,
       },
     }
 
@@ -796,6 +929,8 @@ export async function joinCompetitiveQueue(params: {
                 ...player,
                 bestWave: 0,
                 finishedAt: undefined,
+                forfeitAt: undefined,
+                ready: true,
               },
             ]),
           )
@@ -844,6 +979,42 @@ export async function leaveMultiplayerRoom(roomId: string, userId: string): Prom
       return current
     }
 
+    const leavingPlayer = current.players[userId]
+
+    if (current.status === "active") {
+      if (hasPlayerResolved(leavingPlayer)) {
+        return current
+      }
+
+      const now = Date.now()
+      const nextPlayers: Record<string, MultiplayerRoomPlayer> = {
+        ...current.players,
+        [userId]: {
+          ...leavingPlayer,
+          finishedAt: leavingPlayer.finishedAt || now,
+          forfeitAt: leavingPlayer.forfeitAt || now,
+          ready: false,
+        },
+      }
+
+      const nextRoom: MultiplayerRoom = {
+        ...current,
+        players: nextPlayers,
+      }
+
+      const nextHost = Object.values(nextPlayers).find((player) => !hasPlayerResolved(player))
+      if (nextHost) {
+        nextRoom.hostUserId = nextHost.userId
+        nextRoom.hostDisplayName = nextHost.displayName
+      }
+
+      if (areAllPlayersResolved(nextPlayers)) {
+        return finalizeFinishedRoom(nextRoom, now)
+      }
+
+      return nextRoom
+    }
+
     const nextPlayers = { ...current.players }
     delete nextPlayers[userId]
 
@@ -887,13 +1058,14 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
     }
 
     const count = Object.keys(players).length
+    const allPlayersReady = areAllPlayersReady(normalizedCurrent)
 
     if (normalizedCurrent.status !== "waiting") {
       return normalizedCurrent
     }
 
     const minimumPlayers = normalizedCurrent.mode === "competitive" ? normalizedCurrent.maxPlayers : 2
-    if (count < minimumPlayers) {
+    if (count < minimumPlayers || !allPlayersReady) {
       return normalizedCurrent
     }
 
@@ -908,6 +1080,8 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
             ...player,
             bestWave: 0,
             finishedAt: undefined,
+            forfeitAt: undefined,
+            ready: true,
           },
         ]),
       ),
@@ -959,7 +1133,9 @@ export async function updateMultiplayerPlayerWave(params: {
       displayName: params.displayName,
       joinedAt: current?.joinedAt || now,
       bestWave: Math.max(currentBest, Math.max(0, params.wave)),
+      ready: current?.ready,
       finishedAt: current?.finishedAt,
+      forfeitAt: current?.forfeitAt,
     }
   })
 }
@@ -983,18 +1159,96 @@ export async function markMultiplayerPlayerFinished(params: { roomId: string; us
         ...player,
         bestWave,
         finishedAt: player.finishedAt || now,
+        ready: false,
       },
     }
 
-    const everyoneFinished = Object.values(nextPlayers).every((entry) => typeof entry.finishedAt === "number")
+    const everyoneFinished = areAllPlayersResolved(nextPlayers)
+
+    if (everyoneFinished) {
+      return finalizeFinishedRoom({ ...current, players: nextPlayers }, now)
+    }
 
     return {
       ...current,
       players: nextPlayers,
-      status: everyoneFinished ? "finished" : current.status,
-      finishedAt: everyoneFinished ? now : current.finishedAt,
+      status: current.status,
+      finishedAt: current.finishedAt,
     }
   })
+}
+
+export async function setMultiplayerPlayerReady(params: {
+  roomId: string
+  userId: string
+  ready: boolean
+}): Promise<void> {
+  const db = requireDatabase()
+  const playerRef = ref(db, `${ROOM_ROOT}/${params.roomId}/players/${params.userId}`)
+
+  await runTransaction(playerRef, (current: MultiplayerRoomPlayer | null) => {
+    if (!current) {
+      return current
+    }
+
+    if (hasPlayerResolved(current)) {
+      return current
+    }
+
+    return {
+      ...current,
+      ready: params.ready,
+    }
+  })
+}
+
+export async function requestMultiplayerRematch(params: {
+  roomId: string
+  hostUserId: string
+}): Promise<{ ok: boolean; message?: string }> {
+  const db = requireDatabase()
+  const roomRef = ref(db, `${ROOM_ROOT}/${params.roomId}`)
+
+  const transaction = await runTransaction(roomRef, (current: MultiplayerRoom | null) => {
+    if (!current) {
+      return current
+    }
+
+    if (current.status !== "finished") {
+      return current
+    }
+
+    const players = current.players || {}
+    const playerIds = Object.keys(players)
+    const normalizedHostUserId = players[current.hostUserId] ? current.hostUserId : playerIds[0] || params.hostUserId
+    const normalizedHostDisplayName = players[normalizedHostUserId]?.displayName || current.hostDisplayName
+    const normalizedCurrent: MultiplayerRoom = {
+      ...current,
+      hostUserId: normalizedHostUserId,
+      hostDisplayName: normalizedHostDisplayName,
+    }
+
+    if (normalizedCurrent.hostUserId !== params.hostUserId) {
+      return normalizedCurrent
+    }
+
+    return resetRoomForRematch(normalizedCurrent)
+  })
+
+  if (!transaction.committed) {
+    return { ok: false, message: "Nao foi possivel preparar a revanche" }
+  }
+
+  const room = transaction.snapshot.val() as MultiplayerRoom | null
+  if (!room) {
+    return { ok: false, message: "Sala nao encontrada" }
+  }
+
+  if (room.status !== "waiting") {
+    return { ok: false, message: "Nao foi possivel preparar a revanche" }
+  }
+
+  return { ok: true }
 }
 
 export function subscribeMultiplayerRoom(
@@ -1024,6 +1278,8 @@ export async function submitMonthlyLeaderboardScore(params: {
   userId: string
   displayName: string
   wave: number
+  points?: number
+  result?: MultiplayerMatchOutcome
   roomId?: string
 }): Promise<void> {
   const db = requireDatabase()
@@ -1041,8 +1297,10 @@ export async function submitMonthlyLeaderboardScore(params: {
     userId: params.userId,
     displayName: params.displayName,
     wave: Math.max(0, params.wave),
+    points: typeof params.points === "number" ? params.points : Math.max(0, params.wave),
     finishedAt: now,
     roomId: params.roomId,
+    result: params.result,
   }
 
   await set(runRef, payload)
@@ -1058,10 +1316,17 @@ export async function getMonthlyLeaderboard(monthKey: string, limitCount = 50): 
   }
 
   const values = (snapshot.val() as Record<string, unknown>) || {}
-  const entries: MonthlyLeaderboardEntry[] = Object.values(values)
-    .map((entry): MonthlyLeaderboardEntry | null => {
+  const aggregatedByUser = new Map<
+    string,
+    MonthlyLeaderboardEntry & {
+      matches: number
+      points: number
+    }
+  >()
+
+  Object.values(values).forEach((entry) => {
       if (!entry || typeof entry !== "object") {
-        return null
+        return
       }
 
       const raw = entry as Partial<MonthlyLeaderboardEntry> & {
@@ -1070,31 +1335,48 @@ export async function getMonthlyLeaderboard(monthKey: string, limitCount = 50): 
       }
 
       const wave = typeof raw.wave === "number" ? raw.wave : typeof raw.bestWave === "number" ? raw.bestWave : 0
+      const points = typeof raw.points === "number" ? raw.points : wave
       const finishedAt =
         typeof raw.finishedAt === "number" ? raw.finishedAt : typeof raw.lastUpdatedAt === "number" ? raw.lastUpdatedAt : 0
 
       if (!raw.userId || !raw.displayName) {
-        return null
+        return
       }
 
-      const normalized: MonthlyLeaderboardEntry = {
-        runId: raw.runId || `${raw.userId}-${finishedAt}`,
-        userId: raw.userId,
-        displayName: raw.displayName,
-        wave,
-        finishedAt,
+      const current = aggregatedByUser.get(raw.userId)
+      if (!current) {
+        aggregatedByUser.set(raw.userId, {
+          runId: raw.userId,
+          userId: raw.userId,
+          displayName: raw.displayName,
+          wave,
+          points,
+          finishedAt,
+          roomId: raw.roomId,
+          result: raw.result,
+          matches: 1,
+        })
+        return
       }
 
+      current.points += points
+      current.matches += 1
+      current.wave = Math.max(current.wave, wave)
+      current.finishedAt = Math.max(current.finishedAt, finishedAt)
+      current.displayName = raw.displayName || current.displayName
       if (raw.roomId) {
-        normalized.roomId = raw.roomId
+        current.roomId = raw.roomId
       }
-
-      return normalized
+      if (raw.result) {
+        current.result = raw.result
+      }
     })
-    .filter((entry): entry is MonthlyLeaderboardEntry => entry !== null)
 
-  return entries
+  return [...aggregatedByUser.values()]
     .sort((a, b) => {
+      if ((b.points || 0) !== (a.points || 0)) {
+        return (b.points || 0) - (a.points || 0)
+      }
       if (b.wave !== a.wave) {
         return b.wave - a.wave
       }

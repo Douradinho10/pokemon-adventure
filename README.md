@@ -35,6 +35,8 @@ Deploy `server/socket-server.js` to a host that keeps Node processes alive. The 
 
 If the socket server is unavailable, the app falls back to Firebase RTDB rooms.
 
+Casual multiplayer rooms now require everyone to mark ready before the host can start the run. Ranked multiplayer stores monthly points, and surrendering or closing the browser during a run counts as a loss.
+
 ## How It Works
 
 1. Create and modify your project using [v0.app](https://v0.app)

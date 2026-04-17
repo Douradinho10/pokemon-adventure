@@ -47,6 +47,178 @@ function roomPlayerCount(room) {
   return Object.keys(room.players || {}).length
 }
 
+function hasPlayerResolved(player) {
+  return typeof player?.finishedAt === "number" || typeof player?.forfeitAt === "number"
+}
+
+function areAllPlayersResolved(players) {
+  return Object.values(players || {}).every((player) => hasPlayerResolved(player))
+}
+
+function areAllPlayersReady(room) {
+  if (room.mode === "competitive") {
+    return true
+  }
+
+  const players = Object.values(room.players || {})
+  return players.length >= 2 && players.every((player) => player.ready !== false)
+}
+
+function determineRoomWinner(room) {
+  const players = Object.values(room.players || {})
+  if (players.length === 0) {
+    return null
+  }
+
+  const sortedPlayers = [...players].sort((left, right) => {
+    const leftForfeit = typeof left.forfeitAt === "number"
+    const rightForfeit = typeof right.forfeitAt === "number"
+
+    if (leftForfeit !== rightForfeit) {
+      return leftForfeit ? 1 : -1
+    }
+
+    const waveDelta = Math.max(0, right.bestWave || 0) - Math.max(0, left.bestWave || 0)
+    if (waveDelta !== 0) {
+      return waveDelta
+    }
+
+    const leftResolvedAt = left.finishedAt || left.forfeitAt || 0
+    const rightResolvedAt = right.finishedAt || right.forfeitAt || 0
+    if (leftResolvedAt !== rightResolvedAt) {
+      return leftResolvedAt - rightResolvedAt
+    }
+
+    return left.joinedAt - right.joinedAt
+  })
+
+  const winner = sortedPlayers[0]
+  if (!winner) {
+    return null
+  }
+
+  const anyForfeit = players.some((player) => typeof player.forfeitAt === "number")
+  const tiedOnWave = sortedPlayers.length > 1 && Math.max(0, sortedPlayers[0].bestWave || 0) === Math.max(0, sortedPlayers[1].bestWave || 0)
+
+  return {
+    winnerUserId: winner.userId,
+    winnerDisplayName: winner.displayName,
+    winnerReason: anyForfeit ? "forfeit" : tiedOnWave ? "tie" : "wave",
+  }
+}
+
+function finalizeFinishedRoom(room, finishedAt = Date.now()) {
+  const winner = determineRoomWinner(room)
+
+  return {
+    ...room,
+    status: "finished",
+    finishedAt,
+    winnerUserId: winner?.winnerUserId,
+    winnerDisplayName: winner?.winnerDisplayName,
+    winnerReason: winner?.winnerReason,
+  }
+}
+
+function resetRoomForRematch(room) {
+  return {
+    ...room,
+    status: "waiting",
+    startedAt: undefined,
+    finishedAt: undefined,
+    winnerUserId: undefined,
+    winnerDisplayName: undefined,
+    winnerReason: undefined,
+    players: Object.fromEntries(
+      Object.entries(room.players || {}).map(([id, player]) => [
+        id,
+        {
+          ...player,
+          bestWave: 0,
+          finishedAt: undefined,
+          forfeitAt: undefined,
+          ready: false,
+        },
+      ]),
+    ),
+  }
+}
+
+function normalizeRoomHost(room, players) {
+  const hostCandidate = players[room.hostUserId] && !hasPlayerResolved(players[room.hostUserId]) ? room.hostUserId : null
+  if (hostCandidate) {
+    return {
+      hostUserId: hostCandidate,
+      hostDisplayName: players[hostCandidate]?.displayName || room.hostDisplayName,
+    }
+  }
+
+  const nextHost = Object.values(players).find((player) => !hasPlayerResolved(player)) || Object.values(players)[0]
+  if (!nextHost) {
+    return {
+      hostUserId: room.hostUserId,
+      hostDisplayName: room.hostDisplayName,
+    }
+  }
+
+  return {
+    hostUserId: nextHost.userId,
+    hostDisplayName: nextHost.displayName,
+  }
+}
+
+function finalizePlayerDeparture(room, userId, { forfeit = false } = {}) {
+  const player = room.players?.[userId]
+  if (!player) {
+    return cloneRoom(room)
+  }
+
+  if (room.status === "waiting" && !forfeit) {
+    const nextPlayers = { ...room.players }
+    delete nextPlayers[userId]
+
+    if (Object.keys(nextPlayers).length === 0) {
+      return null
+    }
+
+    const host = normalizeRoomHost(room, nextPlayers)
+    return {
+      ...room,
+      hostUserId: host.hostUserId,
+      hostDisplayName: host.hostDisplayName,
+      players: nextPlayers,
+      status: room.status,
+    }
+  }
+
+  if (hasPlayerResolved(player)) {
+    return cloneRoom(room)
+  }
+
+  const now = Date.now()
+  const nextPlayers = {
+    ...room.players,
+    [userId]: {
+      ...player,
+      finishedAt: player.finishedAt || now,
+      forfeitAt: forfeit ? player.forfeitAt || now : player.forfeitAt,
+      ready: false,
+    },
+  }
+
+  const nextRoom = {
+    ...room,
+    players: nextPlayers,
+    ...normalizeRoomHost(room, nextPlayers),
+  }
+
+  if (areAllPlayersResolved(nextPlayers)) {
+    return finalizeFinishedRoom(nextRoom, now)
+  }
+
+  return nextRoom
+}
+
 function saveRoom(room) {
   rooms.set(room.id, {
     room: cloneRoom(room),
@@ -105,24 +277,11 @@ function removeUserFromRoom(roomId, userId) {
   }
 
   const room = entry.room
-  if (!room.players?.[userId]) {
-    return cloneRoom(room)
-  }
+  const nextRoom = finalizePlayerDeparture(room, userId, { forfeit: room.status === "active" })
 
-  const nextPlayers = { ...room.players }
-  delete nextPlayers[userId]
-
-  if (Object.keys(nextPlayers).length === 0) {
+  if (!nextRoom) {
     deleteRoom(roomId)
     return null
-  }
-
-  const nextHostUserId = nextPlayers[room.hostUserId] ? room.hostUserId : Object.keys(nextPlayers)[0]
-  const nextRoom = {
-    ...room,
-    hostUserId: nextHostUserId,
-    hostDisplayName: nextPlayers[nextHostUserId]?.displayName || room.hostDisplayName,
-    players: nextPlayers,
   }
 
   saveRoom(nextRoom)
@@ -177,6 +336,7 @@ function addPlayerToRoom(roomId, userId, displayName) {
       displayName,
       joinedAt: Date.now(),
       bestWave: 0,
+      ready: room.mode === "competitive",
     },
   }
 
@@ -193,6 +353,8 @@ function addPlayerToRoom(roomId, userId, displayName) {
               ...player,
               bestWave: 0,
               finishedAt: undefined,
+              forfeitAt: undefined,
+              ready: true,
             },
           ]),
         )
@@ -229,6 +391,7 @@ function createRoom(params) {
           displayName: params.hostDisplayName,
           joinedAt: now,
           bestWave: 0,
+          ready: params.mode === "competitive",
         },
       },
     }
@@ -449,10 +612,13 @@ io.on("connection", (socket) => {
       }
 
       const minimumPlayers = room.mode === "competitive" ? room.maxPlayers : 2
-      if (playersCount < minimumPlayers) {
+      if (playersCount < minimumPlayers || !areAllPlayersReady(room)) {
         return {
           ok: false,
-          message: room.mode === "competitive" ? `Precisas de ${room.maxPlayers} jogadores para iniciar` : "Precisas de pelo menos 2 jogadores",
+          message:
+            room.mode === "competitive"
+              ? `Precisas de ${room.maxPlayers} jogadores para iniciar`
+              : "Todos os jogadores precisam de estar prontos",
         }
       }
 
@@ -467,6 +633,8 @@ io.on("connection", (socket) => {
               ...player,
               bestWave: 0,
               finishedAt: undefined,
+              forfeitAt: undefined,
+              ready: true,
             },
           ]),
         ),
@@ -543,19 +711,91 @@ io.on("connection", (socket) => {
             ...player,
             bestWave: Math.max(player.bestWave || 0, wave),
             finishedAt: player.finishedAt || now,
+            ready: false,
           },
         },
       }
 
-      const everyoneFinished = Object.values(nextRoom.players).every((entryPlayer) => typeof entryPlayer.finishedAt === "number")
+      const everyoneFinished = areAllPlayersResolved(nextRoom.players)
       if (everyoneFinished) {
-        nextRoom.status = "finished"
-        nextRoom.finishedAt = now
+        saveRoom(finalizeFinishedRoom(nextRoom, now))
+        broadcastRoom(roomId)
+        return { ok: true }
       }
 
       saveRoom(nextRoom)
       broadcastRoom(roomId)
       return { ok: true }
+    }),
+  )
+
+  socket.on(
+    "multiplayer:room:set-ready",
+    withAck((payload) => {
+      const roomId = String(payload?.roomId || "").trim()
+      const userId = String(payload?.userId || "").trim()
+      const ready = Boolean(payload?.ready)
+
+      if (!roomId || !userId) {
+        return { ok: false, message: "Dados invalidos para atualizar o estado pronto" }
+      }
+
+      const entry = getRoomEntry(roomId)
+      if (!entry?.room?.players?.[userId]) {
+        return { ok: false, message: "Jogador nao encontrado na sala" }
+      }
+
+      const room = entry.room
+      const player = room.players[userId]
+      if (hasPlayerResolved(player)) {
+        return { ok: true }
+      }
+
+      const nextRoom = {
+        ...room,
+        players: {
+          ...room.players,
+          [userId]: {
+            ...player,
+            ready,
+          },
+        },
+      }
+
+      saveRoom(nextRoom)
+      broadcastRoom(roomId)
+      return { ok: true, room: cloneRoom(nextRoom) }
+    }),
+  )
+
+  socket.on(
+    "multiplayer:room:rematch",
+    withAck((payload) => {
+      const roomId = String(payload?.roomId || "").trim()
+      const hostUserId = String(payload?.hostUserId || "").trim()
+
+      if (!roomId || !hostUserId) {
+        return { ok: false, message: "Dados invalidos para a revanche" }
+      }
+
+      const entry = getRoomEntry(roomId)
+      if (!entry?.room) {
+        return { ok: false, message: "Sala nao encontrada" }
+      }
+
+      const room = entry.room
+      if (room.status !== "finished") {
+        return { ok: false, message: "A sala ainda nao terminou" }
+      }
+
+      if (room.hostUserId !== hostUserId) {
+        return { ok: false, message: "Apenas o host pode preparar a revanche" }
+      }
+
+      const nextRoom = resetRoomForRematch(room)
+      saveRoom(nextRoom)
+      broadcastRoom(roomId)
+      return { ok: true, room: cloneRoom(nextRoom) }
     }),
   )
 

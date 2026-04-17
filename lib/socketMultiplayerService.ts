@@ -8,8 +8,10 @@ import {
   joinMultiplayerRoom as joinLegacyMultiplayerRoom,
   leaveMultiplayerRoom as leaveLegacyMultiplayerRoom,
   markMultiplayerPlayerFinished as markLegacyMultiplayerPlayerFinished,
+  requestMultiplayerRematch as requestLegacyMultiplayerRematch,
   startMultiplayerRoom as startLegacyMultiplayerRoom,
   subscribeMultiplayerRoom as subscribeLegacyMultiplayerRoom,
+  setMultiplayerPlayerReady as setLegacyMultiplayerPlayerReady,
   updateMultiplayerPlayerWave as updateLegacyMultiplayerPlayerWave,
 } from "./multiplayerService"
 
@@ -22,7 +24,9 @@ export interface MultiplayerRoomPlayer {
   displayName: string
   joinedAt: number
   bestWave: number
+  ready?: boolean
   finishedAt?: number
+  forfeitAt?: number
 }
 
 export interface MultiplayerRoom {
@@ -36,6 +40,9 @@ export interface MultiplayerRoom {
   createdAt: number
   startedAt?: number
   finishedAt?: number
+  winnerUserId?: string
+  winnerDisplayName?: string
+  winnerReason?: "wave" | "forfeit" | "tie"
   players: Record<string, MultiplayerRoomPlayer>
 }
 
@@ -321,6 +328,51 @@ export async function markMultiplayerPlayerFinished(params: {
   }
 
   await markLegacyMultiplayerPlayerFinished(params)
+}
+
+export async function requestMultiplayerRematch(params: {
+  roomId: string
+  hostUserId: string
+}): Promise<{ ok: boolean; message?: string }> {
+  if (canUseSocketTransport()) {
+    try {
+      const response = await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:rematch", {
+        roomId: params.roomId.trim(),
+        hostUserId: params.hostUserId,
+      })
+
+      return normalizeRoomResponse(response)
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  return await requestLegacyMultiplayerRematch(params)
+}
+
+export async function setMultiplayerPlayerReady(params: {
+  roomId: string
+  userId: string
+  ready: boolean
+}): Promise<void> {
+  if (canUseSocketTransport()) {
+    try {
+      await emitWithAck<{ ok: boolean; message?: string }>("multiplayer:room:set-ready", {
+        roomId: params.roomId.trim(),
+        userId: params.userId,
+        ready: params.ready,
+      })
+      return
+    } catch (error) {
+      if (!isSocketConnectionError(error)) {
+        throw error
+      }
+    }
+  }
+
+  await setLegacyMultiplayerPlayerReady(params)
 }
 
 export function subscribeMultiplayerRoom(

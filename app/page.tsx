@@ -42,6 +42,7 @@ import {
   getCurrentMonthKey,
   getMonthlyLeaderboard,
   getSoloFarthestLeaderboard,
+  calculateMultiplayerPoints,
   submitMonthlyLeaderboardScore,
   submitSoloFarthestRun,
   type MonthlyLeaderboardEntry,
@@ -54,7 +55,9 @@ import {
   joinMultiplayerRoom,
   leaveMultiplayerRoom,
   markMultiplayerPlayerFinished,
+  requestMultiplayerRematch,
   startMultiplayerRoom,
+  setMultiplayerPlayerReady,
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
   type MultiplayerRoom,
@@ -764,6 +767,7 @@ export default function PokemonAdventure() {
   const latestGameStateRef = useRef(gameState)
   const autoActivatedCompetitiveRoomRef = useRef<string | null>(null)
   const autoStartedCompetitiveRoomRef = useRef<string | null>(null)
+  const multiplayerResultSubmittedRef = useRef<string | null>(null)
   const pendingInviteRoomIdRef = useRef<string | null>(null)
   const pendingInviteRetryCountRef = useRef(0)
   const pendingInviteRetryTimeoutRef = useRef<number | null>(null)
@@ -828,6 +832,7 @@ export default function PokemonAdventure() {
       }
 
       clearPendingInviteJoin()
+      multiplayerResultSubmittedRef.current = null
 
       if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
         setMultiplayerJoinedRoomId(null)
@@ -908,6 +913,7 @@ export default function PokemonAdventure() {
       const maxInviteAttempts = 6
 
       await leaveCurrentMultiplayerRoomIfNeeded(roomCode)
+      multiplayerResultSubmittedRef.current = null
 
       setMultiplayerBusy(true)
       setMultiplayerError(null)
@@ -1340,7 +1346,7 @@ export default function PokemonAdventure() {
       displayName: accountName,
       wave: gameState.battles,
     }).catch(() => {
-      // Ignore transient sync errors; next wave update retries.
+      return
     })
   }, [accountName, accountUserId, gameState.battles, multiplayerJoinedRoomId, multiplayerMode])
 
@@ -1354,6 +1360,7 @@ export default function PokemonAdventure() {
       await leaveCurrentMultiplayerRoomIfNeeded()
 
       clearPendingInviteJoin()
+      multiplayerResultSubmittedRef.current = null
 
       setMultiplayerBusy(true)
       setMultiplayerError(null)
@@ -1400,6 +1407,7 @@ export default function PokemonAdventure() {
               displayName: accountName,
               joinedAt: createdAt,
               bestWave: 0,
+              ready: false,
             },
           },
         })
@@ -1428,6 +1436,7 @@ export default function PokemonAdventure() {
     }
 
     clearPendingInviteJoin()
+    multiplayerResultSubmittedRef.current = null
 
     void joinMultiplayerRoomByCode(roomCode)
   }, [accountUserId, clearPendingInviteJoin, joinMultiplayerRoomByCode, multiplayerRoomCodeInput])
@@ -1441,6 +1450,7 @@ export default function PokemonAdventure() {
     await leaveCurrentMultiplayerRoomIfNeeded()
 
     clearPendingInviteJoin()
+    multiplayerResultSubmittedRef.current = null
 
     setMultiplayerBusy(true)
     setMultiplayerError(null)
@@ -1542,6 +1552,8 @@ export default function PokemonAdventure() {
 
       await leaveCurrentMultiplayerRoomIfNeeded(roomId)
 
+      multiplayerResultSubmittedRef.current = null
+
       setMultiplayerBusy(true)
       setMultiplayerError(null)
 
@@ -1582,6 +1594,7 @@ export default function PokemonAdventure() {
     }
 
     clearPendingInviteJoin()
+    multiplayerResultSubmittedRef.current = null
 
     setMultiplayerBusy(true)
     setMultiplayerError(null)
@@ -1609,6 +1622,127 @@ export default function PokemonAdventure() {
     }
   }, [accountUserId, clearPendingInviteJoin, multiplayerJoinedRoomId, showScreenNotice])
 
+  const handleToggleMultiplayerReady = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
+      return
+    }
+
+    if (multiplayerRoom.mode !== "casual" || multiplayerRoom.status !== "waiting") {
+      return
+    }
+
+    const currentPlayer = multiplayerRoom.players?.[accountUserId]
+    if (!currentPlayer || currentPlayer.finishedAt || currentPlayer.forfeitAt) {
+      return
+    }
+
+    const nextReady = !currentPlayer.ready
+
+    if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+      setMultiplayerRoom((prev) => {
+        if (!prev?.players?.[accountUserId]) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          players: {
+            ...prev.players,
+            [accountUserId]: {
+              ...prev.players[accountUserId],
+              ready: nextReady,
+            },
+          },
+        }
+      })
+      showScreenNotice(nextReady ? "Ficaste pronto para jogar." : "Desmarcaste o estado pronto.")
+      return
+    }
+
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      await setMultiplayerPlayerReady({
+        roomId: multiplayerJoinedRoomId,
+        userId: accountUserId,
+        ready: nextReady,
+      })
+      showScreenNotice(nextReady ? "Ficaste pronto para jogar." : "Desmarcaste o estado pronto.")
+    } catch (error) {
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel atualizar o estado pronto."))
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, getMultiplayerErrorMessage, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
+
+  const handleRequestMultiplayerRematch = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
+      return
+    }
+
+    if (multiplayerRoom.status !== "finished") {
+      return
+    }
+
+    if (multiplayerRoom.hostUserId !== accountUserId) {
+      setMultiplayerError("Apenas o host pode preparar a revanche.")
+      return
+    }
+
+    clearPendingInviteJoin()
+    setMultiplayerBusy(true)
+    setMultiplayerError(null)
+
+    try {
+      if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+        setMultiplayerRoom((prev) => {
+          if (!prev) {
+            return prev
+          }
+
+          return {
+            ...prev,
+            status: "waiting",
+            startedAt: undefined,
+            finishedAt: undefined,
+            winnerUserId: undefined,
+            winnerDisplayName: undefined,
+            winnerReason: undefined,
+            players: Object.fromEntries(
+              Object.entries(prev.players || {}).map(([id, player]) => [
+                id,
+                {
+                  ...player,
+                  bestWave: 0,
+                  finishedAt: undefined,
+                  forfeitAt: undefined,
+                  ready: false,
+                },
+              ]),
+            ),
+          }
+        })
+        multiplayerResultSubmittedRef.current = null
+        showScreenNotice("Revanche preparada! Marquem pronto para voltar a competir.")
+        return
+      }
+
+      const result = await requestMultiplayerRematch({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId })
+      if (!result.ok) {
+        setMultiplayerError(result.message || "Nao foi possivel preparar a revanche.")
+        return
+      }
+
+      multiplayerResultSubmittedRef.current = null
+      showScreenNotice("Revanche preparada! Marquem pronto para voltar a competir.")
+    } catch (error) {
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel preparar a revanche."))
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
+
   const handleExitMultiplayerToMainMenu = useCallback(async () => {
     clearPendingInviteJoin()
 
@@ -1625,6 +1759,15 @@ export default function PokemonAdventure() {
 
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
+      return false
+    }
+
+    const allPlayersReady = multiplayerRoom
+      ? Object.values(multiplayerRoom.players || {}).every((player) => player.ready !== false)
+      : false
+
+    if (multiplayerRoom?.mode === "casual" && multiplayerRoom.status === "waiting" && !allPlayersReady) {
+      setMultiplayerError("Todos os jogadores precisam de estar prontos antes de iniciar.")
       return false
     }
 
@@ -1652,7 +1795,7 @@ export default function PokemonAdventure() {
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountUserId, multiplayerJoinedRoomId, showScreenNotice])
+  }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
 
   useEffect(() => {
     if (!multiplayerRoom || !multiplayerJoinedRoomId) {
@@ -1704,26 +1847,33 @@ export default function PokemonAdventure() {
       currentBattle: null,
     })
 
+    multiplayerResultSubmittedRef.current = null
     setMultiplayerMode(true)
     setCurrentScreen("menu")
     setShowModal("starter")
     showScreenNotice(
       multiplayerIsCasual
         ? "Disputa casual ativa: vence quem chegar mais longe (nao conta no ranking mensal)!"
-        : "Modo multiplayer rankeado ativo: vence quem chegar mais longe!",
+        : "Modo multiplayer rankeado ativo: cada run soma pontos e desistir conta como derrota!",
     )
   }, [clearSelectedSlot, multiplayerIsCasual, multiplayerRoom, setGameState, showScreenNotice])
 
   useEffect(() => {
-    if (!multiplayerRoom || !multiplayerJoinedRoomId) {
+    if (!multiplayerRoom || !multiplayerJoinedRoomId || multiplayerMode) {
       autoStartedCompetitiveRoomRef.current = null
       return
     }
 
-    const playersCount = Object.keys(multiplayerRoom.players || {}).length
-    const lobbyIsFull = playersCount >= multiplayerRoom.maxPlayers
+    const currentPlayer = accountUserId && multiplayerRoom.players?.[accountUserId] ? multiplayerRoom.players[accountUserId] : null
 
-    if (multiplayerRoom.mode !== "competitive" || multiplayerRoom.status !== "active" || !lobbyIsFull) {
+    if (
+      multiplayerRoom.status !== "active" ||
+      !currentPlayer ||
+      currentPlayer.finishedAt ||
+      currentPlayer.forfeitAt ||
+      multiplayerRoom.players?.[accountUserId || ""]?.ready === false
+    ) {
+      autoStartedCompetitiveRoomRef.current = null
       return
     }
 
@@ -1733,7 +1883,7 @@ export default function PokemonAdventure() {
 
     autoStartedCompetitiveRoomRef.current = multiplayerJoinedRoomId
     handleStartMultiplayerRun()
-  }, [handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerRoom])
+  }, [accountUserId, handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
 
   useEffect(() => {
     const legacyCharges = Number(gameState.inventory[LEGACY_BATTLE_SIM_ITEM] || 0)
@@ -1923,83 +2073,225 @@ export default function PokemonAdventure() {
     })
   }, [gameState.playerTeam, updatePokemon, clearPokemonStatus, addLog])
 
-  const handleGameOver = () => {
-    const finalWave = Math.max(0, latestGameStateRef.current.battles)
+  const handleGameOver = useCallback(
+    (options?: { silent?: boolean; forfeit?: boolean }) => {
+      const finalWave = Math.max(0, latestGameStateRef.current.battles)
+      const shouldForfeit = Boolean(options?.forfeit)
+      const isRankedMultiplayer = Boolean(
+        multiplayerMode &&
+          accountUserId &&
+          multiplayerJoinedRoomId &&
+          !multiplayerIsCasual &&
+          !multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX),
+      )
 
-    if (multiplayerMode && accountUserId) {
-      if (!multiplayerIsCasual) {
-        submitMonthlyLeaderboardScore({
+      if (multiplayerMode && accountUserId && multiplayerJoinedRoomId) {
+        const currentRoomId = multiplayerJoinedRoomId
+        const points = calculateMultiplayerPoints({ wave: finalWave, forfeit: shouldForfeit })
+
+        if (multiplayerResultSubmittedRef.current !== currentRoomId) {
+          multiplayerResultSubmittedRef.current = currentRoomId
+
+          if (isRankedMultiplayer) {
+            submitMonthlyLeaderboardScore({
+              userId: accountUserId,
+              displayName: accountName,
+              wave: finalWave,
+              points,
+              result: shouldForfeit ? "forfeit" : "finished",
+              roomId: currentRoomId,
+            }).catch(() => {
+              // Ignore monthly submission failures to keep game flow responsive.
+            })
+          }
+
+          if (currentRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
+            setMultiplayerRoom((prev) => {
+              if (!prev || !prev.players?.[accountUserId]) {
+                return prev
+              }
+
+              const now = Date.now()
+              const currentPlayer = prev.players[accountUserId]
+              const nextPlayers = {
+                ...prev.players,
+                [accountUserId]: {
+                  ...currentPlayer,
+                  bestWave: Math.max(currentPlayer.bestWave || 0, finalWave),
+                  finishedAt: currentPlayer.finishedAt || now,
+                  forfeitAt: shouldForfeit ? currentPlayer.forfeitAt || now : currentPlayer.forfeitAt,
+                  ready: false,
+                },
+              }
+
+              const allResolved = Object.values(nextPlayers).every(
+                (player) => typeof player.finishedAt === "number" || typeof player.forfeitAt === "number",
+              )
+
+              return {
+                ...prev,
+                players: nextPlayers,
+                status: allResolved ? "finished" : prev.status,
+                finishedAt: allResolved ? now : prev.finishedAt,
+              }
+            })
+          } else if (shouldForfeit) {
+            leaveMultiplayerRoom(currentRoomId, accountUserId).catch(() => {
+              // Ignore forfeit sync failures; disconnect cleanup can still catch up.
+            })
+          } else {
+            markMultiplayerPlayerFinished({
+              roomId: currentRoomId,
+              userId: accountUserId,
+              wave: finalWave,
+            }).catch(() => {
+              // Ignore finish sync failures; room can still continue.
+            })
+          }
+        }
+
+        if (options?.silent) {
+          return
+        }
+
+        if (screenNoticeTimeoutRef.current) {
+          window.clearTimeout(screenNoticeTimeoutRef.current)
+          screenNoticeTimeoutRef.current = null
+        }
+
+        if (defeatResetTimeoutRef.current) {
+          window.clearTimeout(defeatResetTimeoutRef.current)
+          defeatResetTimeoutRef.current = null
+        }
+
+        if (defeatHideTimeoutRef.current) {
+          window.clearTimeout(defeatHideTimeoutRef.current)
+          defeatHideTimeoutRef.current = null
+        }
+
+        setDefeatAnimationVisible(false)
+        setScreenNotice(
+          shouldForfeit
+            ? "🏳️ A tua partida terminou. A sala continua aberta."
+            : `🏁 Ficaste pela wave ${finalWave}. A sala continua aberta.`,
+        )
+        clearLog()
+        setGameState({
+          playerTeam: {},
+          activePokemon: null,
+          currentEnvironment: "planicie",
+          money: 50,
+          battles: 0,
+          inventory: { Pokébola: 5, "Scanner Tático": 3 },
+          capturedPokemon: [],
+          currentBattle: null,
+        })
+        setShowModal(null)
+        setMultiplayerMode(false)
+        setCurrentScreen("multiplayer")
+        return
+      }
+
+      if (!multiplayerMode && accountUserId) {
+        submitSoloFarthestRun({
           userId: accountUserId,
           displayName: accountName,
           wave: finalWave,
-          roomId: multiplayerJoinedRoomId || undefined,
         }).catch(() => {
-          // Ignore monthly submission failures to keep game flow responsive.
+          // Ignore solo leaderboard failures to preserve game flow.
         })
       }
 
-      if (multiplayerJoinedRoomId && !multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
-        markMultiplayerPlayerFinished({
-          roomId: multiplayerJoinedRoomId,
-          userId: accountUserId,
-          wave: finalWave,
-        }).catch(() => {
-          // Ignore finish sync failures; room can still continue.
-        })
+      if (options?.silent) {
+        return
       }
+
+      setDefeatAnimationVisible(true)
+      setScreenNotice(null)
+
+      if (screenNoticeTimeoutRef.current) {
+        window.clearTimeout(screenNoticeTimeoutRef.current)
+        screenNoticeTimeoutRef.current = null
+      }
+
+      if (defeatResetTimeoutRef.current) {
+        window.clearTimeout(defeatResetTimeoutRef.current)
+      }
+      if (defeatHideTimeoutRef.current) {
+        window.clearTimeout(defeatHideTimeoutRef.current)
+      }
+
+      defeatResetTimeoutRef.current = window.setTimeout(() => {
+        deleteSaveSlot(currentSlot ?? undefined)
+
+        setGameState({
+          playerTeam: {},
+          activePokemon: null,
+          currentEnvironment: "planicie",
+          money: 50,
+          battles: 0,
+          inventory: { Pokébola: 5, "Scanner Tático": 3 },
+          capturedPokemon: [],
+          currentBattle: null,
+        })
+        clearLog()
+        setCurrentScreen("main-menu")
+        setShowModal(null)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(false)
+        multiplayerResultSubmittedRef.current = null
+        defeatResetTimeoutRef.current = null
+      }, 2300)
+
+      defeatHideTimeoutRef.current = window.setTimeout(() => {
+        setDefeatAnimationVisible(false)
+        defeatHideTimeoutRef.current = null
+      }, 3200)
+    },
+    [
+      accountName,
+      accountUserId,
+      calculateMultiplayerPoints,
+      clearLog,
+      currentSlot,
+      deleteSaveSlot,
+      leaveMultiplayerRoom,
+      markMultiplayerPlayerFinished,
+      multiplayerIsCasual,
+      multiplayerJoinedRoomId,
+      multiplayerMode,
+      submitMonthlyLeaderboardScore,
+      setGameState,
+      setMultiplayerMode,
+      setMultiplayerRoom,
+      setMultiplayerIsCasual,
+      setScreenNotice,
+      setShowModal,
+      submitSoloFarthestRun,
+    ],
+  )
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
     }
 
-    if (!multiplayerMode && accountUserId) {
-      submitSoloFarthestRun({
-        userId: accountUserId,
-        displayName: accountName,
-        wave: finalWave,
-      }).catch(() => {
-        // Ignore solo leaderboard failures to preserve game flow.
-      })
+    const handlePageExit = () => {
+      if (!multiplayerMode || !accountUserId || !multiplayerJoinedRoomId) {
+        return
+      }
+
+      void handleGameOver({ silent: true, forfeit: true })
     }
 
-    setDefeatAnimationVisible(true)
-    setScreenNotice(null)
+    window.addEventListener("pagehide", handlePageExit)
+    window.addEventListener("beforeunload", handlePageExit)
 
-    if (screenNoticeTimeoutRef.current) {
-      window.clearTimeout(screenNoticeTimeoutRef.current)
-      screenNoticeTimeoutRef.current = null
+    return () => {
+      window.removeEventListener("pagehide", handlePageExit)
+      window.removeEventListener("beforeunload", handlePageExit)
     }
-
-    if (defeatResetTimeoutRef.current) {
-      window.clearTimeout(defeatResetTimeoutRef.current)
-    }
-    if (defeatHideTimeoutRef.current) {
-      window.clearTimeout(defeatHideTimeoutRef.current)
-    }
-
-    defeatResetTimeoutRef.current = window.setTimeout(() => {
-      deleteSaveSlot(currentSlot ?? undefined)
-
-      setGameState({
-        playerTeam: {},
-        activePokemon: null,
-        currentEnvironment: "planicie",
-        money: 50,
-        battles: 0,
-        inventory: { Pokébola: 5, "Scanner Tático": 3 },
-        capturedPokemon: [],
-        currentBattle: null,
-      })
-      clearLog()
-      setCurrentScreen("main-menu")
-      setShowModal(null)
-      setMultiplayerMode(false)
-      setMultiplayerIsCasual(false)
-      defeatResetTimeoutRef.current = null
-    }, 2300)
-
-    defeatHideTimeoutRef.current = window.setTimeout(() => {
-      setDefeatAnimationVisible(false)
-      defeatHideTimeoutRef.current = null
-    }, 3200)
-  }
+  }, [accountUserId, handleGameOver, multiplayerJoinedRoomId, multiplayerMode])
 
   const handlePlayerKnockout = (pokemonName: string, nextHP = 0) => {
     const alivePokemon = Object.keys(gameState.playerTeam).filter((name) => {
@@ -3846,13 +4138,39 @@ export default function PokemonAdventure() {
     const isHost = Boolean(multiplayerRoom && accountUserId && derivedHostUserId === accountUserId)
     const lockCompetitiveTabs = Boolean(multiplayerJoinedRoomId && multiplayerRoom?.mode === "competitive")
     const roomSize = multiplayerRoom ? Object.keys(multiplayerRoom.players || {}).length : 0
+    const roomReadyCount = multiplayerRoom ? Object.values(multiplayerRoom.players || {}).filter((player) => player.ready !== false).length : 0
+    const allPlayersReady = Boolean(
+      multiplayerRoom &&
+        (multiplayerRoom.mode === "competitive" ||
+          (multiplayerRoom.status === "waiting" && roomReadyCount >= 2 && roomReadyCount === roomSize)),
+    )
+    const currentRoomPlayer = accountUserId && multiplayerRoom?.players?.[accountUserId] ? multiplayerRoom.players[accountUserId] : null
+    const currentPlayerReady = Boolean(currentRoomPlayer?.ready)
+    const currentPlayerResolved = Boolean(currentRoomPlayer?.finishedAt || currentRoomPlayer?.forfeitAt)
+    const opponentPlayers = roomPlayers.filter((player) => player.userId !== accountUserId)
+    const currentOpponent = opponentPlayers[0] || null
+    const currentPlayerRoundPoints = currentRoomPlayer
+      ? calculateMultiplayerPoints({ wave: currentRoomPlayer.bestWave, forfeit: Boolean(currentRoomPlayer.forfeitAt) })
+      : 0
+    const roomWinnerPlayer = multiplayerRoom?.winnerUserId ? multiplayerRoom.players?.[multiplayerRoom.winnerUserId] || null : null
+    const roomWinnerDisplayName = roomWinnerPlayer?.displayName || multiplayerRoom?.winnerDisplayName || null
     const roomStatusLabel = multiplayerRoom
       ? multiplayerRoom.status === "waiting"
-        ? "A aguardar jogadores"
+        ? multiplayerRoom.mode === "casual"
+          ? allPlayersReady
+            ? "Todos prontos"
+            : "A aguardar pronto"
+          : "A aguardar jogadores"
         : multiplayerRoom.status === "active"
-          ? "A decorrer"
-          : "Finalizada"
+          ? currentPlayerResolved
+            ? "A tua ronda terminou"
+            : "A decorrer"
+          : roomWinnerDisplayName
+            ? `Venceu ${roomWinnerDisplayName}`
+            : "Finalizada"
       : "Sem sala ativa"
+    const canOpenRematch = Boolean(multiplayerRoom && multiplayerRoom.status === "finished" && isHost && roomSize >= 2)
+    const roomActionGridClass = multiplayerRoom && multiplayerRoom.status === "waiting" && multiplayerRoom.mode === "casual" ? "sm:grid-cols-3" : "sm:grid-cols-2"
     const inviteUrl = multiplayerRoom ? buildMultiplayerInviteUrl(multiplayerRoom.id) : ""
     const activeRoom = multiplayerRoom!
 
@@ -4100,10 +4418,15 @@ export default function PokemonAdventure() {
                       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{roomStatusLabel}</p>
                       <p className="mt-1 text-xs text-slate-600">{isHost ? "Tu és o host" : "Ligado como convidado"}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">
+                        {activeRoom.mode === "casual"
+                          ? `${roomReadyCount}/${roomSize} prontos`
+                          : "Fila competitiva automática"}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className={`mt-4 grid gap-2 ${roomActionGridClass}`}>
                     <Button
                       onClick={handleLeaveMultiplayerRoom}
                       disabled={multiplayerBusy}
@@ -4111,23 +4434,100 @@ export default function PokemonAdventure() {
                     >
                       Sair do Grupo
                     </Button>
+                    {activeRoom.mode === "casual" && activeRoom.status === "waiting" && (
+                      <Button
+                        onClick={handleToggleMultiplayerReady}
+                        disabled={multiplayerBusy}
+                        className={`pixel-menu-button h-11 ${currentPlayerReady ? "bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        {currentPlayerReady ? "Desmarcar pronto" : "Estou pronto"}
+                      </Button>
+                    )}
                     {activeRoom.mode === "casual" && (
                       <Button
                         onClick={handleStartMultiplayerRoom}
-                        disabled={multiplayerBusy || !isHost || activeRoom.status !== "waiting"}
+                        disabled={multiplayerBusy || !isHost || activeRoom.status !== "waiting" || !allPlayersReady}
                         className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
                       >
-                        Iniciar Grupo
+                        {allPlayersReady ? "Iniciar Grupo" : "A aguardar pronto"}
                       </Button>
                     )}
-                    <Button
-                      onClick={handleStartMultiplayerRun}
-                      disabled={multiplayerBusy || activeRoom.status !== "active"}
-                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                    >
-                      Jogar Run Multiplayer
-                    </Button>
+                    {activeRoom.mode === "casual" && activeRoom.status === "active" && !currentPlayerResolved && (
+                      <Button
+                        onClick={handleStartMultiplayerRun}
+                        disabled={multiplayerBusy || activeRoom.status !== "active"}
+                        className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      >
+                        Jogar Run Multiplayer
+                      </Button>
+                    )}
                   </div>
+
+                  {currentRoomPlayer && (currentPlayerResolved || activeRoom.status === "finished") && (
+                    <section className="mt-4 rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#fff7ed_100%)] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                            {activeRoom.status === "finished" ? "Resultado da ronda" : "A tua ronda terminou"}
+                          </p>
+                          <h3 className="mt-1 font-pixel text-sm text-slate-900">
+                            {activeRoom.status === "finished"
+                              ? roomWinnerDisplayName
+                                ? `${roomWinnerDisplayName} venceu a ronda`
+                                : "Ronda concluída"
+                              : currentRoomPlayer.forfeitAt
+                                ? "Perdeste por desistência"
+                                : `Ficaste pela wave ${currentRoomPlayer.bestWave}`}
+                          </h3>
+                        </div>
+                        <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
+                          {currentRoomPlayer.forfeitAt
+                            ? "Derrota"
+                            : currentRoomPlayer.finishedAt
+                              ? "Terminaste"
+                              : "Em jogo"}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">A tua wave</p>
+                          <p className="mt-1 text-2xl font-black text-slate-900">Wave {currentRoomPlayer.bestWave}</p>
+                          <p className="mt-1 text-xs font-semibold text-slate-600">
+                            Pontos desta ronda: {currentPlayerRoundPoints >= 0 ? "+" : ""}{currentPlayerRoundPoints}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Adversário</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{currentOpponent?.displayName || "A aguardar"}</p>
+                          <p className="mt-1 text-2xl font-black text-slate-900">Wave {currentOpponent?.bestWave || 0}</p>
+                          <p className="mt-1 text-xs font-semibold text-slate-600">
+                            {activeRoom.status === "active" ? "A partida continua" : "Partida concluída"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {activeRoom.status === "finished" ? (
+                        canOpenRematch ? (
+                          <Button
+                            onClick={handleRequestMultiplayerRematch}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button mt-3 h-11 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Revanche
+                          </Button>
+                        ) : (
+                          <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                            A aguardar o host preparar a revanche.
+                          </p>
+                        )
+                      ) : (
+                        <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                          A tua ronda terminou. O adversário continua a correr até cair.
+                        </p>
+                      )}
+                    </section>
+                  )}
                 </section>
               )}
 
@@ -4162,9 +4562,34 @@ export default function PokemonAdventure() {
                             </div>
                             <div className="text-[11px] text-slate-600">Entrou há {Math.max(0, Math.round((Date.now() - player.joinedAt) / 1000))}s</div>
                           </div>
-                          <span className="rounded-full border-2 border-slate-900 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
-                            Wave {player.bestWave}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className={`rounded-full border-2 border-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                                player.forfeitAt
+                                  ? "bg-rose-100 text-rose-800"
+                                  : player.finishedAt
+                                    ? "bg-sky-100 text-sky-800"
+                                    : multiplayerRoom.status === "waiting"
+                                      ? player.ready
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-amber-100 text-amber-800"
+                                      : "bg-white text-slate-700"
+                              }`}
+                            >
+                              {player.forfeitAt
+                                ? "Desistiu"
+                                : player.finishedAt
+                                  ? "Terminou"
+                                  : multiplayerRoom.status === "waiting"
+                                    ? player.ready
+                                      ? "Pronto"
+                                      : "A aguardar"
+                                    : "A jogar"}
+                            </span>
+                            <span className="rounded-full border-2 border-slate-900 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                              Wave {player.bestWave}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -4187,14 +4612,17 @@ export default function PokemonAdventure() {
                       </div>
                       <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">2</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">Entrar e sincronizar</p>
-                        <p className="mt-1 text-xs text-slate-600">O Socket.io envia o estado da sala em tempo real.</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">Marcar pronto</p>
+                        <p className="mt-1 text-xs text-slate-600">Cada jogador marca pronto antes do host iniciar a run.</p>
                       </div>
                       <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">3</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">Começar a run</p>
-                        <p className="mt-1 text-xs text-slate-600">Quando a sala estiver pronta, a partida arranca.</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">Iniciar a run</p>
+                        <p className="mt-1 text-xs text-slate-600">O host inicia quando toda a sala estiver pronta.</p>
                       </div>
+                    </div>
+                    <div className="mt-3 rounded-2xl border-2 border-slate-900 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                      No modo rankeado, fechar o browser ou desistir durante a run conta como derrota.
                     </div>
                   </section>
                 </>
@@ -4255,7 +4683,9 @@ export default function PokemonAdventure() {
     const placementLabel = !accountUserId
       ? "Faz login para ver a tua colocacao."
       : selectedEntries.length === 0
-        ? "Sem runs registadas neste modo ainda."
+        ? leaderboardViewMode === "multiplayer"
+          ? "Sem pontos registados neste modo ainda."
+          : "Sem runs registadas neste modo ainda."
         : playerPlacementIndex >= 0
           ? `A tua colocacao atual: #${playerPlacementIndex + 1}`
           : "Ainda nao apareces no Top 100 deste modo."
@@ -4325,7 +4755,7 @@ export default function PokemonAdventure() {
             <div className="space-y-2">
               {leaderboardEntries.length === 0 && (
                 <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-sm text-slate-700">
-                  Ainda sem pontuacoes para {leaderboardMonth}.
+                  Ainda sem pontos para {leaderboardMonth}.
                 </p>
               )}
 
@@ -4335,8 +4765,8 @@ export default function PokemonAdventure() {
                     <span className="font-black">#{index + 1}</span> {entry.displayName}
                   </div>
                   <div className="text-right text-xs font-black text-slate-700">
-                    <div>Wave {entry.wave}</div>
-                    <div className="text-[10px] font-semibold text-slate-500">Run individual</div>
+                    <div>Pontos {(entry.points ?? entry.wave).toFixed(0)}</div>
+                    <div className="text-[10px] font-semibold text-slate-500">Melhor wave {entry.wave}{entry.matches ? ` · ${entry.matches} partidas` : ""}</div>
                   </div>
                 </div>
               ))}
@@ -4434,7 +4864,7 @@ export default function PokemonAdventure() {
         onClick={() => {
           if (multiplayerMode) {
             showScreenNotice("🏳️ Desististe da run multiplayer.")
-            handleGameOver()
+            handleGameOver({ forfeit: true })
             return
           }
 
