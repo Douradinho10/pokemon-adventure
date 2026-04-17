@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Link2, MessageSquare, ShieldCheck, Sparkles, Trophy, User, Users } from "lucide-react"
+import { MessageSquare, ShieldCheck, Sparkles, Trophy, User, Users } from "lucide-react"
 import { onAuthStateChanged } from "firebase/auth"
 import { useLocalGameState } from "../hooks/useLocalGameState"
 import {
@@ -50,9 +51,9 @@ import {
 } from "../lib/multiplayerService"
 import {
   createMultiplayerRoom,
-  getPublicCasualLobbies,
   joinCompetitiveQueue,
   joinMultiplayerRoom,
+  getPublicCasualLobbies,
   leaveMultiplayerRoom,
   markMultiplayerPlayerFinished,
   requestMultiplayerRematch,
@@ -62,8 +63,8 @@ import {
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
   type MultiplayerRoom,
-  type MultiplayerRoomVisibility,
   type PublicCasualLobbySummary,
+  type MultiplayerRoomVisibility,
 } from "../lib/socketMultiplayerService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import type { StatusCondition } from "../hooks/useGameState"
@@ -288,18 +289,6 @@ function normalizeMultiplayerRoomCode(rawValue: string): string {
   }
 
   return trimmed
-}
-
-function buildMultiplayerInviteUrl(roomId: string): string {
-  if (typeof window === "undefined") {
-    return roomId
-  }
-
-  const inviteUrl = new URL(window.location.href)
-  inviteUrl.searchParams.set("room", roomId)
-  inviteUrl.searchParams.delete("from")
-  inviteUrl.hash = ""
-  return inviteUrl.toString()
 }
 
 const getEffectiveSpeed = (speed = 50, statusCondition?: StatusCondition | null) => {
@@ -696,7 +685,7 @@ const getRandomWildPokemonForEnvironmentWithType = (
   return environmentPool[0] || getRandomWildPokemon(battleCount)
 }
 
-export default function PokemonAdventure() {
+export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
   const {
     gameState,
     updateGameState,
@@ -715,8 +704,9 @@ export default function PokemonAdventure() {
 
   const addLog = useCallback((_message: string) => {}, [])
   const clearLog = useCallback(() => {}, [])
+  const router = useRouter()
 
-  const [currentScreen, setCurrentScreen] = useState<Screen>("main-menu")
+  const [currentScreen, setCurrentScreen] = useState<Screen>(initialScreen)
   const [showModal, setShowModal] = useState<Modal>(null)
   const [isAnimating, setIsAnimating] = useState(false)
   const [attackToReplace, setAttackToReplace] = useState<string | null>(null)
@@ -742,9 +732,10 @@ export default function PokemonAdventure() {
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
   const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
   const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("private")
-  const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
   const [publicCasualLobbies, setPublicCasualLobbies] = useState<PublicCasualLobbySummary[]>([])
-  const [publicCasualLoading, setPublicCasualLoading] = useState(false)
+  const [publicCasualLobbiesLoading, setPublicCasualLobbiesLoading] = useState(false)
+  const [publicCasualLobbiesError, setPublicCasualLobbiesError] = useState<string | null>(null)
+  const [competitiveQueueSize, setCompetitiveQueueSize] = useState<2 | 3>(2)
   const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
   const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
   const [multiplayerMode, setMultiplayerMode] = useState(false)
@@ -965,8 +956,9 @@ export default function PokemonAdventure() {
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
         setMultiplayerSection("casual")
+        setCasualLobbyVisibility("private")
         setMultiplayerRoomCodeInput(roomCode)
-        showScreenNotice("Entraste no grupo por convite!")
+        showScreenNotice("Entraste no grupo por codigo!")
         return true
       } catch (error) {
         setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo."))
@@ -983,32 +975,31 @@ export default function PokemonAdventure() {
       return
     }
 
-    const inviteUrl = buildMultiplayerInviteUrl(multiplayerRoom.id)
+    const roomCode = multiplayerRoom.id
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         await navigator.share({
           title: "Pokemon Adventure",
-          text: `Entra no meu grupo multiplayer: ${inviteUrl}`,
-          url: inviteUrl,
+          text: `Entra no meu grupo multiplayer: ${roomCode}`,
         })
-        showScreenNotice("Convite partilhado.")
+        showScreenNotice("Codigo partilhado.")
         return
       }
 
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(inviteUrl)
-        showScreenNotice("Link do grupo copiado.")
+        await navigator.clipboard.writeText(roomCode)
+        showScreenNotice("Codigo do grupo copiado.")
         return
       }
 
-      setMultiplayerError("O navegador nao suporta partilhar este convite.")
+      setMultiplayerError("O navegador nao suporta partilhar este codigo.")
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return
       }
 
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel partilhar o convite."))
+      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel partilhar o codigo."))
     }
   }, [getMultiplayerErrorMessage, multiplayerRoom, showScreenNotice])
 
@@ -1261,6 +1252,52 @@ export default function PokemonAdventure() {
     }
   }, [accountUserId, getMultiplayerErrorMessage, multiplayerJoinedRoomId])
 
+  const refreshPublicCasualLobbies = useCallback(async () => {
+    if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || casualLobbyVisibility !== "public" || multiplayerJoinedRoomId) {
+      return
+    }
+
+    setPublicCasualLobbiesLoading(true)
+
+    try {
+      const lobbies = await getPublicCasualLobbies(24)
+      setPublicCasualLobbies(lobbies)
+      setPublicCasualLobbiesError(null)
+    } catch (error) {
+      setPublicCasualLobbies([])
+      setPublicCasualLobbiesError(getMultiplayerErrorMessage(error, "Nao foi possivel carregar os lobbies publicos."))
+    } finally {
+      setPublicCasualLobbiesLoading(false)
+    }
+  }, [casualLobbyVisibility, currentScreen, getMultiplayerErrorMessage, multiplayerJoinedRoomId, multiplayerSection])
+
+  useEffect(() => {
+    if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || casualLobbyVisibility !== "public" || multiplayerJoinedRoomId) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadPublicLobbies = async () => {
+      if (cancelled) {
+        return
+      }
+
+      await refreshPublicCasualLobbies()
+    }
+
+    void loadPublicLobbies()
+
+    const interval = window.setInterval(() => {
+      void loadPublicLobbies()
+    }, 10000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [casualLobbyVisibility, currentScreen, multiplayerJoinedRoomId, multiplayerSection, refreshPublicCasualLobbies])
+
   useEffect(() => {
     if (currentScreen !== "leaderboards") {
       return
@@ -1383,7 +1420,8 @@ export default function PokemonAdventure() {
         setMultiplayerRoomCodeInput(room.id)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
-        showScreenNotice(`Grupo criado! Convite: ${room.id}`)
+        setCasualLobbyVisibility(visibility)
+        showScreenNotice(`Grupo criado! Codigo: ${room.id}`)
       } catch (error) {
         if (visibility === "public") {
           setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel criar o grupo agora. Verifica o Firebase e tenta novamente."))
@@ -1417,6 +1455,7 @@ export default function PokemonAdventure() {
         setMultiplayerRoomCodeInput(localCode)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(true)
+        setCasualLobbyVisibility(visibility)
         setMultiplayerError("Grupo criado em modo local. O realtime do Firebase esta indisponivel agora.")
         showScreenNotice(`Grupo local criado! Codigo: ${localCode}`)
       } finally {
@@ -1441,14 +1480,43 @@ export default function PokemonAdventure() {
     clearPendingInviteJoin()
     multiplayerResultSubmittedRef.current = null
 
+    setCurrentScreen("multiplayer")
+    setMultiplayerSection("casual")
+    setCasualLobbyVisibility("private")
+    setMultiplayerMode(false)
+    setMultiplayerIsCasual(true)
+
     void joinMultiplayerRoomByCode(roomCode)
   }, [accountUserId, clearPendingInviteJoin, joinMultiplayerRoomByCode, multiplayerRoomCodeInput])
+
+  const handleJoinPublicCasualLobby = useCallback(
+    async (roomId: string) => {
+      if (!roomId) {
+        return
+      }
+
+      setCurrentScreen("multiplayer")
+      setMultiplayerSection("casual")
+      setCasualLobbyVisibility("public")
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(true)
+      setMultiplayerRoomCodeInput(roomId)
+      await joinMultiplayerRoomByCode(roomId)
+      setCasualLobbyVisibility("public")
+    },
+    [joinMultiplayerRoomByCode],
+  )
 
   const handleEnterCompetitiveMatch = useCallback(async (maxPlayers: 2 | 3) => {
     if (!accountUserId) {
       setMultiplayerError("Faz login para entrar em competitivo.")
       return
     }
+
+    setCurrentScreen("multiplayer")
+    setMultiplayerSection("competitive")
+    setMultiplayerMode(false)
+    setMultiplayerIsCasual(false)
 
     await leaveCurrentMultiplayerRoomIfNeeded()
 
@@ -1490,28 +1558,6 @@ export default function PokemonAdventure() {
     }
   }, [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, showScreenNotice])
 
-  const refreshPublicCasualLobbies = useCallback(async () => {
-    setPublicCasualLoading(true)
-    try {
-      const lobbies = await getPublicCasualLobbies(30)
-      setPublicCasualLobbies(lobbies)
-      if (multiplayerError && multiplayerError.includes("lobbies")) {
-        setMultiplayerError(null)
-      }
-    } catch (error) {
-      setPublicCasualLobbies([])
-      setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel carregar os grupos publicos agora."))
-    } finally {
-      setPublicCasualLoading(false)
-    }
-  }, [getMultiplayerErrorMessage, multiplayerError])
-
-  useEffect(() => {
-    if (currentScreen !== "multiplayer" || multiplayerSection !== "casual" || Boolean(multiplayerJoinedRoomId)) {
-      return
-    }
-  }, [currentScreen, multiplayerJoinedRoomId, multiplayerSection])
-
   useEffect(() => {
     const pendingInviteRoomId = pendingInviteRoomIdRef.current
     if (!pendingInviteRoomId || isAuthChecking || !accountUserId) {
@@ -1536,51 +1582,6 @@ export default function PokemonAdventure() {
       }
     }
   }, [])
-
-  const handleJoinPublicCasualLobby = useCallback(
-    async (roomId: string) => {
-      if (!accountUserId) {
-        setMultiplayerError("Faz login para entrar num grupo multiplayer.")
-        return
-      }
-
-      await leaveCurrentMultiplayerRoomIfNeeded(roomId)
-
-      multiplayerResultSubmittedRef.current = null
-
-      setMultiplayerBusy(true)
-      setMultiplayerError(null)
-
-      try {
-        const result = await joinMultiplayerRoom({
-          roomId,
-          userId: accountUserId,
-          displayName: accountName,
-        })
-
-        if (!result.ok) {
-          setMultiplayerError(result.message || "Nao foi possivel entrar no grupo.")
-          refreshPublicCasualLobbies()
-          return
-        }
-
-        setMultiplayerJoinedRoomId(roomId)
-        if (result.room) {
-          setMultiplayerRoom(result.room)
-        }
-        setMultiplayerMode(false)
-        setMultiplayerIsCasual(true)
-        setMultiplayerSection("casual")
-        showScreenNotice("Entraste no grupo!")
-      } catch (error) {
-        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo."))
-        refreshPublicCasualLobbies()
-      } finally {
-        setMultiplayerBusy(false)
-      }
-    },
-    [accountName, accountUserId, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, refreshPublicCasualLobbies, showScreenNotice],
-  )
 
   const handleLeaveMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId) {
@@ -1791,6 +1792,19 @@ export default function PokemonAdventure() {
 
     if (multiplayerJoinedRoomId) {
       await handleLeaveMultiplayerRoom()
+      if (gameState.activePokemon) {
+        clearLog()
+        setGameState({
+          playerTeam: {},
+          activePokemon: null,
+          currentEnvironment: "planicie",
+          money: 50,
+          battles: 0,
+          inventory: { Pokébola: 5, "Scanner Tático": 3 },
+          capturedPokemon: [],
+          currentBattle: null,
+        })
+      }
       setMultiplayerJoinedRoomId(null)
       setMultiplayerRoom(null)
       setMultiplayerMode(false)
@@ -1798,18 +1812,17 @@ export default function PokemonAdventure() {
     }
 
     setCurrentScreen("main-menu")
-  }, [clearPendingInviteJoin, handleLeaveMultiplayerRoom, multiplayerJoinedRoomId])
+    router.push("/")
+  }, [clearLog, clearPendingInviteJoin, gameState.activePokemon, handleLeaveMultiplayerRoom, multiplayerJoinedRoomId, router, setGameState])
 
   const handleStartMultiplayerRoom = useCallback(async () => {
-    if (!multiplayerJoinedRoomId || !accountUserId) {
+    if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
       return false
     }
 
-    const allPlayersReady = multiplayerRoom
-      ? Object.values(multiplayerRoom.players || {}).every((player) => player.ready !== false)
-      : false
+    const allPlayersReady = Object.values(multiplayerRoom.players || {}).every((player) => player.ready !== false)
 
-    if (multiplayerRoom?.status === "waiting" && !allPlayersReady) {
+    if (multiplayerRoom.status === "waiting" && !allPlayersReady) {
       setMultiplayerError("Todos os jogadores precisam de estar prontos antes de iniciar.")
       return false
     }
@@ -1819,8 +1832,19 @@ export default function PokemonAdventure() {
 
     try {
       if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
-        setMultiplayerRoom((prev) => (prev ? { ...prev, status: "active", startedAt: Date.now() } : prev))
-        showScreenNotice("Disputa local iniciada!")
+        setMultiplayerRoom((prev) => {
+          if (!prev) {
+            return prev
+          }
+
+          return {
+            ...prev,
+            status: "active",
+            startedAt: Date.now(),
+          }
+        })
+
+        showScreenNotice("Disputa iniciada! Cada jogador pode comecar a run multiplayer.")
         return true
       }
 
@@ -2168,22 +2192,22 @@ export default function PokemonAdventure() {
                 },
               }
 
-                  if (shouldForfeit) {
-                    const winnerPlayer =
-                      Object.values(nextPlayers).find((player) => player.userId !== accountUserId && !player.forfeitAt) ||
-                      Object.values(nextPlayers).find((player) => player.userId !== accountUserId) ||
-                      null
+              if (shouldForfeit) {
+                const winnerPlayer =
+                  Object.values(nextPlayers).find((player) => player.userId !== accountUserId && !player.forfeitAt) ||
+                  Object.values(nextPlayers).find((player) => player.userId !== accountUserId) ||
+                  null
 
-                    return {
-                      ...prev,
-                      players: nextPlayers,
-                      status: "finished",
-                      finishedAt: now,
-                      winnerUserId: winnerPlayer?.userId,
-                      winnerDisplayName: winnerPlayer?.displayName,
-                      winnerReason: "forfeit",
-                    }
-                  }
+                return {
+                  ...prev,
+                  players: nextPlayers,
+                  status: "finished",
+                  finishedAt: now,
+                  winnerUserId: winnerPlayer?.userId,
+                  winnerDisplayName: winnerPlayer?.displayName,
+                  winnerReason: "forfeit",
+                }
+              }
 
               const allResolved = Object.values(nextPlayers).every(
                 (player) => typeof player.finishedAt === "number" || typeof player.forfeitAt === "number",
@@ -2197,8 +2221,41 @@ export default function PokemonAdventure() {
               }
             })
           } else if (shouldForfeit) {
+            setMultiplayerRoom((prev) => {
+              if (!prev || !prev.players?.[accountUserId]) {
+                return prev
+              }
+
+              const now = Date.now()
+              const currentPlayer = prev.players[accountUserId]
+              const nextPlayers = {
+                ...prev.players,
+                [accountUserId]: {
+                  ...currentPlayer,
+                  bestWave: Math.max(currentPlayer.bestWave || 0, finalWave),
+                  finishedAt: currentPlayer.finishedAt || now,
+                  forfeitAt: currentPlayer.forfeitAt || now,
+                  ready: false,
+                },
+              }
+
+              const winnerPlayer =
+                Object.values(nextPlayers).find((player) => player.userId !== accountUserId && !player.forfeitAt) ||
+                Object.values(nextPlayers).find((player) => player.userId !== accountUserId) ||
+                null
+
+              return {
+                ...prev,
+                players: nextPlayers,
+                status: "finished",
+                finishedAt: now,
+                winnerUserId: winnerPlayer?.userId,
+                winnerDisplayName: winnerPlayer?.displayName,
+                winnerReason: "forfeit",
+              }
+            })
             leaveMultiplayerRoom(currentRoomId, accountUserId).catch(() => {
-              // Ignore forfeit sync failures; disconnect cleanup can still catch up.
+              // Ignore forfeit sync failures; the local lobby already has the final result.
             })
           } else {
             markMultiplayerPlayerFinished({
@@ -2235,23 +2292,27 @@ export default function PokemonAdventure() {
           shouldVictory
             ? "🏆 O adversário desistiu. Venceste a ronda!"
             : shouldForfeit
-            ? "🏳️ A tua partida terminou. A sala continua aberta."
+            ? "🏳️ A tua partida terminou. O resultado está no lobby."
             : `🏁 Ficaste pela wave ${finalWave}. A sala continua aberta.`,
         )
-        clearLog()
-        setGameState({
-          playerTeam: {},
-          activePokemon: null,
-          currentEnvironment: "planicie",
-          money: 50,
-          battles: 0,
-          inventory: { Pokébola: 5, "Scanner Tático": 3 },
-          capturedPokemon: [],
-          currentBattle: null,
-        })
         setShowModal(null)
         setMultiplayerMode(false)
         setCurrentScreen("multiplayer")
+
+        if (!shouldForfeit) {
+          clearLog()
+          setGameState({
+            playerTeam: {},
+            activePokemon: null,
+            currentEnvironment: "planicie",
+            money: 50,
+            battles: 0,
+            inventory: { Pokébola: 5, "Scanner Tático": 3 },
+            capturedPokemon: [],
+            currentBattle: null,
+          })
+        }
+
         return
       }
 
@@ -3992,7 +4053,7 @@ export default function PokemonAdventure() {
   )
 
   const renderMainMenu = () => (
-    <div className="relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden py-2">
+    <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-2 overflow-hidden py-1 sm:py-2">
       <div className="pointer-events-none absolute inset-0 opacity-70">
         <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
         <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
@@ -4022,39 +4083,36 @@ export default function PokemonAdventure() {
           </Button>
         </div>
       </div>
-      <div className="pixel-surface relative z-10 w-full max-w-3xl bg-[#f8f4dc]/95 p-5 text-center space-y-3">
+      <div className="pixel-surface relative z-10 w-full max-w-3xl space-y-2 bg-[#f8f4dc]/95 p-4 text-center sm:space-y-3 sm:p-5">
         <h2 className="font-pixel text-2xl leading-[1.5] text-slate-900 sm:text-4xl">
           Pokémon
           <span className="mt-2 block text-lg text-slate-600 sm:text-2xl">Adventure</span>
         </h2>
-        <p className="mx-auto max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-3 text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)]">Bem-vindo à tua jornada Pokémon.</p>
+        <p className="mx-auto max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:py-3">
+          Bem-vindo à tua jornada Pokémon.
+        </p>
         <p className="text-slate-500 text-xs pixel-text leading-relaxed">
           📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
         </p>
       </div>
 
       <div className="flex w-full max-w-md flex-col gap-3">
-        <Button
-          onClick={() => setCurrentScreen("solo-menu")}
-          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-        >
-          🎮 Modo Solo
+        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+          <Link href="/solo">🎮 Modo Solo</Link>
         </Button>
 
-        <Button
-          onClick={() => setCurrentScreen("multiplayer")}
-          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-        >
-          <Users className="mr-2 h-4 w-4" />
-          Modo Multiplayer
+        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+          <Link href="/multiplayer">
+            <Users className="mr-2 h-4 w-4" />
+            Modo Multiplayer
+          </Link>
         </Button>
 
-        <Button
-          onClick={() => setCurrentScreen("leaderboards")}
-          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-        >
-          <Trophy className="mr-2 h-4 w-4" />
-          Ver Tabelas
+        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+          <Link href="/leaderboards">
+            <Trophy className="mr-2 h-4 w-4" />
+            Ver Tabelas
+          </Link>
         </Button>
       </div>
 
@@ -4062,18 +4120,18 @@ export default function PokemonAdventure() {
   )
 
   const renderSoloModeScreen = () => (
-    <div className="space-y-4">
-      <div className="pixel-window bg-[#f8f4dc] p-5">
+    <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-3 overflow-hidden md:h-[calc(100dvh-2rem)]">
+      <div className="pixel-window flex-1 min-h-0 bg-[#f8f4dc] p-4">
         <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Modo Solo</h2>
-        <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700">
+        <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700 sm:text-base">
           O competitivo solo e o jogo normal: tenta ir o mais longe possivel em cada run.
         </p>
 
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex flex-col gap-2 sm:gap-3">
           {saveSlots.some((slot) => slot.gameState?.activePokemon) && (
             <Button
               onClick={() => setCurrentScreen("select-continue")}
-              className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#0891b2_50%,#0891b2_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
+              className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#0891b2_50%,#0891b2_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-14 sm:text-sm"
             >
               Continuar Run Solo
             </Button>
@@ -4081,18 +4139,15 @@ export default function PokemonAdventure() {
 
           <Button
             onClick={() => setCurrentScreen("select-slot")}
-            className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:text-sm"
+            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-14 sm:text-sm"
           >
             Novo Jogo Solo
           </Button>
         </div>
       </div>
 
-      <Button
-        onClick={() => setCurrentScreen("main-menu")}
-        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-      >
-        Voltar
+      <Button asChild className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-12 sm:text-xs">
+        <Link href="/">Voltar</Link>
       </Button>
     </div>
   )
@@ -4114,7 +4169,7 @@ export default function PokemonAdventure() {
         <div className="pixel-window bg-[#f8f4dc] p-5">
           <h2 className="font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Arena Multiplayer</h2>
           <p className="mt-2 border-4 border-slate-800 bg-white/80 px-3 py-2 text-sm text-slate-700">
-            Estilo simples: cria uma sala por código, marca pronto e começa. Sem lista pública e com o competitivo a usar a mesma lógica.
+            Estilo simples: usa lobbies públicos no casual ou entra por código em privado. O competitivo segue a fila própria.
           </p>
 
           <div className={`mt-4 grid gap-2 ${lockCompetitiveTabs ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -4172,7 +4227,7 @@ export default function PokemonAdventure() {
                       <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala por código</h3>
                     </div>
                     <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
-                      Sem lista pública
+                      Privado
                     </Badge>
                   </div>
 
@@ -4211,7 +4266,7 @@ export default function PokemonAdventure() {
                   </div>
 
                   <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                    Partilha o código com quem vai jogar. Cada jogador marca pronto e o host inicia a partida.
+                      Partilha o código e começa quando todos estiverem prontos.
                   </p>
                 </div>
               )}
@@ -4220,34 +4275,6 @@ export default function PokemonAdventure() {
 
           {multiplayerJoinedRoomId && multiplayerRoom && (
             <div className="mt-4 space-y-3 rounded-xl border-4 border-slate-800 bg-white/80 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-pixel text-xs text-slate-900 sm:text-sm">
-                  {multiplayerRoom.mode === "casual" ? "Grupo" : "Sala"}: {multiplayerJoinedRoomId}
-                </p>
-                <Badge className="pixel-badge bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
-                  {multiplayerRoom.status === "waiting" ? "Aguardando" : multiplayerRoom.status === "active" ? "Ativa" : "Finalizada"}
-                </Badge>
-              </div>
-              <p className="text-xs font-semibold text-slate-600">Modo da disputa: {multiplayerRoom.mode === "casual" ? "Casual" : "Competitivo"}</p>
-
-              {multiplayerRoom.mode === "casual" && (
-                <div className="rounded-xl border-2 border-emerald-700 bg-emerald-50 px-3 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-800">Convite do grupo</p>
-                      <p className="mt-1 break-all text-xs text-slate-700">{buildMultiplayerInviteUrl(multiplayerRoom.id)}</p>
-                    </div>
-                    <Button
-                      onClick={() => void handleShareMultiplayerInvite()}
-                      disabled={multiplayerBusy}
-                      className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#25d366_0%,#25d366_50%,#128c7e_50%,#128c7e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px]"
-                    >
-                      Partilhar convite
-                    </Button>
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-2">
                 {roomPlayers.map((player, index) => (
                   <div key={player.userId} className="flex items-center justify-between rounded-lg border-2 border-slate-700 bg-slate-50 px-3 py-2">
@@ -4359,32 +4386,40 @@ export default function PokemonAdventure() {
         (multiplayerRoom.mode === "competitive" || isHost),
     )
     const roomActionGridClass = multiplayerRoom && multiplayerRoom.status === "waiting" ? (multiplayerRoom.mode === "casual" && isHost ? "sm:grid-cols-3" : "sm:grid-cols-2") : "sm:grid-cols-1"
-    const inviteUrl = multiplayerRoom ? buildMultiplayerInviteUrl(multiplayerRoom.id) : ""
     const activeRoom = multiplayerRoom!
 
     return (
-      <div className="space-y-4">
-        <div className="overflow-hidden rounded-[28px] border-4 border-slate-900 bg-[linear-gradient(135deg,#ecfeff_0%,#ecfdf5_46%,#fff7ed_100%)] shadow-[10px_10px_0_rgba(15,23,42,0.16)]">
-          <div className="border-b-4 border-slate-900 px-5 py-5 sm:px-6">
+      <div className="flex h-[calc(100dvh-1.5rem)] flex-col overflow-hidden md:h-[calc(100dvh-2rem)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border-4 border-slate-900 bg-[linear-gradient(135deg,#ecfeff_0%,#ecfdf5_46%,#fff7ed_100%)] shadow-[10px_10px_0_rgba(15,23,42,0.16)]">
+          <div className="border-b-4 border-slate-900 px-3 py-3 sm:px-4 sm:py-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="max-w-3xl space-y-2">
+              <div className="max-w-3xl space-y-1 sm:space-y-2">
                 <div className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-900">
                   <Sparkles className="h-3.5 w-3.5" />
                   Socket.io
                 </div>
-                <h2 className="font-pixel text-2xl leading-tight text-slate-900 sm:text-4xl">Arena Multiplayer</h2>
-                <p className="max-w-2xl text-sm leading-relaxed text-slate-700">
-                  Cria uma sala por código, marca pronto e começa. O Socket.io mantém a sala viva em tempo real sem lobbies públicos.
+                <h2 className="font-pixel text-2xl leading-tight text-slate-900 sm:text-3xl">Arena Multiplayer</h2>
+                <p className="max-w-2xl text-xs leading-relaxed text-slate-700 sm:text-sm">
+                  Sala curta, pronta e sem excesso. Entra, marca pronto e começa.
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-2">
-                <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#10b981_0%,#10b981_50%,#059669_50%,#059669_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
-                  {multiplayerBusy ? "A sincronizar" : "Ligado"}
-                </Badge>
-                <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
-                  {roomStatusLabel}
-                </Badge>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#10b981_0%,#10b981_50%,#059669_50%,#059669_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
+                    {multiplayerBusy ? "A sincronizar" : "Ligado"}
+                  </Badge>
+                  <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
+                    {roomStatusLabel}
+                  </Badge>
+                  <Button
+                    onClick={handleExitMultiplayerToMainMenu}
+                    disabled={multiplayerBusy}
+                    className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                  >
+                    Menu
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -4412,11 +4447,11 @@ export default function PokemonAdventure() {
             </div>
           </div>
 
-          <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-            <div className="space-y-4">
+          <div className={`grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 ${multiplayerRoom ? "xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"}`}>
+            <div className="min-h-0 space-y-2 overflow-hidden sm:space-y-3">
               {!multiplayerJoinedRoomId ? (
                 multiplayerSection === "competitive" ? (
-                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Matchmaking automático</p>
@@ -4427,7 +4462,7 @@ export default function PokemonAdventure() {
                       </Badge>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-2 gap-2">
                       <Button
                         onClick={() => setCompetitiveQueueSize(2)}
                         className={`pixel-menu-button h-10 ${competitiveQueueSize === 2 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
@@ -4445,7 +4480,7 @@ export default function PokemonAdventure() {
                     <Button
                       onClick={() => handleEnterCompetitiveMatch(competitiveQueueSize)}
                       disabled={multiplayerBusy}
-                      className="pixel-menu-button mt-3 h-12 w-full bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      className="pixel-menu-button mt-3 h-11 w-full bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-12 sm:text-xs"
                     >
                       Entrar na Fila Competitiva ({competitiveQueueSize})
                     </Button>
@@ -4455,111 +4490,180 @@ export default function PokemonAdventure() {
                     </p>
                   </section>
                 ) : (
-                  <>
-                    <section className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_100%)] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Casual</p>
-                          <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala por código</h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => setCasualLobbyVisibility("public")}
+                        className={`pixel-menu-button h-11 ${casualLobbyVisibility === "public" ? "bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        Público
+                      </Button>
+                      <Button
+                        onClick={() => setCasualLobbyVisibility("private")}
+                        className={`pixel-menu-button h-11 ${casualLobbyVisibility === "private" ? "bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                      >
+                        Privado
+                      </Button>
+                    </div>
+
+                    {casualLobbyVisibility === "public" ? (
+                      <section className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_100%)] p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Casual público</p>
+                            <h3 className="mt-1 font-pixel text-sm text-slate-900">Lobbies abertos</h3>
+                          </div>
+                          <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
+                            Lista viva
+                          </Badge>
                         </div>
-                        <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
-                          Sem lista pública
-                        </Badge>
-                      </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <Button
-                          onClick={() => handleCreateMultiplayerRoom(2)}
-                          disabled={multiplayerBusy}
-                          className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                        >
-                          Criar sala 2 jogadores
-                        </Button>
-                        <Button
-                          onClick={() => handleCreateMultiplayerRoom(3)}
-                          disabled={multiplayerBusy}
-                          className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                        >
-                          Criar sala 3 jogadores
-                        </Button>
-                      </div>
+                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <Button
+                            onClick={() => handleCreateMultiplayerRoom(2, "public")}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Criar lobby público 2
+                          </Button>
+                          <Button
+                            onClick={() => handleCreateMultiplayerRoom(3, "public")}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Criar lobby público 3
+                          </Button>
+                        </div>
 
-                      <div className="mt-4 space-y-2">
-                        <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Código da sala</label>
-                        <input
-                          value={multiplayerRoomCodeInput}
-                          onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
-                          placeholder="ABC12 ou link"
-                          className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                        />
-                        <Button
-                          onClick={handleJoinMultiplayerRoom}
-                          disabled={multiplayerBusy}
-                          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                        >
-                          Entrar por código
-                        </Button>
-                      </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-slate-700">Entra num lobby aberto ou cria um novo.</p>
+                          <Button
+                            onClick={() => void refreshPublicCasualLobbies()}
+                            disabled={publicCasualLobbiesLoading}
+                            className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Atualizar
+                          </Button>
+                        </div>
 
-                      <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
-                        Partilha o código com quem vai jogar. Cada jogador marca pronto e o host inicia a partida.
-                      </p>
-                    </section>
-                  </>
+                        {publicCasualLobbiesError && (
+                          <p className="mt-3 rounded-2xl border-2 border-red-700 bg-red-100 px-3 py-2 text-xs font-semibold text-red-900">
+                            {publicCasualLobbiesError}
+                          </p>
+                        )}
+
+                        {publicCasualLobbiesLoading ? (
+                          <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                            A carregar lobbies públicos...
+                          </p>
+                        ) : publicCasualLobbies.length === 0 ? (
+                          <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                            Sem lobbies públicos abertos agora.
+                          </p>
+                        ) : (
+                          <div className="mt-3 max-h-[min(34vh,18rem)] space-y-2 overflow-y-auto pr-1">
+                            {publicCasualLobbies.map((lobby) => (
+                              <div key={lobby.id} className="flex items-center justify-between gap-2 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                                <div>
+                                  <div className="text-sm font-semibold text-slate-900">{lobby.hostDisplayName}</div>
+                                  <div className="text-xs text-slate-600">
+                                    Sala {lobby.id} · {lobby.playersCount}/{lobby.maxPlayers}
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={() => void handleJoinPublicCasualLobby(lobby.id)}
+                                  disabled={multiplayerBusy}
+                                  className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                                >
+                                  Entrar
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    ) : (
+                      <section className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#eff6ff_0%,#f8fafc_100%)] p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Casual privado</p>
+                            <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala por código</h3>
+                          </div>
+                          <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
+                            Só código
+                          </Badge>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <Button
+                            onClick={() => handleCreateMultiplayerRoom(2, "private")}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Criar sala privada 2
+                          </Button>
+                          <Button
+                            onClick={() => handleCreateMultiplayerRoom(3, "private")}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Criar sala privada 3
+                          </Button>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Código da sala</label>
+                          <input
+                            value={multiplayerRoomCodeInput}
+                            onChange={(event) => setMultiplayerRoomCodeInput(event.target.value)}
+                            placeholder="ABC12"
+                            className="w-full rounded-xl border-4 border-slate-800 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                          />
+                          <Button
+                            onClick={handleJoinMultiplayerRoom}
+                            disabled={multiplayerBusy}
+                            className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                          >
+                            Entrar por código
+                          </Button>
+                        </div>
+
+                        <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                          Sala privada: usa só o código. Sem link.
+                        </p>
+                      </section>
+                    )}
+                  </div>
                 )
               ) : (
-                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Convite ativo</p>
-                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Sala ligada</h3>
+                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
+                  <div className="mt-1 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                          {activeRoom.mode === "casual" ? (activeRoom.visibility === "public" ? "Lobby público" : "Lobby privado") : "Sala competitiva"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900 break-all">Código {multiplayerJoinedRoomId}</p>
+                      </div>
+                      <span className="rounded-full border-2 border-slate-900 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                        {roomSize}/{activeRoom.maxPlayers}
+                      </span>
                     </div>
-                    <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%)] px-3 py-1 text-white">
-                      {activeRoom.mode === "casual" ? "Grupo" : "Sala"}
-                    </Badge>
-                  </div>
 
-                  <div className="mt-3 break-all rounded-2xl border-2 border-slate-900 bg-slate-50 p-3 text-xs text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
-                    {inviteUrl}
-                  </div>
-
-                  {activeRoom.mode === "casual" && (
-                    <Button
-                      onClick={() => void handleShareMultiplayerInvite()}
-                      disabled={multiplayerBusy}
-                      className="pixel-menu-button mt-3 h-10 w-full bg-[linear-gradient(180deg,#25d366_0%,#25d366_50%,#128c7e_50%,#128c7e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-                    >
-                      Partilhar convite
-                    </Button>
-                  )}
-
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Sala</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900 break-all">{multiplayerJoinedRoomId}</p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {activeRoom.mode === "casual" ? "Grupo casual" : "Competitivo"} · {roomSize}/{activeRoom.maxPlayers}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{roomStatusLabel}</p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {activeRoom.mode === "competitive"
-                          ? "Lobby automático"
-                          : isHost
-                            ? "Tu és o host"
-                            : "Ligado como convidado"}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-600">
-                        {`${roomReadyCount}/${roomSize} prontos`}
-                      </p>
-                    </div>
+                    {activeRoom.mode === "casual" && activeRoom.visibility === "private" && (
+                      <Button
+                        onClick={() => void handleShareMultiplayerInvite()}
+                        disabled={multiplayerBusy}
+                        className="pixel-menu-button mt-3 h-9 w-full bg-[linear-gradient(180deg,#25d366_0%,#25d366_50%,#128c7e_50%,#128c7e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      >
+                        Partilhar código
+                      </Button>
+                    )}
                   </div>
 
                   {activeRoom.mode === "competitive" ? (
                     <div className="mt-3 rounded-2xl border-2 border-slate-900 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">
-                      Starter automático: roleta inicial para toda a sala.
+                      Starter automático para toda a sala.
                     </div>
                   ) : activeRoom.status === "waiting" && isHost ? (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-slate-900 bg-amber-50 px-3 py-2">
@@ -4608,7 +4712,7 @@ export default function PokemonAdventure() {
                   </div>
 
                   {currentRoomPlayer && (currentPlayerResolved || activeRoom.status === "finished") && (
-                    <section className="mt-4 rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#fff7ed_100%)] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                    <section className="mt-3 rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#fff7ed_100%)] p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
@@ -4633,7 +4737,7 @@ export default function PokemonAdventure() {
                         </Badge>
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">A tua wave</p>
                           <p className="mt-1 text-2xl font-black text-slate-900">Wave {currentRoomPlayer.bestWave}</p>
@@ -4656,7 +4760,7 @@ export default function PokemonAdventure() {
                           <Button
                             onClick={handleRequestMultiplayerRematch}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button mt-3 h-11 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button mt-3 h-10 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-11 sm:text-xs"
                           >
                             Revanche
                           </Button>
@@ -4676,16 +4780,16 @@ export default function PokemonAdventure() {
               )}
 
               {multiplayerError && (
-                <p className="rounded-2xl border-2 border-red-700 bg-red-100 px-4 py-3 text-xs font-semibold text-red-900 shadow-[4px_4px_0_rgba(185,28,28,0.14)]">
+                <p className="rounded-2xl border-2 border-red-700 bg-red-100 px-4 py-2 text-xs font-semibold text-red-900 shadow-[4px_4px_0_rgba(185,28,28,0.14)] sm:py-3">
                   {multiplayerError}
                 </p>
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {multiplayerRoom ? (
                 <>
-                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Pessoas online</p>
@@ -4696,15 +4800,14 @@ export default function PokemonAdventure() {
                       </Badge>
                     </div>
 
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-3 space-y-2">
                       {roomPlayers.map((player, index) => (
-                        <div key={player.userId} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                        <div key={player.userId} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
                           <div>
                             <div className="text-sm font-semibold text-slate-900">
                               {index + 1}. {player.displayName}
                               {derivedHostUserId === player.userId ? " (Host)" : ""}
                             </div>
-                            <div className="text-[11px] text-slate-600">Entrou há {Math.max(0, Math.round((Date.now() - player.joinedAt) / 1000))}s</div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span
@@ -4739,81 +4842,25 @@ export default function PokemonAdventure() {
                     </div>
                   </section>
 
-                  <section className="rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#ffffff_0%,#ecfeff_100%)] p-4 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 text-slate-700" />
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Estado do grupo</p>
-                        <h3 className="mt-1 font-pixel text-sm text-slate-900">Pronto para jogar</h3>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">1</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">Partilhar link</p>
-                        <p className="mt-1 text-xs text-slate-600">O grupo abre por convite ou código.</p>
-                      </div>
-                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">2</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">Marcar pronto</p>
-                        <p className="mt-1 text-xs text-slate-600">Cada jogador marca pronto antes do host iniciar a run.</p>
-                      </div>
-                      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">3</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">Iniciar a run</p>
-                        <p className="mt-1 text-xs text-slate-600">O host inicia quando toda a sala estiver pronta.</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 rounded-2xl border-2 border-slate-900 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                      No modo rankeado, fechar o browser ou desistir durante a run conta como derrota.
-                    </div>
-                  </section>
                 </>
               ) : (
-                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-5 shadow-[6px_6px_0_rgba(15,23,42,0.12)]">
+                <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-slate-700" />
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Guia rápido</p>
-                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Como funciona</h3>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Lobby curto</p>
+                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Sem sala ativa</h3>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">1</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">Cria ou encontra um grupo</p>
-                      <p className="mt-1 text-xs text-slate-600">Casual para convidar amigos, competitivo para fila automática.</p>
-                    </div>
-                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">2</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">Partilha o link</p>
-                      <p className="mt-1 text-xs text-slate-600">Quem recebe o convite entra com um toque.</p>
-                    </div>
-                    <div className="rounded-2xl border-2 border-slate-900 bg-slate-50 p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">3</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">Sincroniza a run</p>
-                      <p className="mt-1 text-xs text-slate-600">O estado da sala mantém-se actualizado sem refresh manual.</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border-2 border-slate-900 bg-[linear-gradient(180deg,#f8fafc_0%,#ecfeff_100%)] p-4 text-sm text-slate-700">
-                    O Socket.io substitui a fila frágil e as salas presas. Cada grupo é autoritativo no servidor e os jogadores entram pela mesma fonte de verdade.
-                  </div>
+                  <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                    Cria uma sala ou entra por código. O competitivo usa a mesma lógica e não depende de host.
+                  </p>
                 </section>
               )}
             </div>
           </div>
         </div>
-
-        <Button
-          onClick={handleExitMultiplayerToMainMenu}
-          disabled={multiplayerBusy}
-          className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-        >
-          Voltar ao Menu Principal
-        </Button>
       </div>
     )
   }
@@ -4835,8 +4882,8 @@ export default function PokemonAdventure() {
           : "Ainda nao apareces no Top 100 deste modo."
 
     return (
-    <div className="space-y-4">
-      <div className="pixel-window bg-[#f8f4dc] p-5">
+      <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-3 overflow-hidden md:h-[calc(100dvh-2rem)]">
+      <div className="pixel-window flex-1 min-h-0 bg-[#f8f4dc] p-4">
         <div className="mb-3 flex items-center gap-2">
           <Trophy className="h-5 w-5 text-amber-700" />
           <h3 className="font-pixel text-base text-slate-900 sm:text-xl">Tabelas De Classificacao</h3>
@@ -4858,8 +4905,8 @@ export default function PokemonAdventure() {
         </div>
 
         {leaderboardViewMode === "solo" ? (
-          <div>
-            <div className="space-y-2">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
             {soloLeaderboardEntries.length === 0 && (
               <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-sm text-slate-700">
                 Ainda sem runs solo registadas.
@@ -4880,7 +4927,7 @@ export default function PokemonAdventure() {
             </div>
           </div>
         ) : (
-          <div>
+          <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Mes</label>
               <select
@@ -4896,7 +4943,7 @@ export default function PokemonAdventure() {
               </select>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
               {leaderboardEntries.length === 0 && (
                 <p className="rounded-lg border-2 border-slate-700 bg-white/80 px-3 py-2 text-sm text-slate-700">
                   Ainda sem pontos para {leaderboardMonth}.
@@ -4919,28 +4966,25 @@ export default function PokemonAdventure() {
         )}
       </div>
 
-      <div className="pixel-window bg-[#f8f4dc] p-4">
+      <div className="pixel-window bg-[#f8f4dc] p-3">
         <p className="text-center text-sm font-black text-slate-800">{placementLabel}</p>
       </div>
 
-      <Button
-        onClick={() => setCurrentScreen("main-menu")}
-        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
-      >
-        Voltar
+      <Button asChild className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-12 sm:text-xs">
+        <Link href="/">Voltar</Link>
       </Button>
     </div>
     )
   }
 
   const renderGameMenu = () => (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col gap-3 overflow-hidden md:h-[calc(100dvh-2rem)]">
       {gameState.activePokemon && statusBar}
-      <div className="pixel-window bg-[#f8f4dc] p-5">
+      <div className="pixel-window flex-1 min-h-0 bg-[#f8f4dc] p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="mb-3 font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Centro Do Treinador</h2>
-            <p className="pixel-band bg-white/80 px-3 py-2 text-sm text-slate-600">Escolhe a tua próxima ação como num menu de aventura Pokémon.</p>
+            <h2 className="mb-2 font-pixel text-lg leading-relaxed text-slate-900 sm:text-2xl">Centro Do Treinador</h2>
+            <p className="pixel-band bg-white/80 px-3 py-2 text-xs text-slate-600 sm:text-sm">Escolhe a tua próxima ação como num menu de aventura Pokémon.</p>
             <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-600">
               Ambiente atual: {environmentLabels[(gameState.currentEnvironment as BattleEnvironment) || "planicie"]}
             </p>
@@ -4971,24 +5015,24 @@ export default function PokemonAdventure() {
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <Button
           onClick={startBattle}
-          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#dc2626_50%,#dc2626_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#dc2626_50%,#dc2626_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-16 sm:text-xs"
           disabled={isAnimating}
         >
           ⚔️ Batalhar
         </Button>
         <Button
           onClick={() => setCurrentScreen("shop")}
-          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-16 sm:text-xs"
           disabled={isAnimating}
         >
           🏪 Loja
         </Button>
         <Button
           onClick={() => setShowModal("team")}
-          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-16 sm:text-xs"
           disabled={isAnimating}
         >
           👥 Equipe
@@ -4998,7 +5042,7 @@ export default function PokemonAdventure() {
             setInventoryTab("pokeballs")
             setShowModal("inventory")
           }}
-          className="pixel-menu-button h-16 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#c026d3_50%,#c026d3_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+          className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#c026d3_50%,#c026d3_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-16 sm:text-xs"
           disabled={isAnimating}
         >
           🎒 Inventário
@@ -5014,7 +5058,7 @@ export default function PokemonAdventure() {
 
           returnToMenu()
         }}
-        className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        className="pixel-menu-button mt-auto h-11 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-12 sm:text-xs"
       >
         {multiplayerMode ? "🏳️ Desistir da Run" : "🏠 Voltar ao Menu"}
       </Button>
@@ -5305,11 +5349,11 @@ export default function PokemonAdventure() {
   )
 
   const renderSelectSlotScreen = () => (
-    <div className="flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center py-4">
+    <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col items-center justify-center gap-3 overflow-hidden md:h-[calc(100dvh-2rem)]">
       {renderSelectSlotModal()}
       <Button
         onClick={() => setCurrentScreen("main-menu")}
-        className="pixel-menu-button mt-5 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        className="pixel-menu-button mt-3 h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:mt-4 sm:h-12 sm:text-xs"
       >
         🏠 Voltar ao Menu
       </Button>
@@ -5317,11 +5361,11 @@ export default function PokemonAdventure() {
   )
 
   const renderSelectContinueScreen = () => (
-    <div className="flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center py-4">
+    <div className="flex h-[calc(100dvh-1.5rem)] min-h-0 flex-col items-center justify-center gap-3 overflow-hidden md:h-[calc(100dvh-2rem)]">
       {renderSelectContinueModal()}
       <Button
         onClick={() => setCurrentScreen("main-menu")}
-        className="pixel-menu-button mt-5 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+        className="pixel-menu-button mt-3 h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:mt-4 sm:h-12 sm:text-xs"
       >
         🏠 Voltar ao Menu
       </Button>
@@ -6387,4 +6431,8 @@ export default function PokemonAdventure() {
       </div>
     </div>
   )
+}
+
+export default function PokemonAdventure() {
+  return <PokemonAdventureApp />
 }
