@@ -4053,7 +4053,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   )
 
   const renderMainMenu = () => (
-    <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-2 overflow-hidden py-1 sm:py-2">
+    <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden py-1 sm:gap-2 sm:py-2">
       <div className="pointer-events-none absolute inset-0 opacity-70">
         <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
         <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
@@ -4074,32 +4074,32 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         <div className="flex justify-end">
           <Button
             asChild
-            className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+            className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2.5 text-[9px] leading-relaxed sm:text-[10px]"
           >
             <Link href="/perfil" aria-label="Abrir perfil">
-              <User className="mr-2 h-4 w-4" />
+                <User className="mr-2 h-3.5 w-3.5" />
               {accountName}
             </Link>
           </Button>
         </div>
       </div>
-      <div className="pixel-surface relative z-10 w-full max-w-3xl overflow-hidden bg-[#f8f4dc]/95 p-4 text-center sm:p-5">
+        <div className="pixel-surface relative z-10 w-full max-w-2xl overflow-hidden bg-[#f8f4dc]/95 p-3 text-center sm:p-4">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_70%)]" />
-        <div className="pointer-events-none absolute left-3 top-4 h-14 w-14 rounded-full bg-rose-300/30 blur-2xl" />
-        <div className="pointer-events-none absolute right-3 top-6 h-14 w-14 rounded-full bg-cyan-300/30 blur-2xl" />
+          <div className="pointer-events-none absolute left-3 top-4 h-12 w-12 rounded-full bg-rose-300/30 blur-2xl" />
+          <div className="pointer-events-none absolute right-3 top-6 h-12 w-12 rounded-full bg-cyan-300/30 blur-2xl" />
 
-        <div className="relative mx-auto mb-3 grid h-28 max-w-2xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-2 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-36 sm:gap-2 sm:p-3">
+          <div className="relative mx-auto mb-2 grid h-24 max-w-xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[22px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-1.5 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-28 sm:gap-2 sm:p-2">
           <motion.div
             animate={{ y: [0, -8, 0], rotate: [-6, -2, -6] }}
             transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
             className="relative flex items-center justify-center"
           >
             <div className="absolute inset-x-3 bottom-1 h-4 rounded-full bg-rose-300/50 blur-xl" />
-            <AnimatedSprite
-              sprite="https://play.pokemonshowdown.com/sprites/gen5/charizard.png"
-              size="md"
-              className="sm:scale-110"
-            />
+              <AnimatedSprite
+                sprite="https://play.pokemonshowdown.com/sprites/gen5/charizard.png"
+                size="sm"
+                className="sm:scale-105"
+              />
           </motion.div>
 
           <motion.div
@@ -4107,11 +4107,11 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             className="relative flex items-center justify-center"
           >
-            <div className="absolute inset-2 rounded-full bg-yellow-300/60 blur-3xl animate-pulse" />
+              <div className="absolute inset-2 rounded-full bg-yellow-300/60 blur-3xl animate-pulse" />
             <AnimatedSprite
               sprite="https://play.pokemonshowdown.com/sprites/gen5/pikachu.png"
-              size="lg"
-              className="sm:scale-110"
+                size="md"
+                className="sm:scale-105"
             />
           </motion.div>
 
@@ -4121,46 +4121,46 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             className="relative flex items-center justify-center"
           >
             <div className="absolute inset-x-3 bottom-1 h-4 rounded-full bg-cyan-300/50 blur-xl" />
-            <AnimatedSprite
-              sprite="https://play.pokemonshowdown.com/sprites/gen5/blastoise.png"
-              size="md"
-              className="sm:scale-110"
-            />
+              <AnimatedSprite
+                sprite="https://play.pokemonshowdown.com/sprites/gen5/blastoise.png"
+                size="sm"
+                className="sm:scale-105"
+              />
           </motion.div>
         </div>
 
-        <h2 className="font-pixel text-2xl leading-[1.5] text-slate-900 sm:text-4xl">
+        <h2 className="font-pixel text-xl leading-[1.35] text-slate-900 sm:text-3xl">
           Pokémon
-          <span className="mt-2 block text-lg text-slate-600 sm:text-2xl">Adventure</span>
+          <span className="mt-1 block text-base text-slate-600 sm:text-xl">Adventure</span>
         </h2>
-        <p className="mx-auto mt-3 max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:py-3">
+        <p className="mx-auto mt-2 max-w-lg border-4 border-slate-800 bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:px-4 sm:py-2 sm:text-sm">
           Bem-vindo à tua jornada Pokémon.
         </p>
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700 sm:text-[11px]">
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Batalha</span>
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Captura</span>
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Multiplayer</span>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-700 sm:text-[10px]">
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Batalha</span>
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Captura</span>
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Multiplayer</span>
         </div>
-        <p className="mt-3 text-slate-500 text-xs pixel-text leading-relaxed">
+        <p className="mt-2 text-slate-500 text-[10px] pixel-text leading-relaxed sm:text-xs">
           📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
         </p>
       </div>
 
-      <div className="flex w-full max-w-md flex-col gap-3">
-        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+      <div className="flex w-full max-w-sm flex-col gap-2.5">
+        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
           <Link href="/solo">🎮 Modo Solo</Link>
         </Button>
 
-        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
           <Link href="/multiplayer">
-            <Users className="mr-2 h-4 w-4" />
+            <Users className="mr-2 h-3.5 w-3.5" />
             Modo Multiplayer
           </Link>
         </Button>
 
-        <Button asChild className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-14 sm:text-xs">
+        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
           <Link href="/leaderboards">
-            <Trophy className="mr-2 h-4 w-4" />
+            <Trophy className="mr-2 h-3.5 w-3.5" />
             Ver Tabelas
           </Link>
         </Button>
