@@ -703,6 +703,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const addLog = useCallback((_message: string) => {}, [])
   const clearLog = useCallback(() => {}, [])
   const router = useRouter()
+  const [viewportCategory, setViewportCategory] = useState<"compact" | "standard" | "wide">("standard")
 
   const [currentScreen, setCurrentScreen] = useState<Screen>(initialScreen)
   const [showModal, setShowModal] = useState<Modal>(null)
@@ -765,6 +766,30 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const pendingInviteRetryCountRef = useRef(0)
   const pendingInviteRetryTimeoutRef = useRef<number | null>(null)
   const random = useCallback((min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min, [])
+
+  useEffect(() => {
+    const updateViewportCategory = () => {
+      if (typeof window === "undefined") {
+        return
+      }
+
+      const width = window.innerWidth
+      const height = window.innerHeight
+      const nextViewportCategory = width < 1100 || height < 820 ? "compact" : width >= 1600 && height >= 900 ? "wide" : "standard"
+
+      setViewportCategory(nextViewportCategory)
+      document.documentElement.dataset.viewportSize = nextViewportCategory
+    }
+
+    updateViewportCategory()
+    window.addEventListener("resize", updateViewportCategory)
+    window.addEventListener("orientationchange", updateViewportCategory)
+
+    return () => {
+      window.removeEventListener("resize", updateViewportCategory)
+      window.removeEventListener("orientationchange", updateViewportCategory)
+    }
+  }, [])
 
   const delay = useCallback((ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)), [])
 
@@ -4051,7 +4076,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   )
 
   const renderMainMenu = () => (
-    <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden py-1 sm:gap-2 sm:py-2">
+    <div className="main-menu-shell relative flex h-full min-h-0 flex-col items-center justify-center gap-1 overflow-hidden py-1 sm:gap-2 sm:py-2">
       <div className="pointer-events-none absolute inset-0 opacity-70">
         <div className="absolute left-6 top-8 h-10 w-10 border-4 border-slate-800 bg-yellow-300" />
         <div className="absolute right-8 top-20 h-14 w-14 border-4 border-slate-800 bg-emerald-400" />
@@ -4075,18 +4100,18 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2.5 text-[9px] leading-relaxed sm:text-[10px]"
           >
             <Link href="/perfil" aria-label="Abrir perfil">
-                <User className="mr-2 h-3.5 w-3.5" />
+              <User className="mr-2 h-3.5 w-3.5" />
               {accountName}
             </Link>
           </Button>
         </div>
       </div>
-        <div className="pixel-surface relative z-10 w-full max-w-2xl overflow-hidden bg-[#f8f4dc]/95 p-2.5 text-center sm:p-3">
+      <div className="main-menu-card pixel-surface relative z-10 w-full max-w-2xl overflow-hidden bg-[#f8f4dc]/95 p-2.5 text-center sm:p-3">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_70%)]" />
-          <div className="pointer-events-none absolute left-3 top-4 h-12 w-12 rounded-full bg-rose-300/30 blur-2xl" />
-          <div className="pointer-events-none absolute right-3 top-6 h-12 w-12 rounded-full bg-cyan-300/30 blur-2xl" />
+        <div className="pointer-events-none absolute left-3 top-4 h-12 w-12 rounded-full bg-rose-300/30 blur-2xl" />
+        <div className="pointer-events-none absolute right-3 top-6 h-12 w-12 rounded-full bg-cyan-300/30 blur-2xl" />
 
-          <div className="relative mx-auto mb-2 grid h-[5.5rem] max-w-xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[22px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-1.5 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-28 sm:gap-2 sm:p-2">
+        <div className="main-menu-stage relative mx-auto mb-2 grid h-[5.5rem] max-w-xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[22px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-1.5 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-28 sm:gap-2 sm:p-2">
           <motion.div
             animate={{ y: [0, -8, 0], rotate: [-6, -2, -6] }}
             transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
@@ -4127,16 +4152,16 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           </motion.div>
         </div>
 
-        <h2 className="font-pixel text-xl leading-[1.35] text-slate-900 sm:text-3xl">
+        <h2 className="main-menu-title font-pixel text-xl leading-[1.35] text-slate-900 sm:text-3xl">
           Pokémon
-          <span className="mt-1 block text-base text-slate-600 sm:text-xl">Adventure</span>
+          <span className="main-menu-subtitle mt-1 block text-base text-slate-600 sm:text-xl">Adventure</span>
         </h2>
         <p className="mx-auto mt-2 max-w-lg border-4 border-slate-800 bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:px-4 sm:py-2 sm:text-sm">
           Bem-vindo à tua jornada Pokémon.
         </p>
       </div>
 
-      <div className="mt-2.5 flex w-full max-w-sm flex-col gap-2 sm:mt-3">
+      <div className="main-menu-actions mt-2.5 flex w-full max-w-sm flex-col gap-2 sm:mt-3">
         <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
           <Link href="/solo">🎮 Modo Solo</Link>
         </Button>
@@ -6449,7 +6474,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           </div>
         </div>
       )}
-      <div className="max-w-5xl mx-auto">
+      <div className="game-shell max-w-5xl mx-auto" data-viewport-size={viewportCategory}>
         <div
           className={`transition-all duration-500 ${isAnimating ? "opacity-50" : "opacity-100"} ${
             currentScreen === "battle" ? "h-[calc(100dvh-1.5rem)] overflow-hidden" : currentScreen === "main-menu" ? "h-full overflow-hidden" : ""
