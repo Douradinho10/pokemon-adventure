@@ -15,12 +15,21 @@ import {
   pokeballs,
   calculateHP,
   calculateAttackPower,
+  calculateBattleSpeed,
+  createBattleStatStages,
+  createPokemonIVs,
+  applyBattleStatChanges,
+  getBattleStatStageMultiplier,
+  resolvePokemonIVs,
   getEvolutionForPokemon,
   getPokemonBattleTemplate,
   getLevelUpMoveForPokemon,
   getLearnableMovesForPokemon,
   getLegalBattleAttacksForPokemon,
   getMoveStatusEffect,
+  getMoveBattleEffect,
+  getMoveHitChance,
+  getPokemonDefenseDamageMultiplier,
   wildPokemonStats,
   getRandomWildPokemon,
   getDamageMultiplier,
@@ -67,7 +76,7 @@ import {
   type MultiplayerRoomVisibility,
 } from "../lib/socketMultiplayerService"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
-import type { StatusCondition } from "../hooks/useGameState"
+import type { BattleStatStageKey, BattleStatStages, PokemonIVs, StatusCondition } from "../hooks/useGameState"
 
 type Screen =
   | "main-menu"
@@ -88,6 +97,7 @@ type Modal =
   | "capture-success"
   | "switch"
   | "team"
+  | "ivs"
   | "heal"
   | "inventory"
   | "evolution"
@@ -137,6 +147,7 @@ type NextEncounterPreview = {
   enemyType: string
   enemyDisplayType: string
   enemyAttacks: Record<string, [number, number]>
+  enemyIVs: PokemonIVs
   isImpostor: boolean
   isShiny: boolean
 }
@@ -263,6 +274,14 @@ const statusLabels: Record<StatusCondition, string> = {
   confused: "Confuso",
 }
 
+const battleStatLabels: Record<BattleStatStageKey, string> = {
+  attack: "Ataque",
+  defense: "Defesa",
+  speed: "Velocidade",
+  accuracy: "Precisão",
+  evasion: "Evasão",
+}
+
 function normalizeMultiplayerRoomCode(rawValue: string): string {
   const trimmed = rawValue.trim()
   if (!trimmed) {
@@ -289,12 +308,53 @@ function normalizeMultiplayerRoomCode(rawValue: string): string {
   return trimmed
 }
 
-const getEffectiveSpeed = (speed = 50, statusCondition?: StatusCondition | null) => {
-  if (statusCondition === "paralyzed") {
-    return Math.max(1, Math.floor(speed * 0.25))
+const getEffectiveSpeed = (
+  speed = 50,
+  statusCondition?: StatusCondition | null,
+  speedStage = 0,
+  ivs?: Partial<PokemonIVs> | null,
+) => calculateBattleSpeed(speed, statusCondition, speedStage, ivs)
+
+const describeBattleStageDelta = (
+  previousStages: Partial<BattleStatStages> | undefined,
+  nextStages: BattleStatStages,
+) =>
+  (Object.keys(battleStatLabels) as BattleStatStageKey[])
+    .map((statKey) => {
+      const previousValue = previousStages?.[statKey] ?? 0
+      const nextValue = nextStages[statKey]
+      const delta = nextValue - previousValue
+
+      if (delta === 0) {
+        return null
+      }
+
+      return `${delta > 0 ? "+" : ""}${delta} ${battleStatLabels[statKey]}`
+    })
+    .filter((entry): entry is string => Boolean(entry))
+
+const formatBattleStageValue = (stage: number) => {
+  if (stage > 0) {
+    return `+${stage}`
   }
 
-  return speed
+  if (stage < 0) {
+    return `${stage}`
+  }
+
+  return "0"
+}
+
+const getBattleStageTone = (stage: number) => {
+  if (stage > 0) {
+    return "border-emerald-300/70 bg-emerald-400/15 text-emerald-100"
+  }
+
+  if (stage < 0) {
+    return "border-rose-300/70 bg-rose-400/15 text-rose-100"
+  }
+
+  return "border-white/20 bg-white/10 text-white/75"
 }
 
 const persistentStatusWaveDuration: Partial<Record<StatusCondition, number>> = {
@@ -2073,6 +2133,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
       const isShiny = Math.random() < SHINY_CHANCE
+      const enemyIVs = createPokemonIVs()
 
       const legalEnemyAttacks = getLegalBattleAttacksForPokemon(
         impostorName,
@@ -2080,7 +2141,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         enemyLevel,
       )
       const enemyAttacks = Object.fromEntries(
-        Object.entries(legalEnemyAttacks).map(([name, power]) => [name, calculateAttackPower(power, enemyLevel)]),
+        Object.entries(legalEnemyAttacks).map(([name, power]) => [name, calculateAttackPower(power, enemyLevel, enemyIVs)]),
       )
 
       return {
@@ -2093,6 +2154,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         enemyType: wildPokemon[impostorName].type,
         enemyDisplayType: wildPokemon[displayEnemyName].type,
         enemyAttacks,
+        enemyIVs,
         isImpostor: shouldUseImpostor,
         isShiny,
       }
@@ -2462,6 +2524,34 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     void handleGameOver({ victory: true })
   }, [accountUserId, handleGameOver, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const handleLobbyShortcut = (event: KeyboardEvent) => {
+      if ((currentScreen !== "menu" && currentScreen !== "game") || event.ctrlKey || event.metaKey || event.altKey) {
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
+        return
+      }
+
+      if (event.key.toLowerCase() === "i") {
+        event.preventDefault()
+        setShowModal((currentModal) => (currentModal === "ivs" ? null : "ivs"))
+      }
+    }
+
+    window.addEventListener("keydown", handleLobbyShortcut)
+
+    return () => {
+      window.removeEventListener("keydown", handleLobbyShortcut)
+    }
+  }, [currentScreen])
+
   const handlePlayerKnockout = (pokemonName: string, nextHP = 0) => {
     const alivePokemon = Object.keys(gameState.playerTeam).filter((name) => {
       if (name === pokemonName) {
@@ -2518,6 +2608,36 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       enemyStatusTurns: turns,
     })
     addLog(`⚠️ ${gameState.currentBattle?.enemyName} ficou ${statusLabels[effect.status].toLowerCase()}!`)
+  }
+
+  const applyBattleMoveEffect = (moveName: string, attacker: "player" | "enemy") => {
+    const effect = getMoveBattleEffect(moveName)
+    const currentBattle = latestGameStateRef.current.currentBattle
+    if (!effect || !currentBattle) {
+      return { selfDestruct: false }
+    }
+
+    if (effect.statChanges) {
+      const targetSide = effect.target === "self" ? attacker : attacker === "player" ? "enemy" : "player"
+      const currentStages = targetSide === "player" ? currentBattle.playerStatStages : currentBattle.enemyStatStages
+      const nextStages = applyBattleStatChanges(currentStages, effect.statChanges)
+      const stageDeltaText = describeBattleStageDelta(currentStages, nextStages)
+
+      if (targetSide === "player") {
+        updateBattle({ playerStatStages: nextStages })
+      } else {
+        updateBattle({ enemyStatStages: nextStages })
+      }
+
+      if (stageDeltaText.length > 0) {
+        const targetName = targetSide === "player"
+          ? latestGameStateRef.current.activePokemon || "Seu Pokémon"
+          : currentBattle.enemyDisplayName || currentBattle.enemyName
+        addLog(`📈 ${targetName} ajustou estatísticas: ${stageDeltaText.join(" • ")}`)
+      }
+    }
+
+    return { selfDestruct: Boolean(effect.selfDestruct) }
   }
 
   const processStatusAtTurnStart = (target: "player" | "enemy") => {
@@ -2771,7 +2891,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const chooseStarter = useCallback(
     (starterName: string) => {
       const basePokemon = { ...starterPokemon[starterName] }
-      const calculatedHP = calculateHP(basePokemon.HP, basePokemon.level, starterName)
+      const starterIVs = createPokemonIVs()
+      const calculatedHP = calculateHP(basePokemon.HP, basePokemon.level, starterName, starterIVs)
       const legalStarterAttacks = getLegalBattleAttacksForPokemon(
         starterName,
         basePokemon.type,
@@ -2787,10 +2908,11 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         attacks: Object.fromEntries(
           Object.entries(starterAttackTemplate).map(([name, power]) => [
             name,
-            calculateAttackPower(power, basePokemon.level),
+            calculateAttackPower(power, basePokemon.level, starterIVs),
           ]),
         ),
         attackPP: initializePP(starterAttackTemplate),
+        ivs: starterIVs,
       }
 
       updateGameState({
@@ -2907,9 +3029,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const enemyDisplayName = encounterPreview.enemyDisplayName
     const enemyLevel = encounterPreview.enemyLevel
     const isBossWave = encounterPreview.isBoss
+    const enemyIVs = encounterPreview.enemyIVs ?? createPokemonIVs()
 
     const enemyStats = wildPokemonStats[enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
-    const baseEnemyMaxHP = calculateHP(enemyStats.baseHP, enemyLevel, enemyName)
+    const baseEnemyMaxHP = calculateHP(enemyStats.baseHP, enemyLevel, enemyName, enemyIVs)
     const enemyMaxHP = isBossWave ? Math.max(1, Math.floor(baseEnemyMaxHP * BOSS_MULTIPLIER)) : baseEnemyMaxHP
 
     const enemyAttacks = isBossWave
@@ -2921,7 +3044,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         )
       : encounterPreview.enemyAttacks
 
-    const enemySpeed = wildPokemon[enemyName].speed || 50
+    const enemySpeed = calculateBattleSpeed(wildPokemon[enemyName].speed || 50, null, 0, enemyIVs)
     const playerBattleSprite = getPokemonSpriteUrl(
       gameState.activePokemon,
       activePokemon.sprite,
@@ -2943,6 +3066,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       enemyDisplayType: encounterPreview.enemyDisplayType,
       enemyIsDisguised: encounterPreview.isImpostor,
       enemyIsShiny: encounterPreview.isShiny,
+      enemyIVs,
       enemyHP: enemyMaxHP,
       enemyMaxHP: enemyMaxHP,
       enemyLevel,
@@ -2950,6 +3074,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       enemySpeed,
       enemySprite: enemyBattleSprite,
       playerSprite: playerBattleSprite,
+      playerStatStages: createBattleStatStages(),
+      enemyStatStages: createBattleStatStages(),
     }
 
     updateGameState({
@@ -2995,18 +3121,22 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           return { shouldEnemyAttack: false, enemyDefeated: false }
         }
 
+        const playerBattleStages = currentBattle.playerStatStages ?? createBattleStatStages()
+        const enemyBattleStages = currentBattle.enemyStatStages ?? createBattleStatStages()
         const [minDamage, maxDamage] = pokemon.attacks[attackName]
         const baseDamage = random(minDamage, maxDamage)
 
         const attackType = getAttackType(attackName)
+        const moveHitChance = getMoveHitChance(attackName, playerBattleStages.accuracy, enemyBattleStages.evasion)
         const typeMultiplier = getDamageMultiplier(attackType, currentBattle.enemyType || "Normal")
         const stabMultiplier = getStabMultiplier(attackType, pokemon.type)
         const burnMultiplier = pokemon.statusCondition === "burned" ? 0.8 : 1
         const levelMultiplier = getLevelBalanceMultiplier(pokemon.level, currentBattle.enemyLevel, 0.92, 1.18)
-        const finalDamage = Math.max(
-          0,
-          Math.floor(baseDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier),
-        )
+        const attackStageMultiplier = getBattleStatStageMultiplier(playerBattleStages.attack)
+        const defenseStageMultiplier = getBattleStatStageMultiplier(enemyBattleStages.defense)
+        const enemyDefenseIvMultiplier = getPokemonDefenseDamageMultiplier(currentBattle.enemyIVs)
+        const moveBattleEffect = getMoveBattleEffect(attackName)
+        const selfDestructs = Boolean(moveBattleEffect?.selfDestruct)
 
         const newPP = { ...pokemon.attackPP }
         newPP[attackName] = {
@@ -3014,6 +3144,34 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           current: newPP[attackName].current - 1,
         }
         updatePokemon(activePokemonName, { attackPP: newPP })
+
+        if (Math.random() > moveHitChance) {
+          await playAttackAnimation({
+            id: attackAnimationCounter + 1,
+            attacker: "player",
+            target: "enemy",
+            moveName: attackName,
+            attackType,
+          })
+          setAttackAnimationCounter((current) => current + 1)
+
+          addLog(`💨 ${normalizeDisplayText(attackName)} errou!`)
+          return { shouldEnemyAttack: true, enemyDefeated: false }
+        }
+
+        const finalDamage = Math.max(
+          0,
+          Math.floor(
+            baseDamage *
+              typeMultiplier *
+              stabMultiplier *
+              levelMultiplier *
+              burnMultiplier *
+              attackStageMultiplier *
+              enemyDefenseIvMultiplier /
+              defenseStageMultiplier,
+          ),
+        )
 
         await playAttackAnimation({
           id: attackAnimationCounter + 1,
@@ -3035,12 +3193,29 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         if (typeMultiplier === 0) damageTags.push("sem efeito")
         if (burnMultiplier < 1) damageTags.push("queimado")
         if (levelMultiplier > 1.06) damageTags.push("vantagem de nível")
+        if (attackStageMultiplier > 1) damageTags.push("buff de ataque")
+        if (defenseStageMultiplier > 1) damageTags.push("buff de defesa")
 
         addLog(
           `⚔️ ${normalizeDisplayText(attackName)} [${attackType}]${damageTags.length ? ` ${damageTags.join(" • ")}` : ""}: ${finalDamage} dano!`,
         )
 
         applyStatusEffect(attackName, "enemy")
+        applyBattleMoveEffect(attackName, "player")
+
+        if (selfDestructs) {
+          updatePokemon(activePokemonName, { HP: 0 })
+
+          if (newEnemyHP <= 0) {
+            addLog(`💥 ${activePokemonName} usou ${normalizeDisplayText(attackName)} e foi junto!`)
+            handleEnemyDefeat(currentBattle.enemyName)
+            return { shouldEnemyAttack: false, enemyDefeated: true }
+          }
+
+          addLog(`💥 ${activePokemonName} desmaiou após ${normalizeDisplayText(attackName)}!`)
+          handlePlayerKnockout(activePokemonName, 0)
+          return { shouldEnemyAttack: false, enemyDefeated: false }
+        }
 
         if (newEnemyHP <= 0) {
           handleEnemyDefeat(currentBattle.enemyName)
@@ -3050,10 +3225,17 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         return { shouldEnemyAttack: true, enemyDefeated: false }
       }
 
-      const playerSpeed = getEffectiveSpeed(pokemon.speed || 50, pokemon.statusCondition)
+      const playerSpeed = getEffectiveSpeed(
+        pokemon.speed || 50,
+        pokemon.statusCondition,
+        currentBattle.playerStatStages?.speed ?? 0,
+        pokemon.ivs,
+      )
       const enemySpeed = getEffectiveSpeed(
         currentBattle.enemySpeed || 50,
         currentBattle.enemyStatusCondition,
+        currentBattle.enemyStatStages?.speed ?? 0,
+        currentBattle.enemyIVs,
       )
       const enemyAttackNames = Object.keys(currentBattle.enemyAttacks)
       const enemySelectedAttack = enemyAttackNames[Math.floor(Math.random() * enemyAttackNames.length)]
@@ -3243,6 +3425,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       }
 
       const battle = gameState.currentBattle!
+      const enemyBattleStages = battle.enemyStatStages ?? createBattleStatStages()
+      const playerBattleStages = battle.playerStatStages ?? createBattleStatStages()
       const moveInsights = attacks.map((moveName) => {
         const [minDamage, maxDamage] = battle.enemyAttacks[moveName]
         const avgDamage = (minDamage + maxDamage) / 2
@@ -3256,16 +3440,37 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           1,
           Math.floor(avgDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier * overpowerMultiplier),
         )
+        const hasDamage = maxDamage > 0
+        const moveBattleEffect = getMoveBattleEffect(moveName)
+
+        let supportWeight = 1
+        if (moveBattleEffect?.selfDestruct) {
+          supportWeight = battle.enemyHP <= playerPokemon.HP ? 2.6 : 1.1
+        } else if (moveBattleEffect?.statChanges) {
+          const targetStages = moveBattleEffect.target === "self" ? enemyBattleStages : playerBattleStages
+          const hasRelevantStageChange = Object.entries(moveBattleEffect.statChanges).some(([stageKey, change]) => {
+            if (typeof change !== "number" || change === 0) {
+              return false
+            }
+
+            const currentStage = targetStages[stageKey as BattleStatStageKey]
+            return change > 0 ? currentStage < 6 : currentStage > -6
+          })
+
+          supportWeight = moveBattleEffect.target === "self" ? (hasRelevantStageChange ? 2.2 : 0.7) : (hasRelevantStageChange ? 1.8 : 0.8)
+        }
 
         return {
           moveName,
           typeMultiplier,
           expectedDamage,
+          supportWeight,
+          hasDamage,
         }
       })
 
       const finishingMove = moveInsights
-        .filter((insight) => insight.typeMultiplier > 0 && insight.expectedDamage >= playerPokemon.HP)
+        .filter((insight) => insight.hasDamage && insight.typeMultiplier > 0 && insight.expectedDamage >= playerPokemon.HP)
         .sort((insightA, insightB) => insightB.expectedDamage - insightA.expectedDamage)[0]
 
       if (finishingMove && Math.random() < 0.88) {
@@ -3273,7 +3478,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       }
 
       const superEffectiveMove = moveInsights
-        .filter((insight) => insight.typeMultiplier > 1)
+        .filter((insight) => insight.hasDamage && insight.typeMultiplier > 1)
         .sort((insightA, insightB) => insightB.expectedDamage - insightA.expectedDamage)[0]
 
       if (superEffectiveMove && Math.random() < 0.72) {
@@ -3281,7 +3486,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       }
 
       const weightedMoves = moveInsights.map((insight) => {
-        let weight = Math.max(1, insight.expectedDamage)
+        let weight = Math.max(1, insight.expectedDamage) * insight.supportWeight
 
         if (insight.typeMultiplier > 1) {
           weight *= 1.3
@@ -3310,6 +3515,26 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return attacks[Math.floor(Math.random() * attacks.length)]
     })()
 
+    const enemyBattleStages = gameState.currentBattle.enemyStatStages ?? createBattleStatStages()
+    const playerBattleStages = gameState.currentBattle.playerStatStages ?? createBattleStatStages()
+    const moveBattleEffect = getMoveBattleEffect(attackName)
+    const moveHitChance = getMoveHitChance(attackName, enemyBattleStages.accuracy, playerBattleStages.evasion)
+    const selfDestructs = Boolean(moveBattleEffect?.selfDestruct)
+
+    if (Math.random() > moveHitChance) {
+      await playAttackAnimation({
+        id: attackAnimationCounter + 1,
+        attacker: "enemy",
+        target: "player",
+        moveName: attackName,
+        attackType: getAttackType(attackName),
+      })
+      setAttackAnimationCounter((current) => current + 1)
+
+      addLog(`💨 ${normalizeDisplayText(attackName)} errou!`)
+      return { playerFainted: false, enemyFainted: false }
+    }
+
     const [minDamage, maxDamage] = gameState.currentBattle.enemyAttacks[attackName]
     const baseDamage = random(minDamage, maxDamage)
 
@@ -3319,9 +3544,22 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const burnMultiplier = gameState.currentBattle.enemyStatusCondition === "burned" ? 0.8 : 1
     const levelMultiplier = getLevelBalanceMultiplier(gameState.currentBattle.enemyLevel, playerPokemon.level, 0.85, 1.55)
     const overpowerMultiplier = gameState.currentBattle.enemyLevel >= playerPokemon.level * 2 ? 1.35 : 1
+    const attackStageMultiplier = getBattleStatStageMultiplier(enemyBattleStages.attack)
+    const defenseStageMultiplier = getBattleStatStageMultiplier(playerBattleStages.defense)
+    const playerDefenseIvMultiplier = getPokemonDefenseDamageMultiplier(playerPokemon.ivs)
     const damage = Math.max(
       0,
-      Math.floor(baseDamage * typeMultiplier * stabMultiplier * levelMultiplier * burnMultiplier * overpowerMultiplier),
+      Math.floor(
+        baseDamage *
+          typeMultiplier *
+          stabMultiplier *
+          levelMultiplier *
+          burnMultiplier *
+          overpowerMultiplier *
+          attackStageMultiplier *
+          playerDefenseIvMultiplier /
+          defenseStageMultiplier,
+      ),
     )
 
     await playAttackAnimation({
@@ -3343,12 +3581,25 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     if (typeMultiplier === 0) enemyDamageTags.push("sem efeito")
     if (burnMultiplier < 1) enemyDamageTags.push("queimado")
     if (levelMultiplier > 1.06) enemyDamageTags.push("vantagem de nível")
+    if (attackStageMultiplier > 1) enemyDamageTags.push("buff de ataque")
+    if (defenseStageMultiplier > 1) enemyDamageTags.push("buff de defesa")
 
     addLog(
       `💥 ${normalizeDisplayText(attackName)} [${attackType}]${enemyDamageTags.length ? ` ${enemyDamageTags.join(" • ")}` : ""}: ${damage} dano em você!`,
     )
 
     applyStatusEffect(attackName, "player")
+
+    if (moveBattleEffect) {
+      applyBattleMoveEffect(attackName, "enemy")
+    }
+
+    if (selfDestructs) {
+      updateBattle({ enemyHP: 0 })
+      addLog(`💥 ${currentBattle.enemyDisplayName || currentBattle.enemyName} desmaiou após ${normalizeDisplayText(attackName)}!`)
+      handleEnemyDefeat(currentBattle.enemyName)
+      return { playerFainted: newHP <= 0, enemyFainted: true }
+    }
 
     if (newHP <= 0) {
       addLog(`😵 ${gameState.activePokemon} desmaiou!`)
@@ -3449,6 +3700,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           return
         }
 
+        const resolvedTeamIVs = resolvePokemonIVs(teamPokemon.ivs)
         let leveledXp = teamPokemon.xp + sharedXp
         let leveledLevel = teamPokemon.level
         let leveledMaxHP = teamPokemon.maxHP
@@ -3460,7 +3712,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           leveledLevel += 1
 
           const template = getPokemonBattleTemplate(teamPokemonName)
-          const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, teamPokemonName)
+          const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, teamPokemonName, resolvedTeamIVs)
           const hpIncrease = recalculatedMaxHP - leveledMaxHP
           leveledMaxHP = recalculatedMaxHP
           leveledHP = Math.min(leveledMaxHP, leveledHP + hpIncrease)
@@ -3471,6 +3723,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           level: leveledLevel,
           maxHP: leveledMaxHP,
           HP: leveledHP,
+          ivs: resolvedTeamIVs,
         })
 
         addLog(`🤝 ${teamPokemonName} recebeu +${sharedXp} XP pelo XP Share.`)
@@ -3482,6 +3735,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     let leveledLevel = pokemon.level
     let leveledMaxHP = pokemon.maxHP
     let leveledHP = pokemon.HP
+    const resolvedPokemonIVs = resolvePokemonIVs(pokemon.ivs)
 
     while (leveledLevel < waveLevelCap && leveledXp >= getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)) {
       const requiredXp = getXpNeededForNextLevelByWaveCap(leveledLevel, waveLevelCap)
@@ -3489,7 +3743,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       leveledLevel += 1
 
       const template = getPokemonBattleTemplate(activePokemonName)
-      const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, activePokemonName)
+      const recalculatedMaxHP = calculateHP(template?.baseHP || leveledMaxHP, leveledLevel, activePokemonName, resolvedPokemonIVs)
       const hpIncrease = recalculatedMaxHP - leveledMaxHP
       leveledMaxHP = recalculatedMaxHP
       leveledHP = Math.min(leveledMaxHP, leveledHP + hpIncrease)
@@ -3507,12 +3761,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const evolvedName = evolution.evolvesTo
 
       const evolvedBaseHP = evolutionTemplate?.baseHP ?? pokemon.maxHP
-      const evolvedMaxHP = Math.max(1, calculateHP(evolvedBaseHP, finalLevel, evolvedName))
+      const evolvedMaxHP = Math.max(1, calculateHP(evolvedBaseHP, finalLevel, evolvedName, resolvedPokemonIVs))
       const hpDeficit = Math.max(0, leveledMaxHP - leveledHP)
       const evolvedHP = Math.max(1, evolvedMaxHP - hpDeficit)
 
       const evolvedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
-        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
+        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel, resolvedPokemonIVs) }
         : finalScaledAttacks
 
       const evolvedPokemon = {
@@ -3528,6 +3782,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         type: evolutionTemplate?.type ?? pokemon.type,
         speed: Math.max(1, evolutionTemplate?.speed ?? pokemon.speed ?? 50),
         isShiny: pokemon.isShiny,
+        ivs: resolvedPokemonIVs,
         pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
       }
 
@@ -3569,7 +3824,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     } else {
       const upgradedAttacks = learnedMove && Object.keys(finalScaledAttacks).length < 4
-        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel) }
+        ? { ...finalScaledAttacks, [learnedMove.name]: calculateAttackPower(learnedMove.power, finalLevel, resolvedPokemonIVs) }
         : finalScaledAttacks
 
       updatePokemon(activePokemonName, {
@@ -3579,6 +3834,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         HP: leveledHP,
         attacks: upgradedAttacks,
         attackPP: syncAttackPP(pokemon.attackPP, upgradedAttacks),
+        ivs: resolvedPokemonIVs,
         pendingMove: learnedMove && Object.keys(finalScaledAttacks).length >= 4 ? { name: learnedMove.name, power: learnedMove.power } : undefined,
       })
 
@@ -3649,10 +3905,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         addLog(`🎉 ${gameState.currentBattle.enemyName} capturado! (${currentTeamSize + 1}/${MAX_TEAM_SIZE})`)
 
         const enemyStats = wildPokemonStats[gameState.currentBattle.enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
+        const capturedIVs = gameState.currentBattle.enemyIVs ?? createPokemonIVs()
         const maxHP = calculateHP(
           enemyStats.baseHP,
           gameState.currentBattle.enemyLevel,
           gameState.currentBattle.enemyName,
+          capturedIVs,
         )
 
         const reducedMaxHP = isLegendaryBoss ? Math.max(1, Math.floor(maxHP * 0.85)) : maxHP
@@ -3664,7 +3922,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         const scaledCapturedMoves = Object.fromEntries(
           Object.entries(legalCapturedMoves).map(([name, power]) => [
             name,
-            calculateAttackPower(power, gameState.currentBattle!.enemyLevel),
+            calculateAttackPower(power, gameState.currentBattle.enemyLevel, capturedIVs),
           ]),
         )
         const capturedAttacks = isLegendaryBoss
@@ -3699,6 +3957,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           speed: capturedSpeed,
           attackPP: initializePP(capturedAttacks),
           isShiny: Boolean(gameState.currentBattle.enemyIsShiny),
+          ivs: capturedIVs,
         }
 
         updateGameState({
@@ -5064,6 +5323,15 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             >
               ?
             </Button>
+            <Button
+              onClick={() => setShowModal("ivs")}
+              className="pixel-menu-button h-11 w-11 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] p-0 text-[11px] font-black text-white"
+              disabled={isAnimating}
+              title="Ver IVs (I)"
+              aria-label="Abrir painel de IVs"
+            >
+              IV
+            </Button>
             <div className="relative">
               <Button
                 onClick={openBattleSimulation}
@@ -5136,6 +5404,15 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const overlayGradient = attackAnimation
       ? typeColors[normalizeTypeText(attackAnimation.attackType).split("/")[0]] || "from-white to-slate-300"
       : "from-white to-slate-300"
+    const playerBattleStages = gameState.currentBattle.playerStatStages ?? createBattleStatStages()
+    const enemyBattleStages = gameState.currentBattle.enemyStatStages ?? createBattleStatStages()
+    const battleStatEntries: Array<{ key: BattleStatStageKey; shortLabel: string }> = [
+      { key: "attack", shortLabel: "Atk" },
+      { key: "defense", shortLabel: "Def" },
+      { key: "speed", shortLabel: "Spe" },
+      { key: "accuracy", shortLabel: "Acc" },
+      { key: "evasion", shortLabel: "Eva" },
+    ]
 
     return (
       <div className="relative flex h-full min-h-0 flex-col gap-2 overflow-hidden pb-[env(safe-area-inset-bottom)]">
@@ -5172,6 +5449,47 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           className="flex-1 min-h-0"
         />
 
+        <div className="pixel-window shrink-0 bg-[#f8f4dc]/95 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="font-pixel text-[10px] uppercase tracking-[0.2em] text-slate-600 sm:text-xs">Estágios de batalha</div>
+            <div className="text-[10px] font-semibold text-slate-500">Buffs e debuffs ativos</div>
+          </div>
+          <div className="grid gap-2 lg:grid-cols-2">
+            {[
+              {
+                isPlayer: true,
+                label: `${gameState.activePokemon}${gameState.playerTeam[gameState.activePokemon].isShiny ? " ✨" : ""}`,
+                stages: playerBattleStages,
+                sideTone: "border-emerald-300/60 bg-emerald-50/80 text-emerald-950",
+              },
+              {
+                isPlayer: false,
+                label: gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
+                stages: enemyBattleStages,
+                sideTone: "border-rose-300/60 bg-rose-50/80 text-rose-950",
+              },
+            ].map((side) => (
+              <div key={side.label} className={`rounded-2xl border-2 px-3 py-2 ${side.sideTone}`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="font-bold text-xs uppercase tracking-[0.15em]">{side.label}</div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.15em]">{side.isPlayer ? "Jogador" : "Adversário"}</div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {battleStatEntries.map(({ key, shortLabel }) => {
+                    const stageValue = side.stages[key]
+                    return (
+                      <div key={key} className={`rounded-lg border px-2 py-1 text-center text-[10px] font-bold ${getBattleStageTone(stageValue)}`}>
+                        <div className="uppercase tracking-[0.12em]">{shortLabel}</div>
+                        <div className="text-sm leading-tight">{formatBattleStageValue(stageValue)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-2">
           <Button
             onClick={() => setShowModal("attacks")}
@@ -5207,10 +5525,17 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 return
               }
 
-              const playerSpeed = getEffectiveSpeed(playerPokemon.speed || 50, playerPokemon.statusCondition)
+              const playerSpeed = getEffectiveSpeed(
+                playerPokemon.speed || 50,
+                playerPokemon.statusCondition,
+                gameState.currentBattle.playerStatStages?.speed ?? 0,
+                playerPokemon.ivs,
+              )
               const enemySpeed = getEffectiveSpeed(
                 gameState.currentBattle.enemySpeed || 50,
                 gameState.currentBattle.enemyStatusCondition,
+                gameState.currentBattle.enemyStatStages?.speed ?? 0,
+                gameState.currentBattle.enemyIVs,
               )
 
               let fleeChance = 0.5 // Base 50% chance
@@ -5458,6 +5783,15 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 const attackAccuracy = getMoveAccuracy(attackName)
                 const attackTypeGradient = typeColors[attackType] || "from-gray-500 to-gray-600"
                 const statusEffect = getMoveStatusEffect(attackName)
+                const battleEffect = getMoveBattleEffect(attackName)
+                const battleEffectLabel = battleEffect
+                  ? battleEffect.selfDestruct
+                    ? "Auto-Destrói"
+                    : Object.entries(battleEffect.statChanges || {})
+                        .filter(([, change]) => typeof change === "number" && change !== 0)
+                        .map(([statKey, change]) => `${change > 0 ? "+" : ""}${change} ${battleStatLabels[statKey as BattleStatStageKey]}`)
+                        .join(" • ")
+                  : ""
                 const effectiveness = gameState.currentBattle
                   ? getDamageMultiplier(attackType, gameState.currentBattle.enemyType)
                   : 1
@@ -5493,6 +5827,11 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           {statusEffect && (
                             <span className="rounded-full border border-cyan-300/70 bg-cyan-400/15 px-2 py-0 text-cyan-100">
                               {statusLabels[statusEffect.status]}
+                            </span>
+                          )}
+                          {battleEffect && battleEffectLabel && (
+                            <span className={`rounded-full border px-2 py-0 ${battleEffect.selfDestruct ? "border-rose-300/70 bg-rose-400/15 text-rose-100" : "border-amber-300/70 bg-amber-400/15 text-amber-100"}`}>
+                              {battleEffectLabel}
                             </span>
                           )}
                         </div>
@@ -5798,6 +6137,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                             "back",
                             Boolean(gameState.playerTeam[name].isShiny),
                           ),
+                          playerStatStages: createBattleStatStages(),
                         })
                       }
                       addLog(`🔄 Trocou para ${name}!`)
@@ -5825,6 +6165,9 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                         ❤️ {gameState.playerTeam[name].HP}/{gameState.playerTeam[name].maxHP}
                       </div>
                       <div className="text-blue-400">⭐ Nv.{gameState.playerTeam[name].level}</div>
+                      <div className="text-amber-300">
+                        IVs {resolvePokemonIVs(gameState.playerTeam[name].ivs).hp}/{resolvePokemonIVs(gameState.playerTeam[name].ivs).attack}/{resolvePokemonIVs(gameState.playerTeam[name].ivs).defense}/{resolvePokemonIVs(gameState.playerTeam[name].ivs).speed}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -5855,7 +6198,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       if (pokemon.HP > 0) {
                         updateGameState({ activePokemon: name })
                         if (gameState.currentBattle) {
-                          updateBattle({ playerSprite: getPokemonSpriteUrl(name, pokemon.sprite, "back", Boolean(pokemon.isShiny)) })
+                          updateBattle({
+                            playerSprite: getPokemonSpriteUrl(name, pokemon.sprite, "back", Boolean(pokemon.isShiny)),
+                            playerStatStages: createBattleStatStages(),
+                          })
                         }
                         addLog(`✨ ${name} ativo!`)
                         setShowModal(null)
@@ -5875,10 +6221,48 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                         ❤️ {pokemon.HP}/{pokemon.maxHP}
                       </div>
                       <div className="text-blue-400">⭐ Nv.{pokemon.level}</div>
+                      <div className="text-amber-300">
+                        IVs {resolvePokemonIVs(pokemon.ivs).hp}/{resolvePokemonIVs(pokemon.ivs).attack}/{resolvePokemonIVs(pokemon.ivs).defense}/{resolvePokemonIVs(pokemon.ivs).speed}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+          )
+
+        case "ivs":
+          return (
+            <div>
+              <h3 className="font-bold text-white mb-2 text-center">🔎 IVs da Equipe</h3>
+              <p className="text-center text-white/70 text-sm mb-4">I = abre/fecha este painel no lobby.</p>
+              {Object.keys(gameState.playerTeam).length === 0 ? (
+                <div className="text-center text-white/70">Sem Pokémon na equipa.</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
+                    const ivs = resolvePokemonIVs(pokemon.ivs)
+                    const totalIv = ivs.hp + ivs.attack + ivs.defense + ivs.speed
+
+                    return (
+                      <div key={name} className="rounded-2xl border-2 border-white/20 bg-white/10 p-3 text-white shadow-[4px_4px_0_rgba(15,23,42,0.14)]">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="font-semibold">{name}{pokemon.isShiny ? " ✨" : ""}</div>
+                          <div className="rounded-full border border-amber-300/60 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-100">
+                            Total {totalIv}/124
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-lg border border-white/15 bg-slate-950/20 px-2 py-2">HP {ivs.hp}/31</div>
+                          <div className="rounded-lg border border-white/15 bg-slate-950/20 px-2 py-2">Atk {ivs.attack}/31</div>
+                          <div className="rounded-lg border border-white/15 bg-slate-950/20 px-2 py-2">Def {ivs.defense}/31</div>
+                          <div className="rounded-lg border border-white/15 bg-slate-950/20 px-2 py-2">Spe {ivs.speed}/31</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
 

@@ -10,6 +10,23 @@ export interface PendingMove {
   power: [number, number]
 }
 
+export interface PokemonIVs {
+  hp: number
+  attack: number
+  defense: number
+  speed: number
+}
+
+export type BattleStatStageKey = "attack" | "defense" | "speed" | "accuracy" | "evasion"
+
+export interface BattleStatStages {
+  attack: number
+  defense: number
+  speed: number
+  accuracy: number
+  evasion: number
+}
+
 export interface Pokemon {
   HP: number
   maxHP: number
@@ -27,6 +44,7 @@ export interface Pokemon {
   statusTurns?: number
   statusWavesRemaining?: number
   isShiny?: boolean
+  ivs?: PokemonIVs
 }
 
 export interface Battle {
@@ -40,12 +58,15 @@ export interface Battle {
   enemyHP: number
   enemyMaxHP: number
   enemyLevel: number
+  enemyIVs?: PokemonIVs
   enemyAttacks: Record<string, [number, number]>
   enemySpeed?: number
   enemySprite?: string
   playerSprite?: string
   enemyStatusCondition?: StatusCondition | null
   enemyStatusTurns?: number
+  playerStatStages?: BattleStatStages
+  enemyStatStages?: BattleStatStages
 }
 
 export interface GameState {

@@ -1,4 +1,4 @@
-import type { PendingMove, Pokemon, StatusCondition } from "../hooks/useGameState"
+import type { BattleStatStageKey, BattleStatStages, PendingMove, Pokemon, PokemonIVs, StatusCondition } from "../hooks/useGameState"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, type PokemonSpriteSet, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 
 // Rarity configuration - moved to top for better visibility
@@ -26,7 +26,7 @@ export const POKEMON_RARITY_CONFIG = {
 export type PokemonRarity = keyof typeof POKEMON_RARITY_CONFIG
 
 // FunÃ¯Â¿Â½Ã¯Â¿Â½o para calcular HP baseado no nÃ¯Â¿Â½vel e tipo de PokÃƒÂ©mon
-export const calculateHP = (baseHP: number, level: number, pokemonName: string): number => {
+export const calculateHP = (baseHP: number, level: number, pokemonName: string, ivs?: Partial<PokemonIVs> | null): number => {
   const hpMultipliers: Record<string, number> = {
     // Starters
     Charmander: 1.0,
@@ -175,13 +175,111 @@ export const calculateHP = (baseHP: number, level: number, pokemonName: string):
   }
 
   const multiplier = hpMultipliers[pokemonName] || 1.0
-  const calculatedHP = Math.floor(baseHP + (level - 1) * 8 * multiplier)
+  const resolvedIVs = resolvePokemonIVs(ivs)
+  const calculatedHP = Math.floor(baseHP + (level - 1) * 8 * multiplier + getIvBonus(resolvedIVs.hp, 15))
   return Math.max(calculatedHP, 15)
 }
 
-export const calculateAttackPower = (baseAttack: [number, number], level: number): [number, number] => {
+const clampValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+const getIvBonus = (ivValue: number, maxBonus: number) => Math.floor((clampValue(ivValue, 0, 31) / 31) * maxBonus)
+
+export const defaultPokemonIVs: PokemonIVs = {
+  hp: 15,
+  attack: 15,
+  defense: 15,
+  speed: 15,
+}
+
+export const createPokemonIVs = (): PokemonIVs => ({
+  hp: Math.floor(Math.random() * 32),
+  attack: Math.floor(Math.random() * 32),
+  defense: Math.floor(Math.random() * 32),
+  speed: Math.floor(Math.random() * 32),
+})
+
+export const resolvePokemonIVs = (ivs?: Partial<PokemonIVs> | null): PokemonIVs => ({
+  hp: clampValue(ivs?.hp ?? defaultPokemonIVs.hp, 0, 31),
+  attack: clampValue(ivs?.attack ?? defaultPokemonIVs.attack, 0, 31),
+  defense: clampValue(ivs?.defense ?? defaultPokemonIVs.defense, 0, 31),
+  speed: clampValue(ivs?.speed ?? defaultPokemonIVs.speed, 0, 31),
+})
+
+export const createBattleStatStages = (): BattleStatStages => ({
+  attack: 0,
+  defense: 0,
+  speed: 0,
+  accuracy: 0,
+  evasion: 0,
+})
+
+export const clampBattleStatStage = (stage: number) => clampValue(Math.trunc(stage), -6, 6)
+
+export const getBattleStatStageMultiplier = (stage: number): number => {
+  const normalizedStage = clampBattleStatStage(stage)
+  return normalizedStage >= 0 ? (2 + normalizedStage) / 2 : 2 / (2 - normalizedStage)
+}
+
+export const applyBattleStatChanges = (
+  currentStages?: Partial<BattleStatStages> | null,
+  stageChanges?: Partial<Record<BattleStatStageKey, number>>,
+): BattleStatStages => {
+  const nextStages = createBattleStatStages()
+
+  if (currentStages) {
+    nextStages.attack = clampBattleStatStage(currentStages.attack ?? 0)
+    nextStages.defense = clampBattleStatStage(currentStages.defense ?? 0)
+    nextStages.speed = clampBattleStatStage(currentStages.speed ?? 0)
+    nextStages.accuracy = clampBattleStatStage(currentStages.accuracy ?? 0)
+    nextStages.evasion = clampBattleStatStage(currentStages.evasion ?? 0)
+  }
+
+  if (!stageChanges) {
+    return nextStages
+  }
+
+  Object.entries(stageChanges).forEach(([stageKey, change]) => {
+    if (typeof change !== "number" || change === 0) {
+      return
+    }
+
+    const key = stageKey as BattleStatStageKey
+    nextStages[key] = clampBattleStatStage(nextStages[key] + change)
+  })
+
+  return nextStages
+}
+
+export const calculateAttackPower = (baseAttack: [number, number], level: number, ivs?: Partial<PokemonIVs> | null): [number, number] => {
+  if (baseAttack[0] === 0 && baseAttack[1] === 0) {
+    return [0, 0]
+  }
+
   const levelBonus = Math.floor((level - 1) * 2)
-  return [baseAttack[0] + levelBonus, baseAttack[1] + levelBonus]
+  const resolvedIVs = resolvePokemonIVs(ivs)
+  const ivBonus = getIvBonus(resolvedIVs.attack, 8)
+  return [baseAttack[0] + levelBonus + ivBonus, baseAttack[1] + levelBonus + ivBonus]
+}
+
+export const calculateBattleSpeed = (
+  baseSpeed = 50,
+  statusCondition?: StatusCondition | null,
+  speedStage = 0,
+  ivs?: Partial<PokemonIVs> | null,
+): number => {
+  const resolvedIVs = resolvePokemonIVs(ivs)
+  const stagedSpeed = Math.max(1, Math.floor(baseSpeed * getBattleStatStageMultiplier(speedStage)) + getIvBonus(resolvedIVs.speed, 8))
+
+  if (statusCondition === "paralyzed") {
+    return Math.max(1, Math.floor(stagedSpeed * 0.25))
+  }
+
+  return stagedSpeed
+}
+
+export const getPokemonDefenseDamageMultiplier = (ivs?: Partial<PokemonIVs> | null): number => {
+  const resolvedIVs = resolvePokemonIVs(ivs)
+  return 1 - (clampValue(resolvedIVs.defense, 0, 31) / 31) * 0.08
 }
 
 export const starterPokemon: Record<string, Pokemon> = {
@@ -2008,6 +2106,23 @@ export const MOVE_PP: Record<string, number> = {
   Surf: 15,
   "Shadow Ball": 15,
 
+  // Battle control moves
+  Growl: 40,
+  "Tail Whip": 30,
+  Leer: 30,
+  Screech: 40,
+  "Sand Attack": 15,
+  Smokescreen: 20,
+  "String Shot": 40,
+  Howl: 30,
+  Agility: 30,
+  Harden: 30,
+  "Defense Curl": 40,
+  "Bulk Up": 20,
+  "Swords Dance": 20,
+  "Double Team": 15,
+  Minimize: 10,
+
   // Very powerful moves - 5 PP
   "Hyper Beam": 5,
   Explosion: 5,
@@ -2091,6 +2206,7 @@ const moveAccuracyLookup: Record<string, number> = {
   "meteor mash": 90,
   "flash cannon": 100,
   "hyper beam": 90,
+  screech: 85,
 }
 
 export const getMoveAccuracy = (moveName: string): number => {
@@ -2146,6 +2262,12 @@ export interface MoveStatusEffect {
   status: StatusCondition
   chance: number
   turns?: [number, number]
+}
+
+export interface MoveBattleEffect {
+  target: "self" | "opponent"
+  statChanges?: Partial<Record<BattleStatStageKey, number>>
+  selfDestruct?: boolean
 }
 
 export interface LevelUpMove extends PendingMove {
@@ -2226,8 +2348,15 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   ],
   Pidgey: [
     { level: 9, name: "Ataque Rápido", power: [14, 24] },
+    { level: 12, name: "Agility", power: [0, 0] },
     { level: 18, name: "Ataque de Asa", power: [22, 36] },
     { level: 30, name: "Air Slash", power: [30, 48] },
+  ],
+  Growlithe: [
+    { level: 1, name: "Brasa", power: [12, 22] },
+    { level: 1, name: "Mordida", power: [15, 28] },
+    { level: 12, name: "Howl", power: [0, 0] },
+    { level: 24, name: "Lança Chamas", power: [28, 46] },
   ],
   Pidgeotto: [
     { level: 19, name: "Ataque de Asa", power: [24, 38] },
@@ -2236,6 +2365,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   ],
   Zubat: [
     { level: 9, name: "Supersônico", power: [0, 0] },
+    { level: 12, name: "Screech", power: [0, 0] },
     { level: 18, name: "Ataque de Asa", power: [22, 36] },
     { level: 28, name: "Air Slash", power: [30, 48] },
   ],
@@ -2457,8 +2587,36 @@ const moveStatusEffects: Record<string, MoveStatusEffect> = {
   supersônico: { status: "confused", chance: 1, turns: [2, 4] },
 }
 
+const moveBattleEffects: Record<string, MoveBattleEffect> = {
+  growl: { target: "opponent", statChanges: { attack: -1 } },
+  "tail whip": { target: "opponent", statChanges: { defense: -1 } },
+  leer: { target: "opponent", statChanges: { defense: -1 } },
+  screech: { target: "opponent", statChanges: { defense: -2 } },
+  "sand attack": { target: "opponent", statChanges: { accuracy: -1 } },
+  smokescreen: { target: "opponent", statChanges: { accuracy: -1 } },
+  "string shot": { target: "opponent", statChanges: { speed: -1 } },
+  howl: { target: "self", statChanges: { attack: 1 } },
+  agility: { target: "self", statChanges: { speed: 2 } },
+  harden: { target: "self", statChanges: { defense: 1 } },
+  "defense curl": { target: "self", statChanges: { defense: 1 } },
+  "bulk up": { target: "self", statChanges: { attack: 1, defense: 1 } },
+  "swords dance": { target: "self", statChanges: { attack: 2 } },
+  "double team": { target: "self", statChanges: { evasion: 1 } },
+  minimize: { target: "self", statChanges: { evasion: 2 } },
+  "self-destruct": { target: "opponent", selfDestruct: true },
+  explosion: { target: "opponent", selfDestruct: true },
+}
+
 export const scaleAttackSetForLevel = (attacks: Record<string, [number, number]>) =>
-  Object.fromEntries(Object.entries(attacks).map(([name, [min, max]]) => [name, [min + 2, max + 3] as [number, number]]))
+  Object.fromEntries(
+    Object.entries(attacks).map(([name, [min, max]]) => {
+      if (min === 0 && max === 0) {
+        return [name, [0, 0] as [number, number]]
+      }
+
+      return [name, [min + 2, max + 3] as [number, number]]
+    }),
+  )
 
 export const getPokemonBattleTemplate = (pokemonName: string): PokemonBattleTemplate | null => {
   const starterData = starterPokemon[pokemonName]
@@ -2491,6 +2649,21 @@ export const getPokemonBattleTemplate = (pokemonName: string): PokemonBattleTemp
 export const getMoveStatusEffect = (moveName: string): MoveStatusEffect | null => {
   const normalizedMoveName = normalizeMoveLookupKey(moveName)
   return moveStatusEffects[normalizedMoveName] || null
+}
+
+export const getMoveBattleEffect = (moveName: string): MoveBattleEffect | null => {
+  const normalizedMoveName = normalizeMoveLookupKey(moveName)
+  return moveBattleEffects[normalizedMoveName] || null
+}
+
+export const getMoveHitChance = (
+  moveName: string,
+  attackerAccuracyStage = 0,
+  defenderEvasionStage = 0,
+): number => {
+  const baseAccuracy = getMoveAccuracy(moveName) / 100
+  const adjustedAccuracy = baseAccuracy * (getBattleStatStageMultiplier(attackerAccuracyStage) / getBattleStatStageMultiplier(defenderEvasionStage))
+  return clampValue(adjustedAccuracy, 0.05, 1)
 }
 
 export const getLevelUpMoveForPokemon = (
