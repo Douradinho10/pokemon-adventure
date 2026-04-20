@@ -203,8 +203,6 @@ const getXpNeededForNextLevelByWaveCap = (level: number, waveLevelCap: number) =
 
 const GAME_SAVE_KEY = "pokemon-adventure-save-slots"
 
-const saveSource = "firebase"
-
 const getStabMultiplier = (attackType: string, pokemonType?: string) => {
   const normalizedAttackType = normalizeTypeText(attackType)
   const pokemonTypes = normalizeTypeText(pokemonType).split("/").filter(Boolean)
@@ -4083,12 +4081,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           </Button>
         </div>
       </div>
-        <div className="pixel-surface relative z-10 w-full max-w-2xl overflow-hidden bg-[#f8f4dc]/95 p-3 text-center sm:p-4">
+        <div className="pixel-surface relative z-10 w-full max-w-2xl overflow-hidden bg-[#f8f4dc]/95 p-2.5 text-center sm:p-3">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_70%)]" />
           <div className="pointer-events-none absolute left-3 top-4 h-12 w-12 rounded-full bg-rose-300/30 blur-2xl" />
           <div className="pointer-events-none absolute right-3 top-6 h-12 w-12 rounded-full bg-cyan-300/30 blur-2xl" />
 
-          <div className="relative mx-auto mb-2 grid h-24 max-w-xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[22px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-1.5 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-28 sm:gap-2 sm:p-2">
+          <div className="relative mx-auto mb-2 grid h-[5.5rem] max-w-xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[22px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-1.5 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-28 sm:gap-2 sm:p-2">
           <motion.div
             animate={{ y: [0, -8, 0], rotate: [-6, -2, -6] }}
             transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
@@ -4136,17 +4134,9 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         <p className="mx-auto mt-2 max-w-lg border-4 border-slate-800 bg-white/80 px-3 py-1.5 text-xs text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:px-4 sm:py-2 sm:text-sm">
           Bem-vindo à tua jornada Pokémon.
         </p>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-700 sm:text-[10px]">
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Batalha</span>
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Captura</span>
-          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-2.5 py-0.5 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Multiplayer</span>
-        </div>
-        <p className="mt-2 text-slate-500 text-[10px] pixel-text leading-relaxed sm:text-xs">
-          📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
-        </p>
       </div>
 
-      <div className="flex w-full max-w-sm flex-col gap-2.5">
+      <div className="mt-2.5 flex w-full max-w-sm flex-col gap-2 sm:mt-3">
         <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
           <Link href="/solo">🎮 Modo Solo</Link>
         </Button>
