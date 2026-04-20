@@ -2836,7 +2836,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const finalStarter = starterNames[Math.floor(Math.random() * starterNames.length)]
       setStarterRouletteChoice(finalStarter)
       chooseStarter(finalStarter)
-    }, 1500)
+    }, 300)
 
     return () => {
       if (starterRouletteIntervalRef.current !== null) {
@@ -4083,15 +4083,65 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           </Button>
         </div>
       </div>
-      <div className="pixel-surface relative z-10 w-full max-w-3xl space-y-2 bg-[#f8f4dc]/95 p-4 text-center sm:space-y-3 sm:p-5">
+      <div className="pixel-surface relative z-10 w-full max-w-3xl overflow-hidden bg-[#f8f4dc]/95 p-4 text-center sm:p-5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),transparent_70%)]" />
+        <div className="pointer-events-none absolute left-3 top-4 h-14 w-14 rounded-full bg-rose-300/30 blur-2xl" />
+        <div className="pointer-events-none absolute right-3 top-6 h-14 w-14 rounded-full bg-cyan-300/30 blur-2xl" />
+
+        <div className="relative mx-auto mb-3 grid h-28 max-w-2xl grid-cols-3 items-end gap-1 overflow-hidden rounded-[24px] border-4 border-slate-900 bg-[linear-gradient(180deg,#dff4ff_0%,#fff9db_100%)] p-2 shadow-[6px_6px_0_rgba(15,23,42,0.14)] sm:h-36 sm:gap-2 sm:p-3">
+          <motion.div
+            animate={{ y: [0, -8, 0], rotate: [-6, -2, -6] }}
+            transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
+            className="relative flex items-center justify-center"
+          >
+            <div className="absolute inset-x-3 bottom-1 h-4 rounded-full bg-rose-300/50 blur-xl" />
+            <AnimatedSprite
+              sprite="https://play.pokemonshowdown.com/sprites/gen5/charizard.png"
+              size="md"
+              className="sm:scale-110"
+            />
+          </motion.div>
+
+          <motion.div
+            animate={{ y: [0, -12, 0], scale: [1, 1.06, 1] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className="relative flex items-center justify-center"
+          >
+            <div className="absolute inset-2 rounded-full bg-yellow-300/60 blur-3xl animate-pulse" />
+            <AnimatedSprite
+              sprite="https://play.pokemonshowdown.com/sprites/gen5/pikachu.png"
+              size="lg"
+              className="sm:scale-110"
+            />
+          </motion.div>
+
+          <motion.div
+            animate={{ y: [0, -8, 0], rotate: [6, 2, 6] }}
+            transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+            className="relative flex items-center justify-center"
+          >
+            <div className="absolute inset-x-3 bottom-1 h-4 rounded-full bg-cyan-300/50 blur-xl" />
+            <AnimatedSprite
+              sprite="https://play.pokemonshowdown.com/sprites/gen5/blastoise.png"
+              size="md"
+              className="sm:scale-110"
+            />
+          </motion.div>
+        </div>
+
         <h2 className="font-pixel text-2xl leading-[1.5] text-slate-900 sm:text-4xl">
           Pokémon
           <span className="mt-2 block text-lg text-slate-600 sm:text-2xl">Adventure</span>
         </h2>
-        <p className="mx-auto max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:py-3">
+        <p className="mx-auto mt-3 max-w-xl border-4 border-slate-800 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-[4px_4px_0_rgba(15,23,42,0.16)] sm:py-3">
           Bem-vindo à tua jornada Pokémon.
         </p>
-        <p className="text-slate-500 text-xs pixel-text leading-relaxed">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700 sm:text-[11px]">
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Batalha</span>
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Captura</span>
+          <span className="rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 shadow-[3px_3px_0_rgba(15,23,42,0.14)]">Multiplayer</span>
+        </div>
+        <p className="mt-3 text-slate-500 text-xs pixel-text leading-relaxed">
           📍 {saveSource === "firebase" ? "Guardado no servidor" : "Guardado no navegador"}
         </p>
       </div>
