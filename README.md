@@ -31,7 +31,7 @@ If you need them separately, use `pnpm run dev:web` or `pnpm run dev:socket`.
 
 Socket.io rooms need a live Node server. `render.yaml` is included for a standalone Socket.io service.
 
-Deploy `server/socket-server.js` to a host that keeps Node processes alive. The app now defaults to `https://pokemon-adventure.onrender.com` in production, and you can override it with `NEXT_PUBLIC_SOCKET_SERVER_URL` if you move the socket service.
+Deploy `server/socket-server.js` to a host that keeps Node processes alive. The app now defaults to `https://pokemon-adventure-socket.onrender.com` in production, and you can override it with `NEXT_PUBLIC_SOCKET_SERVER_URL` if you move the socket service.
 
 If the socket server is unavailable, the app falls back to Firebase RTDB rooms.
 

@@ -597,6 +597,7 @@ io.on("connection", (socket) => {
 
       const room = entry.room
       const playersCount = roomPlayerCount(room)
+      const requiresReadyCheck = room.mode !== "competitive"
 
       if (room.status !== "waiting") {
         return { ok: false, message: "Sala ja iniciada" }
@@ -607,7 +608,7 @@ io.on("connection", (socket) => {
       }
 
       const minimumPlayers = room.mode === "competitive" ? room.maxPlayers : 2
-      if (playersCount < minimumPlayers || !areAllPlayersReady(room)) {
+      if (playersCount < minimumPlayers || (requiresReadyCheck && !areAllPlayersReady(room))) {
         return {
           ok: false,
           message:

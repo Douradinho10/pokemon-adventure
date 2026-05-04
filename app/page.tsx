@@ -1905,7 +1905,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
 
     const allPlayersReady = Object.values(multiplayerRoom.players || {}).every((player) => player.ready !== false)
 
-    if (multiplayerRoom.status === "waiting" && !allPlayersReady) {
+    if (multiplayerRoom.mode === "casual" && multiplayerRoom.status === "waiting" && !allPlayersReady) {
       setMultiplayerError("Todos os jogadores precisam de estar prontos antes de iniciar.")
       return false
     }
@@ -2004,7 +2004,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     showScreenNotice(
       multiplayerIsCasual
         ? "Disputa casual ativa: vence quem chegar mais longe (nao conta no ranking mensal)!"
-        : "Modo multiplayer rankeado ativo: cada run soma pontos e desistir conta como derrota!",
+        : "Disputa competitiva ativa: ficas no lobby até a ronda terminar.",
     )
   }, [clearSelectedSlot, multiplayerIsCasual, multiplayerRoom, setGameState, showScreenNotice])
 
@@ -2378,7 +2378,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             ? "🏆 O adversário desistiu. Venceste a ronda!"
             : shouldForfeit
             ? "🏳️ A tua partida terminou. O resultado está no lobby."
-            : `🏁 Ficaste pela wave ${finalWave}. A sala continua aberta.`,
+            : `🏁 Ficaste pela wave ${finalWave}. Voltas para o lobby e ficas à espera do adversário terminar.`,
         )
         setShowModal(null)
         setMultiplayerMode(false)
@@ -4421,18 +4421,18 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       </div>
 
       <div className="main-menu-actions mt-2.5 flex w-full max-w-sm flex-col gap-2 sm:mt-3">
-        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
+        <Button asChild className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-16 sm:text-[12px]">
           <Link href="/solo">🎮 Modo Solo</Link>
         </Button>
 
-        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
+        <Button asChild className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-16 sm:text-[12px]">
           <Link href="/multiplayer">
             <Users className="mr-2 h-3.5 w-3.5" />
             Modo Multiplayer
           </Link>
         </Button>
 
-        <Button asChild className="pixel-menu-button h-10 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[9px] leading-relaxed sm:h-11 sm:text-[10px]">
+        <Button asChild className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#3b82f6_0%,#3b82f6_50%,#2563eb_50%,#2563eb_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-16 sm:text-[12px]">
           <Link href="/leaderboards">
             <Trophy className="mr-2 h-3.5 w-3.5" />
             Ver Tabelas
@@ -4682,9 +4682,6 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const currentPlayerResolved = Boolean(currentRoomPlayer?.finishedAt || currentRoomPlayer?.forfeitAt)
     const opponentPlayers = roomPlayers.filter((player) => player.userId !== accountUserId)
     const currentOpponent = opponentPlayers[0] || null
-    const currentPlayerRoundPoints = currentRoomPlayer
-      ? calculateMultiplayerPoints({ wave: currentRoomPlayer.bestWave, forfeit: Boolean(currentRoomPlayer.forfeitAt) })
-      : 0
     const roomStarterMode = multiplayerRoom?.starterMode || (multiplayerRoom?.mode === "competitive" ? "roulette" : "manual")
     const roomWinnerPlayer = multiplayerRoom?.winnerUserId ? multiplayerRoom.players?.[multiplayerRoom.winnerUserId] || null : null
     const roomWinnerDisplayName = roomWinnerPlayer?.displayName || multiplayerRoom?.winnerDisplayName || null
@@ -5066,7 +5063,9 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">A tua wave</p>
                           <p className="mt-1 text-2xl font-black text-slate-900">Wave {currentRoomPlayer.bestWave}</p>
                           <p className="mt-1 text-xs font-semibold text-slate-600">
-                            Pontos desta ronda: {currentPlayerRoundPoints >= 0 ? "+" : ""}{currentPlayerRoundPoints}
+                            {activeRoom.status === "finished"
+                              ? "Resultado guardado no lobby."
+                              : "Ficas no lobby à espera do adversário terminar."}
                           </p>
                         </div>
                         <div className="rounded-2xl border-2 border-slate-900 bg-white p-3">
@@ -5090,7 +5089,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           </Button>
                         ) : (
                           <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                            A aguardar o host preparar a revanche.
+                            {activeRoom.mode === "competitive" ? "A aguardar a revanche." : "A aguardar o host preparar a revanche."}
                           </p>
                         )
                       ) : (
@@ -5130,7 +5129,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <div>
                             <div className="text-sm font-semibold text-slate-900">
                               {index + 1}. {player.displayName}
-                              {derivedHostUserId === player.userId ? " (Host)" : ""}
+                              {multiplayerRoom.mode === "casual" && derivedHostUserId === player.userId ? " (Host)" : ""}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">

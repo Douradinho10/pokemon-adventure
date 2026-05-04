@@ -56,7 +56,7 @@ export interface PublicCasualLobbySummary {
   createdAt: number
 }
 
-const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure.onrender.com"
+const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onrender.com"
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 const SOCKET_TIMEOUT_MS = 10000
 

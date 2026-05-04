@@ -14,7 +14,7 @@ const webPort = String(getArgValue("--port", process.env.PORT || 5000))
 const webHost = getArgValue("--host", process.env.HOST || "0.0.0.0")
 const socketPort = String(getArgValue("--socket-port", process.env.SOCKET_SERVER_PORT || 4001))
 const socketOrigin = getArgValue("--socket-origin", process.env.SOCKET_SERVER_ORIGIN || "*")
-const socketServerUrl = getArgValue("--socket-url", process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || `http://127.0.0.1:${socketPort}`)
+const socketServerUrl = getArgValue("--socket-url", `http://127.0.0.1:${socketPort}`)
 
 const nextBin = require.resolve("next/dist/bin/next")
 const socketServerPath = path.resolve(__dirname, "../server/socket-server.js")
