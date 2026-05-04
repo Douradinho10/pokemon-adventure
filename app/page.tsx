@@ -966,7 +966,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       normalized.includes("network") ||
       normalized.includes("offline") ||
       normalized.includes("timeout") ||
-      normalized.includes("demorou")
+      normalized.includes("demorou") ||
+      normalized.includes("xhr poll")
     ) {
       return withDetail("Falha de rede no multiplayer Socket.io. Tenta novamente em alguns segundos.")
     }

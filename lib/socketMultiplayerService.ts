@@ -94,6 +94,7 @@ function isSocketConnectionError(error: unknown) {
     message.includes("timeout") ||
     message.includes("connect_error") ||
     message.includes("websocket") ||
+    message.includes("xhr poll") ||
     message.includes("network") ||
     message.includes("socket.io indisponivel") ||
     message.includes("failed to fetch")
