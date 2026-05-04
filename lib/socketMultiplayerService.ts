@@ -61,6 +61,7 @@ const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_R
 const SOCKET_TIMEOUT_MS = 10000
 const LEGACY_TIMEOUT_MS = 15000
 const LEGACY_TIMEOUT_MESSAGE = "Operacao multiplayer demorou demasiado a responder"
+const HAS_EXPLICIT_SOCKET_URL = Boolean(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL)
 
 function isLocalDevelopmentHost() {
   if (typeof window === "undefined") {
@@ -71,12 +72,12 @@ function isLocalDevelopmentHost() {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.endsWith(".local")
 }
 
-function resolveSocketServerUrl() {
+function resolveSocketServerUrl(preferRemote = false) {
   if (typeof window === "undefined") {
     return SOCKET_SERVER_URL
   }
 
-  if (isLocalDevelopmentHost()) {
+  if (!preferRemote && isLocalDevelopmentHost() && !HAS_EXPLICIT_SOCKET_URL) {
     const currentPort = Number(window.location.port)
     const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
     const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
@@ -90,10 +91,15 @@ function canUseSocketTransport() {
   return Boolean(resolveSocketServerUrl())
 }
 
+function shouldAttemptRemoteFallback() {
+  return typeof window !== "undefined" && isLocalDevelopmentHost() && !HAS_EXPLICIT_SOCKET_URL
+}
+
 function isSocketConnectionError(error: unknown) {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error || "").toLowerCase()
   return (
     message.includes("timeout") ||
+    message.includes("demorou") ||
     message.includes("connect_error") ||
     message.includes("websocket") ||
     message.includes("xhr poll") ||
@@ -127,14 +133,20 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = LEGACY_TIMEOUT_MS): Pro
 }
 
 let socketInstance: Socket | null = null
+let socketServerUrlInUse: string | null = null
 
-function getSocket(): Socket {
-  const socketServerUrl = resolveSocketServerUrl()
+function getSocket(preferRemote = false): Socket {
+  const socketServerUrl = resolveSocketServerUrl(preferRemote)
   if (!socketServerUrl) {
     throw new Error("Socket.io indisponivel neste ambiente")
   }
 
-  if (!socketInstance) {
+  if (!socketInstance || socketServerUrlInUse !== socketServerUrl) {
+    if (socketInstance) {
+      socketInstance.removeAllListeners()
+      socketInstance.disconnect()
+    }
+
     socketInstance = io(socketServerUrl, {
       autoConnect: false,
       transports: ["polling", "websocket"],
@@ -142,6 +154,7 @@ function getSocket(): Socket {
       reconnection: true,
       reconnectionAttempts: 5,
     })
+    socketServerUrlInUse = socketServerUrl
   }
 
   if (!socketInstance.connected && !socketInstance.active) {
@@ -151,12 +164,12 @@ function getSocket(): Socket {
   return socketInstance
 }
 
-async function ensureSocketConnected(): Promise<Socket> {
+async function ensureSocketConnected(preferRemote = false): Promise<Socket> {
   if (typeof window === "undefined") {
     throw new Error("Socket.io indisponivel fora do browser")
   }
 
-  const socket = getSocket()
+  const socket = getSocket(preferRemote)
   if (socket.connected) {
     return socket
   }
@@ -192,9 +205,19 @@ async function ensureSocketConnected(): Promise<Socket> {
   })
 }
 
-async function emitWithAck<T>(eventName: string, payload?: unknown, timeoutMs = SOCKET_TIMEOUT_MS): Promise<T> {
-  const socket = await ensureSocketConnected()
+async function ensureSocketConnectedWithFallback(): Promise<Socket> {
+  try {
+    return await ensureSocketConnected(false)
+  } catch (error) {
+    if (!shouldAttemptRemoteFallback() || !isSocketConnectionError(error)) {
+      throw error
+    }
 
+    return await ensureSocketConnected(true)
+  }
+}
+
+async function emitWithAckOnSocket<T>(socket: Socket, eventName: string, payload?: unknown, timeoutMs = SOCKET_TIMEOUT_MS): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     socket.timeout(timeoutMs).emit(eventName, payload, (error: Error | null, response: T) => {
       if (error) {
@@ -205,6 +228,12 @@ async function emitWithAck<T>(eventName: string, payload?: unknown, timeoutMs = 
       resolve(response)
     })
   })
+}
+
+async function emitWithAck<T>(eventName: string, payload?: unknown, timeoutMs = SOCKET_TIMEOUT_MS): Promise<T> {
+  const socket = await ensureSocketConnectedWithFallback()
+
+  return await emitWithAckOnSocket(socket, eventName, payload, timeoutMs)
 }
 
 function normalizeRoomResponse<T extends { ok: boolean; message?: string }>(response: T): T {
@@ -435,16 +464,10 @@ export function subscribeMultiplayerRoom(
     return subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
   }
 
-  let socket: Socket
-  try {
-    socket = getSocket()
-  } catch (error) {
-    return subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
-  }
-
   const normalizedRoomId = roomId.trim()
   let active = true
   let legacyUnsubscribe: (() => void) | null = null
+  let socket: Socket | null = null
 
   const handleRoomUpdate = (payload: { roomId?: string; room?: MultiplayerRoom | null }) => {
     if (!active || payload.roomId !== normalizedRoomId) {
@@ -462,49 +485,72 @@ export function subscribeMultiplayerRoom(
     onRoomUpdate(null)
   }
 
-  socket.on("multiplayer:room:update", handleRoomUpdate)
-  socket.on("multiplayer:room:deleted", handleRoomDeleted)
+  const attachListeners = (target: Socket) => {
+    target.on("multiplayer:room:update", handleRoomUpdate)
+    target.on("multiplayer:room:deleted", handleRoomDeleted)
+  }
 
-  void emitWithAck<{ ok: boolean; room?: MultiplayerRoom | null; message?: string }>("multiplayer:room:subscribe", {
-    roomId: normalizedRoomId,
-  })
-    .then((response) => {
-      if (!active) {
-        return
-      }
+  const detachListeners = (target: Socket) => {
+    target.off("multiplayer:room:update", handleRoomUpdate)
+    target.off("multiplayer:room:deleted", handleRoomDeleted)
+  }
 
-      if (!response.ok) {
-        onError?.(new Error(response.message || "Nao foi possivel sincronizar a sala"))
-        return
-      }
+  const subscribeWithSocket = async () => {
+    const connectedSocket = await ensureSocketConnectedWithFallback()
+    if (!active) {
+      return
+    }
 
-      onRoomUpdate(response.room || null)
-    })
-    .catch((error) => {
-      if (!active) {
-        return
-      }
+    socket = connectedSocket
+    attachListeners(connectedSocket)
 
-      if (isSocketConnectionError(error)) {
-        socket.off("multiplayer:room:update", handleRoomUpdate)
-        socket.off("multiplayer:room:deleted", handleRoomDeleted)
+    const response = await emitWithAckOnSocket<{ ok: boolean; room?: MultiplayerRoom | null; message?: string }>(
+      connectedSocket,
+      "multiplayer:room:subscribe",
+      {
+        roomId: normalizedRoomId,
+      },
+    )
+
+    if (!active) {
+      return
+    }
+
+    if (!response.ok) {
+      onError?.(new Error(response.message || "Nao foi possivel sincronizar a sala"))
+      return
+    }
+
+    onRoomUpdate(response.room || null)
+  }
+
+  void subscribeWithSocket().catch((error) => {
+    if (!active) {
+      return
+    }
+
+    if (isSocketConnectionError(error)) {
+      if (socket) {
+        detachListeners(socket)
         socket.emit("multiplayer:room:unsubscribe", {
           roomId: normalizedRoomId,
         })
-        legacyUnsubscribe = subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
-        return
       }
+      legacyUnsubscribe = subscribeLegacyMultiplayerRoom(roomId, onRoomUpdate, onError)
+      return
+    }
 
-      onError?.(error)
-    })
+    onError?.(error)
+  })
 
   return () => {
     active = false
-    socket.off("multiplayer:room:update", handleRoomUpdate)
-    socket.off("multiplayer:room:deleted", handleRoomDeleted)
-    socket.emit("multiplayer:room:unsubscribe", {
-      roomId: normalizedRoomId,
-    })
+    if (socket) {
+      detachListeners(socket)
+      socket.emit("multiplayer:room:unsubscribe", {
+        roomId: normalizedRoomId,
+      })
+    }
     legacyUnsubscribe?.()
   }
 }
