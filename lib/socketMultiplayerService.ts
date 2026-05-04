@@ -59,6 +59,8 @@ export interface PublicCasualLobbySummary {
 const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onrender.com"
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 const SOCKET_TIMEOUT_MS = 10000
+const LEGACY_TIMEOUT_MS = 15000
+const LEGACY_TIMEOUT_MESSAGE = "Operacao multiplayer demorou demasiado a responder"
 
 function isLocalDevelopmentHost() {
   if (typeof window === "undefined") {
@@ -99,6 +101,29 @@ function isSocketConnectionError(error: unknown) {
     message.includes("socket.io indisponivel") ||
     message.includes("failed to fetch")
   )
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = LEGACY_TIMEOUT_MS): Promise<T> {
+  if (typeof window === "undefined") {
+    return promise
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(LEGACY_TIMEOUT_MESSAGE))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timeoutId)
+        reject(error)
+      },
+    )
+  })
 }
 
 let socketInstance: Socket | null = null
@@ -221,7 +246,7 @@ export async function createMultiplayerRoom(params: {
     }
   }
 
-  return await createLegacyMultiplayerRoom(params)
+  return await withTimeout(createLegacyMultiplayerRoom(params))
 }
 
 export async function joinMultiplayerRoom(params: {
@@ -245,7 +270,7 @@ export async function joinMultiplayerRoom(params: {
     }
   }
 
-  return await joinLegacyMultiplayerRoom(params)
+  return await withTimeout(joinLegacyMultiplayerRoom(params))
 }
 
 export async function leaveMultiplayerRoom(roomId: string, userId: string): Promise<void> {
@@ -263,7 +288,7 @@ export async function leaveMultiplayerRoom(roomId: string, userId: string): Prom
     }
   }
 
-  await leaveLegacyMultiplayerRoom(roomId, userId)
+  await withTimeout(leaveLegacyMultiplayerRoom(roomId, userId))
 }
 
 export async function startMultiplayerRoom(roomId: string, hostUserId: string): Promise<{ ok: boolean; message?: string }> {
@@ -282,7 +307,7 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
     }
   }
 
-  return await startLegacyMultiplayerRoom(roomId, hostUserId)
+  return await withTimeout(startLegacyMultiplayerRoom(roomId, hostUserId))
 }
 
 export async function updateMultiplayerPlayerWave(params: {
@@ -307,7 +332,7 @@ export async function updateMultiplayerPlayerWave(params: {
     }
   }
 
-  await updateLegacyMultiplayerPlayerWave(params)
+  await withTimeout(updateLegacyMultiplayerPlayerWave(params))
 }
 
 export async function markMultiplayerPlayerFinished(params: {
@@ -330,7 +355,7 @@ export async function markMultiplayerPlayerFinished(params: {
     }
   }
 
-  await markLegacyMultiplayerPlayerFinished(params)
+  await withTimeout(markLegacyMultiplayerPlayerFinished(params))
 }
 
 export async function requestMultiplayerRematch(params: {
@@ -352,7 +377,7 @@ export async function requestMultiplayerRematch(params: {
     }
   }
 
-  return await requestLegacyMultiplayerRematch(params)
+  return await withTimeout(requestLegacyMultiplayerRematch(params))
 }
 
 export async function setMultiplayerPlayerReady(params: {
@@ -375,7 +400,7 @@ export async function setMultiplayerPlayerReady(params: {
     }
   }
 
-  await setLegacyMultiplayerPlayerReady(params)
+  await withTimeout(setLegacyMultiplayerPlayerReady(params))
 }
 
 export async function setMultiplayerStarterMode(params: {
@@ -398,7 +423,7 @@ export async function setMultiplayerStarterMode(params: {
     }
   }
 
-  await setLegacyMultiplayerStarterMode(params)
+  await withTimeout(setLegacyMultiplayerStarterMode(params))
 }
 
 export function subscribeMultiplayerRoom(
@@ -506,7 +531,7 @@ export async function getPublicCasualLobbies(limitCount = 30): Promise<PublicCas
     }
   }
 
-  return await getLegacyPublicCasualLobbies(limitCount)
+  return await withTimeout(getLegacyPublicCasualLobbies(limitCount))
 }
 
 export async function joinCompetitiveQueue(params: {
@@ -533,5 +558,5 @@ export async function joinCompetitiveQueue(params: {
     }
   }
 
-  return await joinLegacyCompetitiveQueue(params)
+  return await withTimeout(joinLegacyCompetitiveQueue(params))
 }
