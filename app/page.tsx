@@ -969,7 +969,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       normalized.includes("demorou") ||
       normalized.includes("xhr poll")
     ) {
-      return withDetail("Falha de rede no multiplayer Socket.io. Tenta novamente em alguns segundos.")
+      return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
     }
 
     return withDetail(fallbackMessage)

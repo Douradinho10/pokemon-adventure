@@ -60,7 +60,7 @@ const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onren
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 const SOCKET_TIMEOUT_MS = 10000
 const LEGACY_TIMEOUT_MS = 30000
-const LEGACY_TIMEOUT_MESSAGE = "Falha de rede na base de dados de multiplayer. Tenta novamente em alguns segundos."
+const LEGACY_TIMEOUT_MESSAGE = "Falha de rede na base de dados multiplayer. Tenta novamente."
 const HAS_EXPLICIT_SOCKET_URL = Boolean(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL)
 
 function isLocalDevelopmentHost() {
@@ -102,8 +102,9 @@ function isSocketConnectionError(error: unknown) {
     message.includes("websocket") ||
     message.includes("xhr poll") ||
     message.includes("socket.io indisponivel") ||
+    message.includes("socket.io demorou") ||
     message.includes("failed to fetch") ||
-    (message.includes("timeout") && !message.includes("demorou"))
+    (message.includes("timeout") && !message.includes("base de dados") && !message.includes("database"))
   )
 }
 
