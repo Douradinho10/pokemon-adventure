@@ -3593,8 +3593,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
 
     if (selfDestructs) {
       updateBattle({ enemyHP: 0 })
-      addLog(`💥 ${currentBattle.enemyDisplayName || currentBattle.enemyName} desmaiou após ${normalizeDisplayText(attackName)}!`)
-      handleEnemyDefeat(currentBattle.enemyName)
+      addLog(`💥 ${gameState.currentBattle?.enemyDisplayName || gameState.currentBattle?.enemyName} desmaiou após ${normalizeDisplayText(attackName)}!`)
+      handleEnemyDefeat(gameState.currentBattle?.enemyName || "")
       return { playerFainted: newHP <= 0, enemyFainted: true }
     }
 
@@ -3846,6 +3846,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const handlePokeball = useCallback(
     (ballType: string) => {
       if (!gameState.currentBattle || gameState.currentBattle.enemyHP <= 0) return
+      const currentBattle = gameState.currentBattle
 
       const ballConfig = pokeballs[ballType]
       const ownedBallCount = gameState.inventory[ballType] || 0
@@ -3861,7 +3862,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       }
 
       const currentTeamSize = Object.keys(gameState.playerTeam).length
-      const enemyName = gameState.currentBattle.enemyName
+      const enemyName = currentBattle.enemyName
 
       if (currentTeamSize >= MAX_TEAM_SIZE) {
         addLog(`🚫 Equipe cheia! O máximo é ${MAX_TEAM_SIZE} Pokémon.`)
@@ -3878,10 +3879,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const newInventory = { ...gameState.inventory }
       newInventory[ballType] = Math.max(0, ownedBallCount - 1)
 
-      const enemyData = wildPokemon[gameState.currentBattle.enemyName]
+      const enemyData = wildPokemon[currentBattle.enemyName]
       const rarity = enemyData.rarity
       const isLegendaryBoss = rarity === "lendario"
-      const belowHalfHP = gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
+      const belowHalfHP = currentBattle.enemyHP <= Math.floor(currentBattle.enemyMaxHP / 2)
 
       if (isLegendaryBoss && !belowHalfHP) {
         showScreenNotice("👑 Chefes lendários só podem ser capturados após ficarem com metade da vida.")
@@ -3891,35 +3892,35 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const finalChance = getClassicCatchChance(
         ballType,
         rarity,
-        gameState.currentBattle.enemyHP,
-        gameState.currentBattle.enemyMaxHP,
-        gameState.currentBattle.enemyStatusCondition,
+        currentBattle.enemyHP,
+        currentBattle.enemyMaxHP,
+        currentBattle.enemyStatusCondition,
       )
 
       setShowModal(null)
 
       if (Math.random() < finalChance) {
-        addLog(`🎉 ${gameState.currentBattle.enemyName} capturado! (${currentTeamSize + 1}/${MAX_TEAM_SIZE})`)
+        addLog(`🎉 ${currentBattle.enemyName} capturado! (${currentTeamSize + 1}/${MAX_TEAM_SIZE})`)
 
-        const enemyStats = wildPokemonStats[gameState.currentBattle.enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
-        const capturedIVs = gameState.currentBattle.enemyIVs ?? createPokemonIVs()
+        const enemyStats = wildPokemonStats[currentBattle.enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
+        const capturedIVs = currentBattle.enemyIVs ?? createPokemonIVs()
         const maxHP = calculateHP(
           enemyStats.baseHP,
-          gameState.currentBattle.enemyLevel,
-          gameState.currentBattle.enemyName,
+          currentBattle.enemyLevel,
+          currentBattle.enemyName,
           capturedIVs,
         )
 
         const reducedMaxHP = isLegendaryBoss ? Math.max(1, Math.floor(maxHP * 0.85)) : maxHP
         const legalCapturedMoves = getLegalBattleAttacksForPokemon(
-          gameState.currentBattle.enemyName,
+          currentBattle.enemyName,
           enemyData.type,
-          gameState.currentBattle.enemyLevel,
+          currentBattle.enemyLevel,
         )
         const scaledCapturedMoves = Object.fromEntries(
           Object.entries(legalCapturedMoves).map(([name, power]) => [
             name,
-            calculateAttackPower(power, gameState.currentBattle.enemyLevel, capturedIVs),
+            calculateAttackPower(power, currentBattle.enemyLevel, capturedIVs),
           ]),
         )
         const capturedAttacks = isLegendaryBoss
