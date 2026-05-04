@@ -950,16 +950,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       .join(" | ")
       .slice(0, 180)
 
-    const withDetail = (message: string) => (technicalDetail ? `${message} [detalhe: ${technicalDetail}]` : message)
-
     if (normalized.includes("permission") || normalized.includes("denied") || normalized.includes("unauthorized")) {
-      return withDetail("O servidor Socket.io recusou a operacao. Confirma que o multiplayer esta online.")
+      return "O servidor recusou a operacao. Tenta novamente."
     }
 
     if (normalized.includes("indisponivel") || normalized.includes("database") || normalized.includes("config")) {
-      return withDetail(
-        "Socket.io indisponivel para multiplayer. Confirma NEXT_PUBLIC_SOCKET_SERVER_URL e se o servidor Socket.io esta a correr.",
-      )
+      return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
     }
 
     if (
@@ -972,7 +968,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return "Falha de rede no multiplayer. Tenta novamente em alguns segundos."
     }
 
-    return withDetail(fallbackMessage)
+    return fallbackMessage
   }, [])
 
   const joinMultiplayerRoomByCode = useCallback(
