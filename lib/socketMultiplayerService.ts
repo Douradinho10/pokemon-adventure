@@ -58,7 +58,8 @@ export interface PublicCasualLobbySummary {
 
 const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onrender.com"
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
-const SOCKET_TIMEOUT_MS = 10000
+const SOCKET_TIMEOUT_MS = 3000
+const SOCKET_LOCAL_TIMEOUT_MS = 2000
 const LEGACY_TIMEOUT_MS = 30000
 const LEGACY_TIMEOUT_MESSAGE = "Falha de rede na base de dados multiplayer. Tenta novamente."
 const HAS_EXPLICIT_SOCKET_URL = Boolean(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL)
@@ -174,10 +175,11 @@ async function ensureSocketConnected(preferRemote = false): Promise<Socket> {
   }
 
   return await new Promise<Socket>((resolve, reject) => {
+    const timeoutMs = !preferRemote && isLocalDevelopmentHost() ? SOCKET_LOCAL_TIMEOUT_MS : SOCKET_TIMEOUT_MS
     const timeoutId = window.setTimeout(() => {
       cleanup()
       reject(new Error("Socket.io demorou demasiado a responder"))
-    }, SOCKET_TIMEOUT_MS)
+    }, timeoutMs)
 
     const onConnect = () => {
       cleanup()
