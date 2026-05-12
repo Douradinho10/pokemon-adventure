@@ -597,11 +597,13 @@ export async function joinCompetitiveQueue(params: {
         },
       )
 
-      return normalizeRoomResponse(response)
-    } catch (error) {
-      if (!isSocketConnectionError(error)) {
-        throw error
+      if (response.ok) {
+        return normalizeRoomResponse(response)
       }
+
+      throw new Error(response.message || "Nao foi possivel entrar na fila competitiva")
+    } catch {
+      // Fall back to the legacy queue whenever the socket path cannot complete the join.
     }
   }
 
