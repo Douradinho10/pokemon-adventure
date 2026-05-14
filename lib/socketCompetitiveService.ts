@@ -21,6 +21,19 @@ interface SocketQueueResult {
 const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onrender.com"
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 
+function resolveLocalSocketHostname() {
+  if (typeof window === "undefined") {
+    return "127.0.0.1"
+  }
+
+  const hostname = window.location.hostname.toLowerCase()
+  if (hostname === "localhost" || hostname === "0.0.0.0") {
+    return "127.0.0.1"
+  }
+
+  return window.location.hostname
+}
+
 function isLocalDevelopmentHost() {
   if (typeof window === "undefined") {
     return false
@@ -42,7 +55,7 @@ function resolveSocketServerUrl() {
   if (isLocalDevelopmentHost()) {
     const currentPort = Number(window.location.port)
     const socketPort = Number.isFinite(currentPort) && currentPort >= 3000 && currentPort < 4000 ? currentPort + 1000 : 4001
-    const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname
+    const hostname = resolveLocalSocketHostname()
     return `${window.location.protocol}//${hostname}:${socketPort}`
   }
 
