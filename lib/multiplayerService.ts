@@ -165,31 +165,41 @@ function finalizeFinishedRoom(room: MultiplayerRoom, finishedAt = Date.now()): M
     ...room,
     status: "finished",
     finishedAt,
-    winnerUserId: winner?.userId,
-    winnerDisplayName: winner?.displayName,
-    winnerReason: winner?.reason,
+    ...(winner?.userId ? { winnerUserId: winner.userId } : {}),
+    ...(winner?.displayName ? { winnerDisplayName: winner.displayName } : {}),
+    ...(winner?.reason ? { winnerReason: winner.reason } : {}),
   }
 }
 
 function resetRoomForRematch(room: MultiplayerRoom): MultiplayerRoom {
+  const {
+    startedAt: _startedAt,
+    finishedAt: _finishedAt,
+    winnerUserId: _winnerUserId,
+    winnerDisplayName: _winnerDisplayName,
+    winnerReason: _winnerReason,
+    ...roomWithoutResult
+  } = room
+
   return {
-    ...room,
+    ...roomWithoutResult,
     status: "waiting",
-    startedAt: undefined,
-    finishedAt: undefined,
-    winnerUserId: undefined,
-    winnerDisplayName: undefined,
-    winnerReason: undefined,
     players: Object.fromEntries(
       Object.entries(room.players || {}).map(([id, player]) => [
         id,
-        {
-          ...player,
-          bestWave: 0,
-          finishedAt: undefined,
-          forfeitAt: undefined,
-          ready: false,
-        },
+        (() => {
+          const {
+            finishedAt: _playerFinishedAt,
+            forfeitAt: _playerForfeitAt,
+            ...playerWithoutResult
+          } = player
+
+          return {
+            ...playerWithoutResult,
+            bestWave: 0,
+            ready: false,
+          }
+        })(),
       ]),
     ),
   }
@@ -498,7 +508,7 @@ export async function joinMultiplayerRoom(params: {
     return {
       ...normalizedCurrent,
       status: shouldAutoStartCompetitive ? "active" : current.status,
-      startedAt: shouldAutoStartCompetitive ? Date.now() : current.startedAt,
+      ...(shouldAutoStartCompetitive ? { startedAt: Date.now() } : {}),
       starterMode: normalizedCurrent.starterMode || "roulette",
       players: shouldAutoStartCompetitive
         ? Object.fromEntries(
@@ -507,8 +517,6 @@ export async function joinMultiplayerRoom(params: {
               {
                 ...player,
                 bestWave: 0,
-                finishedAt: undefined,
-                forfeitAt: undefined,
                 ready: false,
               },
             ]),
@@ -933,8 +941,6 @@ export async function startMultiplayerRoom(roomId: string, hostUserId: string): 
           {
             ...player,
             bestWave: 0,
-            finishedAt: undefined,
-            forfeitAt: undefined,
             ready: true,
           },
         ]),
@@ -982,14 +988,15 @@ export async function updateMultiplayerPlayerWave(params: {
   await runTransaction(playerRef, (current: MultiplayerRoomPlayer | null) => {
     const now = Date.now()
     const currentBest = Math.max(0, current?.bestWave || 0)
+
     return {
       userId: params.userId,
       displayName: params.displayName,
       joinedAt: current?.joinedAt || now,
       bestWave: Math.max(currentBest, Math.max(0, params.wave)),
-      ready: current?.ready,
-      finishedAt: current?.finishedAt,
-      forfeitAt: current?.forfeitAt,
+      ...(typeof current?.ready === "boolean" ? { ready: current.ready } : {}),
+      ...(typeof current?.finishedAt === "number" ? { finishedAt: current.finishedAt } : {}),
+      ...(typeof current?.forfeitAt === "number" ? { forfeitAt: current.forfeitAt } : {}),
     }
   })
 }
@@ -1027,7 +1034,7 @@ export async function markMultiplayerPlayerFinished(params: { roomId: string; us
       ...current,
       players: nextPlayers,
       status: current.status,
-      finishedAt: current.finishedAt,
+      ...(typeof current.finishedAt === "number" ? { finishedAt: current.finishedAt } : {}),
     }
   })
 }
