@@ -363,6 +363,10 @@ export async function joinMultiplayerRoom(params: {
         displayName: params.displayName,
       })
 
+      if (!response.ok || !response.room) {
+        throw new Error(response.message || "Nao foi possivel entrar na sala")
+      }
+
       return normalizeRoomResponse(response)
     },
     legacyOperation: async () => {
