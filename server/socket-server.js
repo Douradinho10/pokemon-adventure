@@ -3,6 +3,7 @@ const { Server } = require("socket.io")
 
 const PORT = Number(process.env.PORT || process.env.SOCKET_SERVER_PORT || 4001)
 const ORIGIN = process.env.SOCKET_SERVER_ORIGIN || "*"
+const ORIGIN_REGEX = process.env.SOCKET_SERVER_ORIGIN_REGEX || "^https://pokemon-adventure-.*\\.vercel\\.app$"
 
 const ROOM_STALE_MS = 30 * 60 * 1000
 const FINISHED_ROOM_TTL_MS = 10 * 60 * 1000
@@ -11,14 +12,67 @@ const ROOM_ID_LENGTH = 5
 
 const rooms = new Map()
 
-const httpServer = createServer()
+const allowedOrigins = ORIGIN.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+let originRegex = null
+if (ORIGIN_REGEX) {
+  try {
+    originRegex = new RegExp(ORIGIN_REGEX)
+  } catch {
+    originRegex = null
+  }
+}
+
+function isOriginAllowed(origin) {
+  if (!origin) {
+    return true
+  }
+
+  if (allowedOrigins.includes("*")) {
+    return true
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true
+  }
+
+  return Boolean(originRegex && originRegex.test(origin))
+}
+
+const httpServer = createServer((req, res) => {
+  const requestUrl = req.url || "/"
+
+  if (requestUrl.startsWith("/socket.io/")) {
+    return
+  }
+
+  if (requestUrl === "/" || requestUrl.startsWith("/healthz")) {
+    res.statusCode = 200
+    res.setHeader("Content-Type", "application/json")
+    res.end(JSON.stringify({ ok: true, service: "pokemon-adventure-socket" }))
+    return
+  }
+
+  res.statusCode = 404
+  res.setHeader("Content-Type", "application/json")
+  res.end(JSON.stringify({ ok: false, message: "Not Found" }))
+})
+
 const io = new Server(httpServer, {
   cors: {
-    origin: ORIGIN,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error(`Origin not allowed: ${origin}`), false)
+    },
     methods: ["GET", "POST"],
   },
 })
-
 function cloneRoom(room) {
   return {
     ...room,

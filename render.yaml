@@ -7,4 +7,6 @@ services:
     startCommand: node server/socket-server.js
     envVars:
       - key: SOCKET_SERVER_ORIGIN
-        value: "*"
+        value: "https://pokemon-adventure-xaqx.vercel.app,https://localhost:3001,http://127.0.0.1:3001,http://localhost:3001"
+      - key: SOCKET_SERVER_ORIGIN_REGEX
+        value: "^https://pokemon-adventure-.*\\.vercel\\.app$"
