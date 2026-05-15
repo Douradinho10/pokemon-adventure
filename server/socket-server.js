@@ -122,6 +122,21 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
 })
+// Helper to robustly require the data module from different relative paths
+function tryLoadPokemonData() {
+  const candidates = ["../data/pokemonData", "../../data/pokemonData", "../data/pokemonData.js", "../../data/pokemonData.js", "../data/pokemonData.ts", "../../data/pokemonData.ts"]
+  for (const p of candidates) {
+    try {
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      const mod = require(p)
+      if (mod) return mod
+    } catch (err) {
+      // ignore and try next
+    }
+  }
+  console.error("pokemon-adventure: failed to load data/pokemonData from known paths")
+  return null
+}
 function cloneRoom(room) {
   return {
     ...room,
@@ -153,7 +168,7 @@ function scheduleBotSimulation(roomId, botId) {
   // choose starter (if roulette) and broadcast quickly
   const starterMode = room.starterMode || (room.mode === "competitive" ? "roulette" : "manual")
   if (starterMode === "roulette") {
-    const starterNames = Object.keys(require("../data/pokemonData")?.starterPokemon || {})
+    const starterNames = Object.keys((tryLoadPokemonData()?.starterPokemon) || {})
     const choice = starterNames.length ? starterNames[randomInt(0, starterNames.length - 1)] : null
     if (choice) {
       const nextRoom = {
