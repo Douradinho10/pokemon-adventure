@@ -2062,6 +2062,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     }
 
+    // Only auto-start competitive rooms. Casual runs must be started by the host.
+    if (multiplayerRoom.mode !== "competitive") {
+      autoStartedCompetitiveRoomRef.current = null
+      return
+    }
+
     autoStartedCompetitiveRoomRef.current = multiplayerJoinedRoomId
     handleStartMultiplayerRun()
   }, [accountUserId, handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
@@ -4783,8 +4789,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const canOpenRematch = Boolean(
       multiplayerRoom &&
         multiplayerRoom.status === "finished" &&
-        roomSize >= 2 &&
-        (multiplayerRoom.mode === "competitive" || isHost),
+        (multiplayerRoom.mode === "competitive" ? roomSize >= 2 : isHost),
     )
     const roomActionGridClass = multiplayerRoom && multiplayerRoom.status === "waiting" ? (multiplayerRoom.mode === "casual" && isHost ? "sm:grid-cols-3" : "sm:grid-cols-2") : "sm:grid-cols-1"
     const activeRoom = multiplayerRoom!
