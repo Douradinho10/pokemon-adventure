@@ -71,6 +71,8 @@ import {
   setMultiplayerPlayerReady,
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
+  addBotToRoom,
+  kickPlayerFromRoom,
   type MultiplayerRoom,
   type PublicCasualLobbySummary,
   type MultiplayerRoomVisibility,
@@ -1945,6 +1947,36 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       setMultiplayerBusy(false)
     }
   }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
+
+  const handleAddBot = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId) return
+    setMultiplayerBusy(true)
+    try {
+      const res = await addBotToRoom({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId, displayName: `Bot` })
+      if (!res.ok) {
+        setMultiplayerError(res.message || "Nao foi possivel adicionar bot")
+      }
+    } catch (err) {
+      setMultiplayerError("Erro ao adicionar bot")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, multiplayerJoinedRoomId])
+
+  const handleKickPlayer = useCallback(async (targetUserId: string) => {
+    if (!multiplayerJoinedRoomId || !accountUserId) return
+    setMultiplayerBusy(true)
+    try {
+      const res = await kickPlayerFromRoom({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId, targetUserId })
+      if (!res.ok) {
+        setMultiplayerError(res.message || "Nao foi possivel expulsar")
+      }
+    } catch (err) {
+      setMultiplayerError("Erro ao expulsar")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, multiplayerJoinedRoomId])
 
   useEffect(() => {
     if (!multiplayerRoom || !multiplayerJoinedRoomId) {
@@ -4625,13 +4657,24 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       {index + 1}. {player.displayName}
                       {multiplayerRoom.mode === "casual" && derivedHostUserId === player.userId ? " (Host)" : ""}
                     </span>
-                    <span className="text-xs font-black text-slate-700">Wave {player.bestWave}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-700">Wave {player.bestWave}</span>
+                      {isHost && multiplayerRoom.mode === "casual" && player.userId !== derivedHostUserId && (
+                        <Button
+                          onClick={() => handleKickPlayer(player.userId)}
+                          disabled={multiplayerBusy}
+                          className="pixel-menu-button h-7 px-2 text-[10px] leading-relaxed sm:text-xs"
+                        >
+                          Expulsar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
               {multiplayerRoom.mode === "casual" ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                   <Button
                     onClick={handleLeaveMultiplayerRoom}
                     disabled={multiplayerBusy}
@@ -4655,6 +4698,15 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                   >
                     Jogar Run Multiplayer
                   </Button>
+                  {isHost && (
+                    <Button
+                      onClick={handleAddBot}
+                      disabled={multiplayerBusy || Object.keys(multiplayerRoom.players || {}).length >= multiplayerRoom.maxPlayers}
+                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Adicionar Bot
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border-2 border-slate-700 bg-slate-100 px-3 py-3 text-center text-[11px] font-semibold text-slate-700">

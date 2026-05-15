@@ -136,6 +136,78 @@ function cloneRoom(room) {
   }
 }
 
+function isBotId(userId) {
+  return typeof userId === "string" && userId.startsWith("BOT_")
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+function scheduleBotSimulation(roomId, botId) {
+  const entry = getRoomEntry(roomId)
+  if (!entry) return
+  const room = entry.room
+  if (!room || !room.players || !room.players[botId]) return
+
+  // choose starter (if roulette) and broadcast quickly
+  const starterMode = room.starterMode || (room.mode === "competitive" ? "roulette" : "manual")
+  if (starterMode === "roulette") {
+    const starterNames = Object.keys(require("../data/pokemonData")?.starterPokemon || {})
+    const choice = starterNames.length ? starterNames[randomInt(0, starterNames.length - 1)] : null
+    if (choice) {
+      const nextRoom = {
+        ...room,
+        players: {
+          ...room.players,
+          [botId]: {
+            ...(room.players[botId] || {}),
+            // expose chosen starter for clients if they care
+            starterName: choice,
+          },
+        },
+      }
+
+      saveRoom(nextRoom)
+      broadcastRoom(roomId)
+    }
+  }
+
+  // simulate playing: after random delay mark finished with a random bestWave
+  const playTimeMs = randomInt(4000, 12000)
+  setTimeout(() => {
+    const entry2 = getRoomEntry(roomId)
+    if (!entry2) return
+    const room2 = entry2.room
+    if (!room2 || !room2.players || !room2.players[botId]) return
+
+    const now = Date.now()
+    const bestWave = randomInt(1, 30)
+    const nextRoom2 = {
+      ...room2,
+      players: {
+        ...room2.players,
+        [botId]: {
+          ...(room2.players[botId] || {}),
+          bestWave: Math.max(room2.players[botId].bestWave || 0, bestWave),
+          finishedAt: room2.players[botId].finishedAt || now,
+          ready: false,
+        },
+      },
+    }
+
+    const everyoneFinished = areAllPlayersResolved(nextRoom2.players)
+    if (everyoneFinished) {
+      saveRoom(finalizeFinishedRoom(nextRoom2, now))
+      broadcastRoom(roomId)
+      return
+    }
+
+    saveRoom(nextRoom2)
+    broadcastRoom(roomId)
+  }, playTimeMs)
+}
+
 function generateRoomId(length = ROOM_ID_LENGTH) {
   let output = ""
   for (let index = 0; index < length; index++) {
@@ -742,7 +814,100 @@ io.on("connection", (socket) => {
       saveRoom(nextRoom)
       broadcastRoom(roomId)
 
+      // schedule bot simulations for any bots in this room
+      for (const id of Object.keys(nextRoom.players || {})) {
+        if (isBotId(id)) {
+          scheduleBotSimulation(roomId, id)
+        }
+      }
+
       return { ok: true, room: cloneRoom(nextRoom) }
+    }),
+  )
+
+  socket.on(
+    "multiplayer:room:add-bot",
+    withAck((payload) => {
+      const roomId = String(payload?.roomId || "").trim()
+      const hostUserId = String(payload?.hostUserId || "").trim()
+      const displayName = String(payload?.displayName || "Bot").trim() || "Bot"
+
+      if (!roomId || !hostUserId) {
+        return { ok: false, message: "Dados invalidos para adicionar bot" }
+      }
+
+      const entry = getRoomEntry(roomId)
+      if (!entry) {
+        return { ok: false, message: "Sala nao encontrada" }
+      }
+
+      const room = entry.room
+      if (room.mode !== "casual") {
+        return { ok: false, message: "Bots so estao disponíveis no modo casual" }
+      }
+
+      if (room.hostUserId !== hostUserId) {
+        return { ok: false, message: "Apenas o host pode adicionar bots" }
+      }
+
+      if (roomPlayerCount(room) >= room.maxPlayers) {
+        return { ok: false, message: "Sala cheia" }
+      }
+
+      // generate bot id
+      const botId = `BOT_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`
+      const nextRoom = {
+        ...room,
+        players: {
+          ...room.players,
+          [botId]: {
+            userId: botId,
+            displayName,
+            joinedAt: Date.now(),
+            bestWave: 0,
+            ready: true,
+          },
+        },
+      }
+
+      saveRoom(nextRoom)
+      broadcastRoom(roomId)
+
+      return { ok: true, room: cloneRoom(nextRoom), botId }
+    }),
+  )
+
+  socket.on(
+    "multiplayer:room:kick",
+    withAck((payload) => {
+      const roomId = String(payload?.roomId || "").trim()
+      const hostUserId = String(payload?.hostUserId || "").trim()
+      const targetUserId = String(payload?.targetUserId || "").trim()
+
+      if (!roomId || !hostUserId || !targetUserId) {
+        return { ok: false, message: "Dados invalidos para expulsar jogador" }
+      }
+
+      const entry = getRoomEntry(roomId)
+      if (!entry) {
+        return { ok: false, message: "Sala nao encontrada" }
+      }
+
+      const room = entry.room
+      if (room.mode !== "casual") {
+        return { ok: false, message: "So e possivel expulsar no modo casual" }
+      }
+
+      if (room.hostUserId !== hostUserId) {
+        return { ok: false, message: "Apenas o host pode expulsar jogadores" }
+      }
+
+      if (targetUserId === room.hostUserId) {
+        return { ok: false, message: "Nao podes expulsar o host" }
+      }
+
+      removeUserFromRoom(roomId, targetUserId)
+      return { ok: true }
     }),
   )
 

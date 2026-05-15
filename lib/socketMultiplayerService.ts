@@ -527,6 +527,24 @@ export async function setMultiplayerStarterMode(params: {
   })
 }
 
+export async function addBotToRoom(params: { roomId: string; hostUserId: string; displayName?: string }): Promise<{ ok: boolean; room?: MultiplayerRoom; botId?: string; message?: string }> {
+  if (!canUseSocketTransport()) {
+    return { ok: false, message: "Bots only available when socket transport is active" }
+  }
+
+  const socket = await ensureSocketConnectedWithFallback()
+  return await emitWithAckOnSocket(socket, "multiplayer:room:add-bot", params)
+}
+
+export async function kickPlayerFromRoom(params: { roomId: string; hostUserId: string; targetUserId: string }): Promise<{ ok: boolean; message?: string }> {
+  if (!canUseSocketTransport()) {
+    return { ok: false, message: "Kick requires socket transport" }
+  }
+
+  const socket = await ensureSocketConnectedWithFallback()
+  return await emitWithAckOnSocket(socket, "multiplayer:room:kick", params)
+}
+
 export function subscribeMultiplayerRoom(
   roomId: string,
   onRoomUpdate: (room: MultiplayerRoom | null) => void,
