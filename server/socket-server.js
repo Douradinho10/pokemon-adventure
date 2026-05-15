@@ -846,6 +846,10 @@ io.on("connection", (socket) => {
         return { ok: false, message: "Bots so estao disponíveis no modo casual" }
       }
 
+      if (room.status !== "waiting") {
+        return { ok: false, message: "Nao e possivel adicionar bots apos o inicio da sala" }
+      }
+
       if (room.hostUserId !== hostUserId) {
         return { ok: false, message: "Apenas o host pode adicionar bots" }
       }

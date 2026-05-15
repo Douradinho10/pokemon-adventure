@@ -4698,7 +4698,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                   >
                     Jogar Run Multiplayer
                   </Button>
-                  {isHost && (
+                  {isHost && multiplayerRoom.status === "waiting" && (
                     <Button
                       onClick={handleAddBot}
                       disabled={multiplayerBusy || Object.keys(multiplayerRoom.players || {}).length >= multiplayerRoom.maxPlayers}
