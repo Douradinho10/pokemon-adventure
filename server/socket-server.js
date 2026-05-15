@@ -41,10 +41,59 @@ function isOriginAllowed(origin) {
   return Boolean(originRegex && originRegex.test(origin))
 }
 
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = ""
+
+    req.on("data", (chunk) => {
+      body += chunk
+
+      if (body.length > 10_000) {
+        reject(new Error("Request body too large"))
+        req.destroy()
+      }
+    })
+
+    req.on("end", () => resolve(body))
+    req.on("error", reject)
+  })
+}
+
 const httpServer = createServer((req, res) => {
   const requestUrl = req.url || "/"
 
   if (requestUrl.startsWith("/socket.io/")) {
+    return
+  }
+
+  if (requestUrl === "/multiplayer/leave" && req.method === "POST") {
+    readRequestBody(req)
+      .then((body) => {
+        let payload = null
+
+        if (body) {
+          try {
+            payload = JSON.parse(body)
+          } catch {
+            payload = null
+          }
+        }
+
+        const roomId = String(payload?.roomId || "").trim()
+        const userId = String(payload?.userId || "").trim()
+
+        if (roomId && userId) {
+          removeUserFromRoom(roomId, userId)
+        }
+
+        res.statusCode = 204
+        res.end()
+      })
+      .catch(() => {
+        res.statusCode = 204
+        res.end()
+      })
+
     return
   }
 

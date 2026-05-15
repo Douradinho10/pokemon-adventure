@@ -2482,12 +2482,31 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     }
 
+    const socketServerUrl = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "https://pokemon-adventure.onrender.com"
+
     const handlePageExit = () => {
       if (!multiplayerMode || !accountUserId || !multiplayerJoinedRoomId) {
         return
       }
 
-      void handleGameOver({ silent: true, forfeit: true })
+      const payload = JSON.stringify({
+        roomId: multiplayerJoinedRoomId,
+        userId: accountUserId,
+      })
+
+      if (typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(`${socketServerUrl}/multiplayer/leave`, new Blob([payload], { type: "application/json" }))
+        return
+      }
+
+      void fetch(`${socketServerUrl}/multiplayer/leave`, {
+        method: "POST",
+        body: payload,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        keepalive: true,
+      }).catch(() => {})
     }
 
     window.addEventListener("pagehide", handlePageExit)
