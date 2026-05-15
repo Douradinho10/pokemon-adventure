@@ -2072,6 +2072,40 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     handleStartMultiplayerRun()
   }, [accountUserId, handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
 
+  // Fallback: if the room just transitioned to active, ensure the client starts the run.
+  // This helps when the primary auto-start checks miss a transition.
+  const prevRoomStatusRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const prevStatus = prevRoomStatusRef.current
+    const currStatus = multiplayerRoom?.status
+    prevRoomStatusRef.current = currStatus
+
+    if (!multiplayerRoom || !multiplayerJoinedRoomId || multiplayerMode) {
+      return
+    }
+
+    // only react to a transition into active
+    if (prevStatus === "active" || currStatus !== "active") {
+      return
+    }
+
+    if (!accountUserId) {
+      return
+    }
+
+    // must be a player in this room
+    if (!multiplayerRoom.players?.[accountUserId]) {
+      return
+    }
+
+    // avoid starting while in defeat reset
+    if (defeatResetTimeoutRef.current) {
+      return
+    }
+
+    handleStartMultiplayerRun()
+  }, [accountUserId, handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
+
   useEffect(() => {
     const legacyCharges = Number(gameState.inventory[LEGACY_BATTLE_SIM_ITEM] || 0)
     if (legacyCharges <= 0) {
