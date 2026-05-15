@@ -4790,10 +4790,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const activeRoom = multiplayerRoom!
 
     return (
-      <div className="flex h-[calc(100dvh-1.5rem)] flex-col overflow-hidden md:h-[calc(100dvh-2rem)]">
+      <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col overflow-y-auto md:h-[calc(100dvh-2rem)] md:overflow-hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border-4 border-slate-900 bg-[linear-gradient(135deg,#ecfeff_0%,#ecfdf5_46%,#fff7ed_100%)] shadow-[10px_10px_0_rgba(15,23,42,0.16)]">
           <div className="border-b-4 border-slate-900 px-3 py-3 sm:px-4 sm:py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="max-w-3xl space-y-1 sm:space-y-2">
                 <div className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-900">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -4805,8 +4805,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 </p>
               </div>
 
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-col items-stretch gap-2 md:items-end">
+                <div className="flex flex-wrap gap-2 md:justify-end">
                   <Badge className="pixel-badge border-2 border-slate-900 bg-[linear-gradient(180deg,#10b981_0%,#10b981_50%,#059669_50%,#059669_100%)] px-3 py-1 text-white shadow-[3px_3px_0_rgba(15,23,42,0.22)]">
                     {multiplayerBusy ? "A sincronizar" : "Ligado"}
                   </Badge>
@@ -4816,7 +4816,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                   <Button
                     onClick={handleExitMultiplayerToMainMenu}
                     disabled={multiplayerBusy}
-                    className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                    className="pixel-menu-button h-9 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:w-auto sm:text-xs"
                   >
                     Menu
                   </Button>
@@ -4828,12 +4828,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
               {!lockCompetitiveTabs && (
                 <Button
                   onClick={() => setMultiplayerSection("competitive")}
-                  className={`pixel-menu-button h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                  className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                 >
                   Competitivo
                 </Button>
               )}
-              <div className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-4 text-[10px] leading-relaxed sm:text-xs flex items-center gap-3">
+              <div className="pixel-menu-button h-10 sm:h-11 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-4 text-[10px] leading-relaxed sm:text-xs flex items-center gap-3">
                 <div className="w-6 h-6 rounded-full bg-white/80 border-2 border-slate-900" />
                 <span className="font-semibold">Casual</span>
               </div>
@@ -4861,16 +4861,16 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       </Badge>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <Button
                         onClick={() => setCompetitiveQueueSize(2)}
-                        className={`pixel-menu-button h-10 ${competitiveQueueSize === 2 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                        className={`pixel-menu-button h-10 w-full ${competitiveQueueSize === 2 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                       >
                         Fila 2 Jogadores
                       </Button>
                       <Button
                         onClick={() => setCompetitiveQueueSize(3)}
-                        className={`pixel-menu-button h-10 ${competitiveQueueSize === 3 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                        className={`pixel-menu-button h-10 w-full ${competitiveQueueSize === 3 ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                       >
                         Fila 3 Jogadores
                       </Button>
@@ -4921,14 +4921,14 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <Button
                             onClick={() => handleCreateMultiplayerRoom(2, "public")}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                           >
                             Criar lobby público 2
                           </Button>
                           <Button
                             onClick={() => handleCreateMultiplayerRoom(3, "public")}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                           >
                             Criar lobby público 3
                           </Button>
@@ -4939,7 +4939,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <Button
                             onClick={() => void refreshPublicCasualLobbies()}
                             disabled={publicCasualLobbiesLoading}
-                            className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button h-9 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:w-auto sm:text-xs"
                           >
                             Atualizar
                           </Button>
@@ -4962,7 +4962,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                         ) : (
                           <div className="mt-3 max-h-[min(34vh,18rem)] space-y-2 overflow-y-auto pr-1">
                             {publicCasualLobbies.map((lobby) => (
-                              <div key={lobby.id} className="flex items-center justify-between gap-2 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                              <div key={lobby.id} className="flex flex-col gap-2 rounded-2xl border-2 border-slate-900 bg-white px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)] sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                   <div className="text-sm font-semibold text-slate-900">{lobby.hostDisplayName}</div>
                                   <div className="text-xs text-slate-600">
@@ -4972,7 +4972,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                                 <Button
                                   onClick={() => void handleJoinPublicCasualLobby(lobby.id)}
                                   disabled={multiplayerBusy}
-                                  className="pixel-menu-button h-9 bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:text-xs"
+                                  className="pixel-menu-button h-9 w-full bg-[linear-gradient(180deg,#16a34a_0%,#16a34a_50%,#166534_50%,#166534_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-3 text-[10px] leading-relaxed sm:w-auto sm:text-xs"
                                 >
                                   Entrar
                                 </Button>
@@ -4997,14 +4997,14 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <Button
                             onClick={() => handleCreateMultiplayerRoom(2, "private")}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#14b8a6_0%,#14b8a6_50%,#0f766e_50%,#0f766e_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                           >
                             Criar sala privada 2
                           </Button>
                           <Button
                             onClick={() => handleCreateMultiplayerRoom(3, "private")}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button h-12 bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                            className="pixel-menu-button h-12 w-full bg-[linear-gradient(180deg,#6366f1_0%,#6366f1_50%,#4338ca_50%,#4338ca_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                           >
                             Criar sala privada 3
                           </Button>
@@ -5082,11 +5082,11 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                     </div>
                   ) : null}
 
-                  <div className={`mt-4 grid gap-2 ${roomActionGridClass}`}>
+                  <div className={`mt-4 grid grid-cols-1 gap-2 ${roomActionGridClass}`}>
                     <Button
                       onClick={handleLeaveMultiplayerRoom}
                       disabled={multiplayerBusy}
-                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                     >
                       Sair do Grupo
                     </Button>
@@ -5094,7 +5094,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       <Button
                         onClick={handleToggleMultiplayerReady}
                         disabled={multiplayerBusy}
-                        className={`pixel-menu-button h-11 ${currentPlayerReady ? "bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} text-[10px] leading-relaxed sm:text-xs`}
+                        className={`pixel-menu-button h-11 w-full ${currentPlayerReady ? "bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                       >
                         {currentPlayerReady ? "Desmarcar pronto" : "Estou pronto"}
                       </Button>
@@ -5103,7 +5103,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       <Button
                         onClick={handleStartMultiplayerRoom}
                         disabled={multiplayerBusy || !allPlayersReady}
-                        className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                        className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#f97316_0%,#f97316_50%,#ea580c_50%,#ea580c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                       >
                         {allPlayersReady ? "Iniciar partida" : "A aguardar pronto"}
                       </Button>
@@ -5112,7 +5112,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                       <Button
                         onClick={handleAddBot}
                         disabled={multiplayerBusy || Object.keys(activeRoom.players || {}).length >= activeRoom.maxPlayers}
-                        className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                        className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
                       >
                         Adicionar Bot
                       </Button>
