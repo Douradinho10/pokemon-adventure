@@ -58,7 +58,7 @@ export interface PublicCasualLobbySummary {
 
 type RoomTransport = "socket" | "legacy"
 
-const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure-socket.onrender.com"
+const DEFAULT_REMOTE_SOCKET_SERVER_URL = "https://pokemon-adventure.onrender.com"
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || DEFAULT_REMOTE_SOCKET_SERVER_URL
 const SOCKET_TIMEOUT_MS = 3000
 const SOCKET_LOCAL_TIMEOUT_MS = 2000
