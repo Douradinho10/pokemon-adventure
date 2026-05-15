@@ -814,6 +814,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const loginRedirectTimeoutRef = useRef<number | null>(null)
   const starterRouletteIntervalRef = useRef<number | null>(null)
   const starterRouletteTimeoutRef = useRef<number | null>(null)
+  const STARTER_ROULETTE_INTERVAL_MS = 90
+  const STARTER_ROULETTE_DURATION_MS = 2600
   const hasAutoRoutedAfterAuthRef = useRef(false)
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
@@ -2986,7 +2988,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
 
     starterRouletteIntervalRef.current = window.setInterval(() => {
       setStarterRouletteChoice(pickNextStarter())
-    }, 120)
+    }, STARTER_ROULETTE_INTERVAL_MS)
 
     starterRouletteTimeoutRef.current = window.setTimeout(() => {
       if (starterRouletteIntervalRef.current !== null) {
@@ -2997,7 +2999,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       const finalStarter = starterNames[Math.floor(Math.random() * starterNames.length)]
       setStarterRouletteChoice(finalStarter)
       chooseStarter(finalStarter)
-    }, 300)
+    }, STARTER_ROULETTE_DURATION_MS)
 
     return () => {
       if (starterRouletteIntervalRef.current !== null) {
