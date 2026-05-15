@@ -2062,8 +2062,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     }
 
-    // Only auto-start competitive rooms. Casual runs must be started by the host.
-    if (multiplayerRoom.mode !== "competitive") {
+    // Avoid auto-starting while the client is in defeat reset flow
+    if (defeatResetTimeoutRef.current) {
       autoStartedCompetitiveRoomRef.current = null
       return
     }
