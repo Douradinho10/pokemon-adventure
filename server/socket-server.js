@@ -173,39 +173,52 @@ function scheduleBotSimulation(roomId, botId) {
     }
   }
 
-  // simulate playing: after random delay mark finished with a random bestWave
-  const playTimeMs = randomInt(4000, 12000)
-  setTimeout(() => {
+  const targetWave = randomInt(10, 15)
+  const waveStepDelayMs = randomInt(450, 900)
+
+  const advanceWave = (wave) => {
     const entry2 = getRoomEntry(roomId)
     if (!entry2) return
     const room2 = entry2.room
     if (!room2 || !room2.players || !room2.players[botId]) return
 
+    const currentPlayer = room2.players[botId]
     const now = Date.now()
-    const bestWave = randomInt(1, 30)
+    const isFinalWave = wave >= targetWave
+
     const nextRoom2 = {
       ...room2,
       players: {
         ...room2.players,
         [botId]: {
-          ...(room2.players[botId] || {}),
-          bestWave: Math.max(room2.players[botId].bestWave || 0, bestWave),
-          finishedAt: room2.players[botId].finishedAt || now,
+          ...(currentPlayer || {}),
+          bestWave: Math.max(currentPlayer.bestWave || 0, wave),
+          finishedAt: isFinalWave ? currentPlayer.finishedAt || now : currentPlayer.finishedAt,
           ready: false,
         },
       },
     }
 
-    const everyoneFinished = areAllPlayersResolved(nextRoom2.players)
-    if (everyoneFinished) {
-      saveRoom(finalizeFinishedRoom(nextRoom2, now))
+    if (isFinalWave) {
+      const everyoneFinished = areAllPlayersResolved(nextRoom2.players)
+      if (everyoneFinished) {
+        saveRoom(finalizeFinishedRoom(nextRoom2, now))
+        broadcastRoom(roomId)
+        return
+      }
+
+      saveRoom(nextRoom2)
       broadcastRoom(roomId)
       return
     }
 
     saveRoom(nextRoom2)
     broadcastRoom(roomId)
-  }, playTimeMs)
+
+    setTimeout(() => advanceWave(wave + 1), waveStepDelayMs)
+  }
+
+  setTimeout(() => advanceWave(1), randomInt(700, 1200))
 }
 
 function generateRoomId(length = ROOM_ID_LENGTH) {
