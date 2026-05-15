@@ -5083,6 +5083,15 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                         {allPlayersReady ? "Iniciar partida" : "A aguardar pronto"}
                       </Button>
                     )}
+                    {activeRoom.status === "waiting" && activeRoom.mode === "casual" && isHost && (
+                      <Button
+                        onClick={handleAddBot}
+                        disabled={multiplayerBusy || Object.keys(activeRoom.players || {}).length >= activeRoom.maxPlayers}
+                        className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                      >
+                        Adicionar Bot
+                      </Button>
+                    )}
                   </div>
 
                   {currentRoomPlayer && (currentPlayerResolved || activeRoom.status === "finished") && (
