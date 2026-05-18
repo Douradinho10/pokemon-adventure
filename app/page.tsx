@@ -1038,10 +1038,11 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         setMultiplayerJoinedRoomId(roomCode)
         if (result.room) {
           setMultiplayerRoom(result.room)
+          const isCasualRoom = result.room.mode === "casual"
+          setMultiplayerIsCasual(isCasualRoom)
+          setMultiplayerSection(isCasualRoom ? "casual" : "competitive")
         }
         setMultiplayerMode(false)
-        setMultiplayerIsCasual(true)
-        setMultiplayerSection("casual")
         setCasualLobbyVisibility("private")
         setMultiplayerRoomCodeInput(roomCode)
         showScreenNotice("Entraste no grupo por codigo!")
