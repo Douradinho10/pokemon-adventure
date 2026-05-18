@@ -2112,6 +2112,14 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     }
 
+    // For competitive rooms, require all players to be ready before starting the run locally.
+    if (multiplayerRoom.mode === "competitive") {
+      const allReady = Object.values(multiplayerRoom.players || {}).every((p) => p.ready !== false)
+      if (!allReady) {
+        return
+      }
+    }
+
     handleStartMultiplayerRun()
   }, [accountUserId, handleStartMultiplayerRun, multiplayerJoinedRoomId, multiplayerMode, multiplayerRoom])
 
@@ -4629,10 +4637,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 Casual
               </Button>
             ) : (
-              <div className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#0ea5e9_0%,#0ea5e9_50%,#0369a1_50%,#0369a1_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs flex items-center justify-center">
+              <div className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs flex items-center justify-center">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-white/80 border-2 border-slate-900" />
-                  <span>Casual</span>
+                  <span>Sala Competitiva</span>
                 </div>
               </div>
             )}
