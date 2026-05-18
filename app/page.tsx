@@ -3094,9 +3094,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         starterRouletteFinalTimeoutRef.current = null
       }
 
+      // enforce final show delay; guard against cases where the modal might close
       starterRouletteFinalTimeoutRef.current = window.setTimeout(() => {
         starterRouletteFinalTimeoutRef.current = null
-        chooseStarter(finalStarter)
+        if (showModal === "starter") {
+          chooseStarter(finalStarter)
+        }
       }, STARTER_ROULETTE_FINAL_SHOW_MS)
     }, STARTER_ROULETTE_DURATION_MS)
 
@@ -4621,7 +4624,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           </p>
 
           <div className={`mt-4 grid gap-2 ${lockCompetitiveTabs ? "grid-cols-1" : "grid-cols-2"}`}>
-            {!multiplayerJoinedRoomId ? (
+            {!multiplayerRoom && !multiplayerJoinedRoomId ? (
               <>
                 <Button
                   onClick={() => setMultiplayerSection("competitive")}
