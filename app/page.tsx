@@ -791,7 +791,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const [accountName, setAccountName] = useState("Treinador")
   const [accountEmail, setAccountEmail] = useState<string | null>(null)
   const [multiplayerRoomCodeInput, setMultiplayerRoomCodeInput] = useState("")
-  const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("casual")
+  const [multiplayerSection, setMultiplayerSection] = useState<"competitive" | "casual">("competitive")
   const [casualLobbyVisibility, setCasualLobbyVisibility] = useState<MultiplayerRoomVisibility>("private")
   const [publicCasualLobbies, setPublicCasualLobbies] = useState<PublicCasualLobbySummary[]>([])
   const [publicCasualLobbiesLoading, setPublicCasualLobbiesLoading] = useState(false)
@@ -940,6 +940,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       setMultiplayerIsCasual(false)
       setMultiplayerBusy(false)
       setMultiplayerError(null)
+      setMultiplayerSection("competitive")
     },
     [accountUserId, clearPendingInviteJoin, multiplayerJoinedRoomId],
   )
@@ -1687,6 +1688,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         setMultiplayerRoom(null)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(false)
+        setMultiplayerSection("competitive")
         showScreenNotice("Saida da sala concluida.")
         return
       }
@@ -1696,6 +1698,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       setMultiplayerRoom(null)
       setMultiplayerMode(false)
       setMultiplayerIsCasual(false)
+      setMultiplayerSection("competitive")
       showScreenNotice("Saida da sala concluida.")
     } catch {
       setMultiplayerError("Erro ao sair da sala.")
@@ -5278,79 +5281,62 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
               )}
             </div>
 
-            <div className="space-y-3">
-              {multiplayerRoom ? (
-                <>
-                  <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Pessoas online</p>
-                        <h3 className="mt-1 font-pixel text-sm text-slate-900">Membros do grupo</h3>
-                      </div>
-                      <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800">
-                        {roomSize}/{multiplayerRoom.maxPlayers}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {roomPlayers.map((player, index) => (
-                        <div key={player.userId} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
-                          <div>
-                            <div className="text-sm font-semibold text-slate-900">
-                              {index + 1}. {player.displayName}
-                              {multiplayerRoom.mode === "casual" && derivedHostUserId === player.userId ? " (Host)" : ""}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span
-                              className={`rounded-full border-2 border-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                                player.forfeitAt
-                                  ? "bg-rose-100 text-rose-800"
-                                  : player.finishedAt
-                                    ? "bg-sky-100 text-sky-800"
-                                    : multiplayerRoom.status === "waiting"
-                                      ? player.ready
-                                        ? "bg-emerald-100 text-emerald-800"
-                                        : "bg-amber-100 text-amber-800"
-                                      : "bg-white text-slate-700"
-                              }`}
-                            >
-                              {player.forfeitAt
-                                ? "Desistiu"
-                                : player.finishedAt
-                                  ? "Terminou"
-                                  : multiplayerRoom.status === "waiting"
-                                    ? player.ready
-                                      ? "Pronto"
-                                      : "A aguardar"
-                                    : "A jogar"}
-                            </span>
-                            <span className="rounded-full border-2 border-slate-900 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
-                              Wave {player.bestWave}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                </>
-              ) : (
+            {multiplayerRoom && (
+              <div className="space-y-3">
                 <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-slate-700" />
+                  <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Lobby curto</p>
-                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Sem sala ativa</h3>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Pessoas online</p>
+                      <h3 className="mt-1 font-pixel text-sm text-slate-900">Membros do grupo</h3>
                     </div>
+                    <Badge className="pixel-badge border-2 border-slate-900 bg-white px-3 py-1 text-slate-800">
+                      {roomSize}/{multiplayerRoom.maxPlayers}
+                    </Badge>
                   </div>
 
-                  <p className="mt-3 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                    Cria uma sala ou entra por código. O competitivo usa a mesma lógica e não depende de host.
-                  </p>
+                  <div className="mt-3 space-y-2">
+                    {roomPlayers.map((player, index) => (
+                      <div key={player.userId} className="flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-2 shadow-[4px_4px_0_rgba(15,23,42,0.08)]">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {index + 1}. {player.displayName}
+                            {multiplayerRoom.mode === "casual" && derivedHostUserId === player.userId ? " (Host)" : ""}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full border-2 border-slate-900 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                              player.forfeitAt
+                                ? "bg-rose-100 text-rose-800"
+                                : player.finishedAt
+                                  ? "bg-sky-100 text-sky-800"
+                                  : multiplayerRoom.status === "waiting"
+                                    ? player.ready
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-amber-100 text-amber-800"
+                                    : "bg-white text-slate-700"
+                            }`}
+                          >
+                            {player.forfeitAt
+                              ? "Desistiu"
+                              : player.finishedAt
+                                ? "Terminou"
+                                : multiplayerRoom.status === "waiting"
+                                  ? player.ready
+                                    ? "Pronto"
+                                    : "A aguardar"
+                                  : "A jogar"}
+                          </span>
+                          <span className="rounded-full border-2 border-slate-900 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                            Wave {player.bestWave}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </section>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
