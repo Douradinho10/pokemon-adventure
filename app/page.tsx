@@ -4902,21 +4902,24 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {!lockCompetitiveTabs && (
-                <Button
-                  onClick={() => setMultiplayerSection("competitive")}
-                  className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
-                >
-                  Competitivo
-                </Button>
-              )}
-              <Button
-                onClick={() => setMultiplayerSection("casual")}
-                className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
-              >
-                Casual
-              </Button>
-              {multiplayerRoom && (
+              {!multiplayerRoom ? (
+                <>
+                  {!lockCompetitiveTabs && (
+                    <Button
+                      onClick={() => setMultiplayerSection("competitive")}
+                      className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
+                    >
+                      Competitivo
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setMultiplayerSection("casual")}
+                    className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
+                  >
+                    Casual
+                  </Button>
+                </>
+              ) : (
                 <Badge className="pixel-badge border-2 border-slate-900 bg-white/90 px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
                   <ShieldCheck className="mr-1 h-3.5 w-3.5" />
                   {multiplayerRoom.mode === "casual" ? "Grupo ativo" : "Sala competitiva"}
