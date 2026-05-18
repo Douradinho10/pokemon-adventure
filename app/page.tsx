@@ -816,8 +816,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const loginRedirectTimeoutRef = useRef<number | null>(null)
   const starterRouletteIntervalRef = useRef<number | null>(null)
   const starterRouletteTimeoutRef = useRef<number | null>(null)
-  const STARTER_ROULETTE_INTERVAL_MS = 90
-  const STARTER_ROULETTE_DURATION_MS = 2600
+  const starterRouletteFinalTimeoutRef = useRef<number | null>(null)
+  const STARTER_ROULETTE_INTERVAL_MS = 120
+  const STARTER_ROULETTE_DURATION_MS = 4200
+  const STARTER_ROULETTE_FINAL_SHOW_MS = 1600
   const hasAutoRoutedAfterAuthRef = useRef(false)
   const forceMainMenuAfterPerfilRef = useRef(false)
   const previousAccountEmailRef = useRef<string | null>(null)
@@ -1997,6 +1999,13 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       return
     }
 
+    // require all players to mark ready before auto-starting competitive matches
+    const allReady = Object.values(multiplayerRoom.players || {}).every((p) => p.ready !== false)
+    if (!allReady) {
+      autoActivatedCompetitiveRoomRef.current = null
+      return
+    }
+
     if (autoActivatedCompetitiveRoomRef.current === multiplayerJoinedRoomId) {
       return
     }
@@ -3070,7 +3079,17 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
 
       const finalStarter = starterNames[Math.floor(Math.random() * starterNames.length)]
       setStarterRouletteChoice(finalStarter)
-      chooseStarter(finalStarter)
+
+      // keep the final choice visible for a moment before actually choosing
+      if (starterRouletteFinalTimeoutRef.current !== null) {
+        window.clearTimeout(starterRouletteFinalTimeoutRef.current)
+        starterRouletteFinalTimeoutRef.current = null
+      }
+
+      starterRouletteFinalTimeoutRef.current = window.setTimeout(() => {
+        starterRouletteFinalTimeoutRef.current = null
+        chooseStarter(finalStarter)
+      }, STARTER_ROULETTE_FINAL_SHOW_MS)
     }, STARTER_ROULETTE_DURATION_MS)
 
     return () => {
@@ -3082,6 +3101,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       if (starterRouletteTimeoutRef.current !== null) {
         window.clearTimeout(starterRouletteTimeoutRef.current)
         starterRouletteTimeoutRef.current = null
+      }
+      if (starterRouletteFinalTimeoutRef.current !== null) {
+        window.clearTimeout(starterRouletteFinalTimeoutRef.current)
+        starterRouletteFinalTimeoutRef.current = null
       }
     }
   }, [chooseStarter, multiplayerRoom?.mode, multiplayerRoom?.starterMode, showModal])
@@ -5211,7 +5234,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                           <Button
                             onClick={handleRequestMultiplayerRematch}
                             disabled={multiplayerBusy}
-                            className="pixel-menu-button mt-3 h-10 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-11 sm:text-xs"
+                            className="relative z-40 pixel-menu-button mt-3 h-10 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:h-11 sm:text-xs"
                           >
                             Revanche
                           </Button>
