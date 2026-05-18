@@ -4860,7 +4860,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
           : roomWinnerDisplayName
             ? `Venceu ${roomWinnerDisplayName}`
             : "Finalizada"
-      : "Sem sala ativa"
+      : ""
     const canOpenRematch = Boolean(
       multiplayerRoom &&
         multiplayerRoom.status === "finished" &&
@@ -4907,18 +4907,21 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             <div className="mt-4 flex flex-wrap gap-2">
               {!multiplayerRoom ? (
                 <>
-                  {!lockCompetitiveTabs && (
+                  {!lockCompetitiveTabs && !multiplayerJoinedRoomId && (
                     <Button
                       onClick={() => setMultiplayerSection("competitive")}
                       className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                     >
                       Competitivo
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => setMultiplayerSection("casual")}
-                    className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
-                  >
+                    {/** Hide Casual button when already joined to a room to avoid confusion. */}
+                    {!multiplayerJoinedRoomId && (
+                      <Button
+                        onClick={() => setMultiplayerSection("casual")}
+                        className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]`} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
+                      >
+                        Casual
+                      </Button>
+                    )}
                     Casual
                   </Button>
                 </>
