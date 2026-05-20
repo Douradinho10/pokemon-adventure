@@ -1,0 +1,5560 @@
+{
+  "Bulbasaur": [
+    "vine whip",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Ivysaur": [
+    "vine whip",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Venusaur": [
+    "vine whip",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Charmander": [
+    "scratch",
+    "leer",
+    "growl",
+    "ember"
+  ],
+  "Charmeleon": [
+    "scratch",
+    "leer",
+    "growl",
+    "ember"
+  ],
+  "Charizard": [
+    "scratch",
+    "wing attack",
+    "leer",
+    "growl"
+  ],
+  "Squirtle": [
+    "headbutt",
+    "tackle",
+    "tail whip",
+    "bite"
+  ],
+  "Wartortle": [
+    "headbutt",
+    "tackle",
+    "tail whip",
+    "bite"
+  ],
+  "Blastoise": [
+    "headbutt",
+    "tackle",
+    "tail whip",
+    "bite"
+  ],
+  "Caterpie": [
+    "tackle",
+    "string shot",
+    "bug bite",
+    "electroweb"
+  ],
+  "Metapod": [
+    "harden",
+    "iron defense",
+    "electroweb",
+    "string shot"
+  ],
+  "Butterfree": [
+    "gust",
+    "whirlwind",
+    "tackle",
+    "supersonic"
+  ],
+  "Weedle": [
+    "poison sting",
+    "string shot",
+    "bug bite",
+    "electroweb"
+  ],
+  "Kakuna": [
+    "harden",
+    "string shot",
+    "iron defense",
+    "bug bite"
+  ],
+  "Beedrill": [
+    "fury attack",
+    "poison sting",
+    "twineedle",
+    "pin missile"
+  ],
+  "Pidgey": [
+    "razor wind",
+    "gust",
+    "wing attack",
+    "whirlwind"
+  ],
+  "Pidgeotto": [
+    "razor wind",
+    "gust",
+    "wing attack",
+    "whirlwind"
+  ],
+  "Pidgeot": [
+    "razor wind",
+    "gust",
+    "wing attack",
+    "whirlwind"
+  ],
+  "Rattata": [
+    "tackle",
+    "take down",
+    "double edge",
+    "tail whip"
+  ],
+  "Raticate": [
+    "swords dance",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Spearow": [
+    "wing attack",
+    "fury attack",
+    "take down",
+    "leer"
+  ],
+  "Fearow": [
+    "wing attack",
+    "fury attack",
+    "take down",
+    "leer"
+  ],
+  "Ekans": [
+    "slam",
+    "wrap",
+    "poison sting",
+    "leer"
+  ],
+  "Arbok": [
+    "slam",
+    "wrap",
+    "poison sting",
+    "leer"
+  ],
+  "Pikachu": [
+    "slam",
+    "double kick",
+    "tail whip",
+    "growl"
+  ],
+  "Raichu": [
+    "thunder punch",
+    "slam",
+    "tail whip",
+    "growl"
+  ],
+  "Sandshrew": [
+    "scratch",
+    "swords dance",
+    "sand attack",
+    "poison sting"
+  ],
+  "Sandslash": [
+    "scratch",
+    "swords dance",
+    "sand attack",
+    "poison sting"
+  ],
+  "Nidorina": [
+    "scratch",
+    "double kick",
+    "tackle",
+    "tail whip"
+  ],
+  "Nidoqueen": [
+    "scratch",
+    "double kick",
+    "tackle",
+    "body slam"
+  ],
+  "Nidorino": [
+    "double kick",
+    "horn attack",
+    "fury attack",
+    "horn drill"
+  ],
+  "Nidoking": [
+    "double kick",
+    "horn attack",
+    "fury attack",
+    "tackle"
+  ],
+  "Clefairy": [
+    "pound",
+    "double slap",
+    "tackle",
+    "body slam"
+  ],
+  "Clefable": [
+    "pound",
+    "double slap",
+    "tackle",
+    "double edge"
+  ],
+  "Vulpix": [
+    "tackle",
+    "tail whip",
+    "roar",
+    "disable"
+  ],
+  "Ninetales": [
+    "tackle",
+    "tail whip",
+    "roar",
+    "disable"
+  ],
+  "Jigglypuff": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Wigglytuff": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Zubat": [
+    "gust",
+    "wing attack",
+    "bite",
+    "supersonic"
+  ],
+  "Golbat": [
+    "gust",
+    "wing attack",
+    "whirlwind",
+    "bite"
+  ],
+  "Oddish": [
+    "acid",
+    "absorb",
+    "mega drain",
+    "growth"
+  ],
+  "Gloom": [
+    "acid",
+    "absorb",
+    "mega drain",
+    "growth"
+  ],
+  "Vileplume": [
+    "acid",
+    "absorb",
+    "mega drain",
+    "growth"
+  ],
+  "Paras": [
+    "scratch",
+    "absorb",
+    "growth",
+    "poison powder"
+  ],
+  "Parasect": [
+    "scratch",
+    "absorb",
+    "leech seed",
+    "growth"
+  ],
+  "Venonat": [
+    "tackle",
+    "supersonic",
+    "disable",
+    "psybeam"
+  ],
+  "Venomoth": [
+    "gust",
+    "whirlwind",
+    "tackle",
+    "supersonic"
+  ],
+  "Diglett": [
+    "scratch",
+    "sand attack",
+    "growl",
+    "earthquake"
+  ],
+  "Dugtrio": [
+    "scratch",
+    "sand attack",
+    "growl",
+    "earthquake"
+  ],
+  "Meowth": [
+    "pay day",
+    "scratch",
+    "bite",
+    "growl"
+  ],
+  "Persian": [
+    "pay day",
+    "scratch",
+    "bite",
+    "growl"
+  ],
+  "Psyduck": [
+    "scratch",
+    "tail whip",
+    "disable",
+    "water gun"
+  ],
+  "Golduck": [
+    "scratch",
+    "tail whip",
+    "disable",
+    "water gun"
+  ],
+  "Mankey": [
+    "karate chop",
+    "scratch",
+    "thrash",
+    "leer"
+  ],
+  "Primeape": [
+    "karate chop",
+    "scratch",
+    "thrash",
+    "leer"
+  ],
+  "Growlithe": [
+    "take down",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Arcanine": [
+    "take down",
+    "double edge",
+    "leer",
+    "bite"
+  ],
+  "Poliwag": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Poliwhirl": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Poliwrath": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Abra": [
+    "teleport",
+    "mega punch",
+    "fire punch",
+    "ice punch"
+  ],
+  "Kadabra": [
+    "disable",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Alakazam": [
+    "disable",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Machop": [
+    "karate chop",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Machoke": [
+    "karate chop",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Machamp": [
+    "karate chop",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Bellsprout": [
+    "slam",
+    "vine whip",
+    "wrap",
+    "acid"
+  ],
+  "Weepinbell": [
+    "slam",
+    "vine whip",
+    "wrap",
+    "acid"
+  ],
+  "Victreebel": [
+    "swords dance",
+    "slam",
+    "vine whip",
+    "wrap"
+  ],
+  "Tentacool": [
+    "wrap",
+    "poison sting",
+    "supersonic",
+    "acid"
+  ],
+  "Tentacruel": [
+    "wrap",
+    "poison sting",
+    "supersonic",
+    "acid"
+  ],
+  "Geodude": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Graveler": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Golem": [
+    "mega punch",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Ponyta": [
+    "stomp",
+    "double kick",
+    "tackle",
+    "take down"
+  ],
+  "Rapidash": [
+    "stomp",
+    "double kick",
+    "fury attack",
+    "horn drill"
+  ],
+  "Slowpoke": [
+    "headbutt",
+    "tackle",
+    "growl",
+    "disable"
+  ],
+  "Slowbro": [
+    "stomp",
+    "headbutt",
+    "tackle",
+    "growl"
+  ],
+  "Magnemite": [
+    "tackle",
+    "supersonic",
+    "sonic boom",
+    "thunder shock"
+  ],
+  "Magneton": [
+    "tackle",
+    "supersonic",
+    "sonic boom",
+    "thunder shock"
+  ],
+  "Farfetchd": [
+    "swords dance",
+    "cut",
+    "sand attack",
+    "fury attack"
+  ],
+  "Doduo": [
+    "swords dance",
+    "wing attack",
+    "jump kick",
+    "fury attack"
+  ],
+  "Dodrio": [
+    "swords dance",
+    "wing attack",
+    "jump kick",
+    "fury attack"
+  ],
+  "Seel": [
+    "headbutt",
+    "take down",
+    "double edge",
+    "growl"
+  ],
+  "Dewgong": [
+    "headbutt",
+    "horn drill",
+    "take down",
+    "double edge"
+  ],
+  "Grimer": [
+    "pound",
+    "disable",
+    "toxic",
+    "screech"
+  ],
+  "Muk": [
+    "pound",
+    "disable",
+    "toxic",
+    "screech"
+  ],
+  "Shellder": [
+    "tackle",
+    "leer",
+    "supersonic",
+    "water gun"
+  ],
+  "Cloyster": [
+    "tackle",
+    "twineedle",
+    "leer",
+    "supersonic"
+  ],
+  "Gastly": [
+    "toxic",
+    "hypnosis",
+    "night shade",
+    "confuse ray"
+  ],
+  "Haunter": [
+    "toxic",
+    "hypnosis",
+    "night shade",
+    "confuse ray"
+  ],
+  "Gengar": [
+    "disable",
+    "toxic",
+    "hypnosis",
+    "night shade"
+  ],
+  "Onix": [
+    "bind",
+    "slam",
+    "tackle",
+    "double edge"
+  ],
+  "Drowzee": [
+    "pound",
+    "headbutt",
+    "disable",
+    "psybeam"
+  ],
+  "Hypno": [
+    "pound",
+    "headbutt",
+    "disable",
+    "psybeam"
+  ],
+  "Krabby": [
+    "vice grip",
+    "guillotine",
+    "swords dance",
+    "slam"
+  ],
+  "Kingler": [
+    "vice grip",
+    "guillotine",
+    "swords dance",
+    "slam"
+  ],
+  "Voltorb": [
+    "tackle",
+    "sonic boom",
+    "thunder shock",
+    "thunderbolt"
+  ],
+  "Electrode": [
+    "tackle",
+    "sonic boom",
+    "thunder shock",
+    "thunderbolt"
+  ],
+  "Exeggcute": [
+    "psybeam",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Exeggutor": [
+    "stomp",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Cubone": [
+    "headbutt",
+    "thrash",
+    "double edge",
+    "tail whip"
+  ],
+  "Marowak": [
+    "swords dance",
+    "headbutt",
+    "thrash",
+    "double edge"
+  ],
+  "Hitmonlee": [
+    "double kick",
+    "mega kick",
+    "jump kick",
+    "rolling kick"
+  ],
+  "Hitmonchan": [
+    "comet punch",
+    "mega punch",
+    "fire punch",
+    "ice punch"
+  ],
+  "Lickitung": [
+    "bind",
+    "slam",
+    "stomp",
+    "tackle"
+  ],
+  "Koffing": [
+    "tackle",
+    "toxic",
+    "smokescreen",
+    "haze"
+  ],
+  "Weezing": [
+    "tackle",
+    "psybeam",
+    "toxic",
+    "screech"
+  ],
+  "Rhyhorn": [
+    "stomp",
+    "sand attack",
+    "horn attack",
+    "fury attack"
+  ],
+  "Rhydon": [
+    "stomp",
+    "sand attack",
+    "horn attack",
+    "fury attack"
+  ],
+  "Chansey": [
+    "pound",
+    "double slap",
+    "tackle",
+    "take down"
+  ],
+  "Tangela": [
+    "bind",
+    "slam",
+    "vine whip",
+    "absorb"
+  ],
+  "Kangaskhan": [
+    "pound",
+    "comet punch",
+    "mega punch",
+    "stomp"
+  ],
+  "Horsea": [
+    "leer",
+    "water gun",
+    "hydro pump",
+    "bubble beam"
+  ],
+  "Seadra": [
+    "leer",
+    "disable",
+    "water gun",
+    "hydro pump"
+  ],
+  "Goldeen": [
+    "horn attack",
+    "fury attack",
+    "horn drill",
+    "tail whip"
+  ],
+  "Seaking": [
+    "horn attack",
+    "fury attack",
+    "horn drill",
+    "tail whip"
+  ],
+  "Staryu": [
+    "tackle",
+    "water gun",
+    "hydro pump",
+    "surf"
+  ],
+  "Starmie": [
+    "tackle",
+    "water gun",
+    "hydro pump",
+    "surf"
+  ],
+  "Scyther": [
+    "razor wind",
+    "swords dance",
+    "wing attack",
+    "leer"
+  ],
+  "Jynx": [
+    "pound",
+    "double slap",
+    "ice punch",
+    "body slam"
+  ],
+  "Electabuzz": [
+    "thunder punch",
+    "leer",
+    "low kick",
+    "thunder shock"
+  ],
+  "Magmar": [
+    "fire punch",
+    "tackle",
+    "leer",
+    "ember"
+  ],
+  "Pinsir": [
+    "vice grip",
+    "guillotine",
+    "swords dance",
+    "bind"
+  ],
+  "Tauros": [
+    "stomp",
+    "horn attack",
+    "tackle",
+    "take down"
+  ],
+  "Magikarp": [
+    "tackle",
+    "splash",
+    "flail",
+    "hydro pump"
+  ],
+  "Gyarados": [
+    "bind",
+    "tackle",
+    "thrash",
+    "leer"
+  ],
+  "Lapras": [
+    "body slam",
+    "growl",
+    "sing",
+    "mist"
+  ],
+  "Ditto": [
+    "transform"
+  ],
+  "Eevee": [
+    "double kick",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Vaporeon": [
+    "double kick",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Jolteon": [
+    "double kick",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Flareon": [
+    "double kick",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Porygon": [
+    "tackle",
+    "double edge",
+    "psybeam",
+    "hyper beam"
+  ],
+  "Omanyte": [
+    "bind",
+    "sand attack",
+    "horn attack",
+    "leer"
+  ],
+  "Omastar": [
+    "bind",
+    "sand attack",
+    "horn attack",
+    "leer"
+  ],
+  "Kabuto": [
+    "scratch",
+    "sand attack",
+    "leer",
+    "hydro pump"
+  ],
+  "Kabutops": [
+    "scratch",
+    "swords dance",
+    "sand attack",
+    "leer"
+  ],
+  "Aerodactyl": [
+    "wing attack",
+    "fly",
+    "take down",
+    "bite"
+  ],
+  "Snorlax": [
+    "headbutt",
+    "tackle",
+    "body slam",
+    "double edge"
+  ],
+  "Articuno": [
+    "gust",
+    "leer",
+    "mist",
+    "ice beam"
+  ],
+  "Zapdos": [
+    "leer",
+    "peck",
+    "drill peck",
+    "thunder shock"
+  ],
+  "Moltres": [
+    "gust",
+    "wing attack",
+    "leer",
+    "ember"
+  ],
+  "Dratini": [
+    "slam",
+    "wrap",
+    "leer",
+    "hyper beam"
+  ],
+  "Dragonair": [
+    "slam",
+    "wrap",
+    "leer",
+    "hyper beam"
+  ],
+  "Dragonite": [
+    "fire punch",
+    "thunder punch",
+    "wing attack",
+    "slam"
+  ],
+  "Mewtwo": [
+    "disable",
+    "mist",
+    "psybeam",
+    "confusion"
+  ],
+  "Mew": [
+    "pound",
+    "mega punch",
+    "confusion",
+    "psychic"
+  ],
+  "Chikorita": [
+    "tackle",
+    "body slam",
+    "growl",
+    "leech seed"
+  ],
+  "Bayleef": [
+    "tackle",
+    "body slam",
+    "growl",
+    "leech seed"
+  ],
+  "Meganium": [
+    "tackle",
+    "body slam",
+    "growl",
+    "leech seed"
+  ],
+  "Cyndaquil": [
+    "tackle",
+    "double edge",
+    "leer",
+    "ember"
+  ],
+  "Quilava": [
+    "tackle",
+    "double edge",
+    "leer",
+    "ember"
+  ],
+  "Typhlosion": [
+    "tackle",
+    "double edge",
+    "leer",
+    "ember"
+  ],
+  "Totodile": [
+    "scratch",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Croconaw": [
+    "scratch",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Feraligatr": [
+    "scratch",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Sentret": [
+    "scratch",
+    "slam",
+    "tackle",
+    "double edge"
+  ],
+  "Furret": [
+    "scratch",
+    "slam",
+    "double edge",
+    "growl"
+  ],
+  "Hoothoot": [
+    "tackle",
+    "take down",
+    "growl",
+    "peck"
+  ],
+  "Noctowl": [
+    "tackle",
+    "take down",
+    "growl",
+    "peck"
+  ],
+  "Ledyba": [
+    "comet punch",
+    "tackle",
+    "double edge",
+    "supersonic"
+  ],
+  "Ledian": [
+    "comet punch",
+    "tackle",
+    "double edge",
+    "supersonic"
+  ],
+  "Spinarak": [
+    "poison sting",
+    "pin missile",
+    "absorb",
+    "string shot"
+  ],
+  "Ariados": [
+    "swords dance",
+    "poison sting",
+    "pin missile",
+    "absorb"
+  ],
+  "Crobat": [
+    "gust",
+    "wing attack",
+    "bite",
+    "supersonic"
+  ],
+  "Chinchou": [
+    "take down",
+    "supersonic",
+    "water gun",
+    "hydro pump"
+  ],
+  "Lanturn": [
+    "take down",
+    "supersonic",
+    "water gun",
+    "hydro pump"
+  ],
+  "Pichu": [
+    "tail whip",
+    "thunder shock",
+    "thunderbolt",
+    "thunder wave"
+  ],
+  "Cleffa": [
+    "pound",
+    "tackle",
+    "double edge",
+    "sing"
+  ],
+  "Igglybuff": [
+    "pound",
+    "sing",
+    "disable",
+    "defense curl"
+  ],
+  "Togepi": [
+    "pound",
+    "tackle",
+    "double edge",
+    "growl"
+  ],
+  "Togetic": [
+    "pound",
+    "tackle",
+    "double edge",
+    "growl"
+  ],
+  "Natu": [
+    "leer",
+    "peck",
+    "psychic",
+    "teleport"
+  ],
+  "Xatu": [
+    "leer",
+    "peck",
+    "psychic",
+    "teleport"
+  ],
+  "Mareep": [
+    "tackle",
+    "take down",
+    "growl",
+    "thunder shock"
+  ],
+  "Flaaffy": [
+    "tackle",
+    "take down",
+    "growl",
+    "thunder shock"
+  ],
+  "Ampharos": [
+    "fire punch",
+    "thunder punch",
+    "tackle",
+    "take down"
+  ],
+  "Marill": [
+    "slam",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Azumarill": [
+    "slam",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Sudowoodo": [
+    "slam",
+    "tackle",
+    "double edge",
+    "low kick"
+  ],
+  "Politoed": [
+    "pound",
+    "double slap",
+    "body slam",
+    "double edge"
+  ],
+  "Hoppip": [
+    "tackle",
+    "tail whip",
+    "absorb",
+    "mega drain"
+  ],
+  "Skiploom": [
+    "tackle",
+    "tail whip",
+    "absorb",
+    "mega drain"
+  ],
+  "Jumpluff": [
+    "tackle",
+    "tail whip",
+    "absorb",
+    "mega drain"
+  ],
+  "Aipom": [
+    "scratch",
+    "sand attack",
+    "double edge",
+    "tail whip"
+  ],
+  "Sunkern": [
+    "tackle",
+    "double edge",
+    "absorb",
+    "mega drain"
+  ],
+  "Sunflora": [
+    "pound",
+    "tackle",
+    "double edge",
+    "absorb"
+  ],
+  "Yanma": [
+    "gust",
+    "wing attack",
+    "tackle",
+    "supersonic"
+  ],
+  "Wooper": [
+    "slam",
+    "tail whip",
+    "mist",
+    "water gun"
+  ],
+  "Quagsire": [
+    "slam",
+    "tail whip",
+    "mist",
+    "water gun"
+  ],
+  "Espeon": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Umbreon": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Murkrow": [
+    "gust",
+    "wing attack",
+    "peck",
+    "night shade"
+  ],
+  "Slowking": [
+    "headbutt",
+    "tackle",
+    "growl",
+    "disable"
+  ],
+  "Misdreavus": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "hypnosis"
+  ],
+  "Unown": [
+    "hidden power"
+  ],
+  "Wobbuffet": [
+    "counter",
+    "amnesia",
+    "splash",
+    "destiny bond"
+  ],
+  "Girafarig": [
+    "stomp",
+    "tackle",
+    "growl",
+    "psybeam"
+  ],
+  "Pineco": [
+    "tackle",
+    "take down",
+    "double edge",
+    "bide"
+  ],
+  "Forretress": [
+    "tackle",
+    "take down",
+    "double edge",
+    "reflect"
+  ],
+  "Dunsparce": [
+    "body slam",
+    "take down",
+    "double edge",
+    "dig"
+  ],
+  "Gligar": [
+    "guillotine",
+    "swords dance",
+    "sand attack",
+    "poison sting"
+  ],
+  "Steelix": [
+    "bind",
+    "slam",
+    "tackle",
+    "double edge"
+  ],
+  "Snubbull": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "tail whip"
+  ],
+  "Granbull": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "tail whip"
+  ],
+  "Qwilfish": [
+    "tackle",
+    "take down",
+    "poison sting",
+    "pin missile"
+  ],
+  "Scizor": [
+    "razor wind",
+    "swords dance",
+    "wing attack",
+    "leer"
+  ],
+  "Shuckle": [
+    "wrap",
+    "rock throw",
+    "withdraw",
+    "bide"
+  ],
+  "Heracross": [
+    "swords dance",
+    "horn attack",
+    "fury attack",
+    "tackle"
+  ],
+  "Sneasel": [
+    "scratch",
+    "swords dance",
+    "leer",
+    "blizzard"
+  ],
+  "Teddiursa": [
+    "scratch",
+    "tackle",
+    "thrash",
+    "double edge"
+  ],
+  "Ursaring": [
+    "scratch",
+    "tackle",
+    "thrash",
+    "double edge"
+  ],
+  "Slugma": [
+    "body slam",
+    "ember",
+    "flamethrower",
+    "rock throw"
+  ],
+  "Magcargo": [
+    "body slam",
+    "ember",
+    "flamethrower",
+    "rock throw"
+  ],
+  "Swinub": [
+    "tackle",
+    "take down",
+    "double edge",
+    "mist"
+  ],
+  "Piloswine": [
+    "horn attack",
+    "fury attack",
+    "tackle",
+    "take down"
+  ],
+  "Corsola": [
+    "tackle",
+    "water gun",
+    "bubble beam",
+    "recover"
+  ],
+  "Remoraid": [
+    "water gun",
+    "hydro pump",
+    "ice beam",
+    "psybeam"
+  ],
+  "Octillery": [
+    "wrap",
+    "water gun",
+    "hydro pump",
+    "ice beam"
+  ],
+  "Delibird": [
+    "drill peck",
+    "present",
+    "mega punch",
+    "ice punch"
+  ],
+  "Mantine": [
+    "wing attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Skarmory": [
+    "wing attack",
+    "sand attack",
+    "fury attack",
+    "leer"
+  ],
+  "Houndour": [
+    "leer",
+    "bite",
+    "roar",
+    "ember"
+  ],
+  "Houndoom": [
+    "leer",
+    "bite",
+    "roar",
+    "ember"
+  ],
+  "Kingdra": [
+    "leer",
+    "water gun",
+    "hydro pump",
+    "bubble beam"
+  ],
+  "Phanpy": [
+    "slam",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Donphan": [
+    "slam",
+    "horn attack",
+    "fury attack",
+    "tackle"
+  ],
+  "Porygon2": [
+    "tackle",
+    "psybeam",
+    "hyper beam",
+    "thunder shock"
+  ],
+  "Stantler": [
+    "stomp",
+    "jump kick",
+    "sand attack",
+    "tackle"
+  ],
+  "Smeargle": [
+    "sketch"
+  ],
+  "Tyrogue": [
+    "tackle",
+    "focus energy",
+    "foresight",
+    "fake out"
+  ],
+  "Hitmontop": [
+    "rolling kick",
+    "tackle",
+    "counter",
+    "dig"
+  ],
+  "Smoochum": [
+    "pound",
+    "ice punch",
+    "sing",
+    "blizzard"
+  ],
+  "Elekid": [
+    "thunder punch",
+    "leer",
+    "low kick",
+    "thunder shock"
+  ],
+  "Magby": [
+    "fire punch",
+    "tackle",
+    "leer",
+    "ember"
+  ],
+  "Miltank": [
+    "stomp",
+    "headbutt",
+    "tackle",
+    "body slam"
+  ],
+  "Blissey": [
+    "pound",
+    "double slap",
+    "tackle",
+    "take down"
+  ],
+  "Raikou": [
+    "leer",
+    "bite",
+    "roar",
+    "thunder shock"
+  ],
+  "Entei": [
+    "stomp",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Suicune": [
+    "gust",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Larvitar": [
+    "tackle",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Pupitar": [
+    "tackle",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Tyranitar": [
+    "tackle",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Lugia": [
+    "gust",
+    "whirlwind",
+    "mist",
+    "hydro pump"
+  ],
+  "Celebi": [
+    "leech seed",
+    "confusion",
+    "recover",
+    "perish song"
+  ],
+  "Treecko": [
+    "pound",
+    "slam",
+    "leer",
+    "absorb"
+  ],
+  "Grovyle": [
+    "pound",
+    "slam",
+    "leer",
+    "absorb"
+  ],
+  "Sceptile": [
+    "pound",
+    "slam",
+    "leer",
+    "absorb"
+  ],
+  "Torchic": [
+    "scratch",
+    "sand attack",
+    "growl",
+    "ember"
+  ],
+  "Combusken": [
+    "scratch",
+    "double kick",
+    "sand attack",
+    "growl"
+  ],
+  "Blaziken": [
+    "fire punch",
+    "scratch",
+    "double kick",
+    "sand attack"
+  ],
+  "Mudkip": [
+    "tackle",
+    "take down",
+    "growl",
+    "supersonic"
+  ],
+  "Marshtomp": [
+    "tackle",
+    "take down",
+    "growl",
+    "supersonic"
+  ],
+  "Swampert": [
+    "tackle",
+    "take down",
+    "growl",
+    "supersonic"
+  ],
+  "Poochyena": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Mightyena": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Zigzagoon": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Linoone": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Wurmple": [
+    "tackle",
+    "poison sting",
+    "string shot",
+    "bug bite"
+  ],
+  "Silcoon": [
+    "tackle",
+    "poison sting",
+    "harden",
+    "iron defense"
+  ],
+  "Beautifly": [
+    "gust",
+    "whirlwind",
+    "tackle",
+    "poison sting"
+  ],
+  "Cascoon": [
+    "tackle",
+    "poison sting",
+    "harden",
+    "iron defense"
+  ],
+  "Dustox": [
+    "gust",
+    "whirlwind",
+    "tackle",
+    "poison sting"
+  ],
+  "Lotad": [
+    "growl",
+    "mist",
+    "water gun",
+    "bubble beam"
+  ],
+  "Lombre": [
+    "growl",
+    "mist",
+    "water gun",
+    "hydro pump"
+  ],
+  "Ludicolo": [
+    "growl",
+    "mist",
+    "water gun",
+    "hydro pump"
+  ],
+  "Seedot": [
+    "headbutt",
+    "tackle",
+    "absorb",
+    "mega drain"
+  ],
+  "Nuzleaf": [
+    "pound",
+    "razor wind",
+    "tackle",
+    "absorb"
+  ],
+  "Shiftry": [
+    "pound",
+    "whirlwind",
+    "tackle",
+    "absorb"
+  ],
+  "Taillow": [
+    "wing attack",
+    "growl",
+    "peck",
+    "agility"
+  ],
+  "Swellow": [
+    "wing attack",
+    "growl",
+    "peck",
+    "agility"
+  ],
+  "Wingull": [
+    "wing attack",
+    "growl",
+    "supersonic",
+    "mist"
+  ],
+  "Pelipper": [
+    "wing attack",
+    "growl",
+    "supersonic",
+    "mist"
+  ],
+  "Ralts": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Kirlia": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Gardevoir": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Surskit": [
+    "mist",
+    "water gun",
+    "bubble beam",
+    "agility"
+  ],
+  "Masquerain": [
+    "gust",
+    "whirlwind",
+    "supersonic",
+    "mist"
+  ],
+  "Shroomish": [
+    "headbutt",
+    "tackle",
+    "absorb",
+    "mega drain"
+  ],
+  "Breloom": [
+    "headbutt",
+    "tackle",
+    "counter",
+    "absorb"
+  ],
+  "Slakoth": [
+    "scratch",
+    "headbutt",
+    "counter",
+    "amnesia"
+  ],
+  "Vigoroth": [
+    "scratch",
+    "headbutt",
+    "counter",
+    "focus energy"
+  ],
+  "Slaking": [
+    "scratch",
+    "mega kick",
+    "headbutt",
+    "counter"
+  ],
+  "Nincada": [
+    "scratch",
+    "sand attack",
+    "absorb",
+    "dig"
+  ],
+  "Ninjask": [
+    "scratch",
+    "swords dance",
+    "sand attack",
+    "absorb"
+  ],
+  "Shedinja": [
+    "scratch",
+    "sand attack",
+    "absorb",
+    "dig"
+  ],
+  "Whismur": [
+    "pound",
+    "stomp",
+    "roar",
+    "supersonic"
+  ],
+  "Loudred": [
+    "pound",
+    "stomp",
+    "bite",
+    "roar"
+  ],
+  "Exploud": [
+    "pound",
+    "stomp",
+    "bite",
+    "roar"
+  ],
+  "Makuhita": [
+    "whirlwind",
+    "sand attack",
+    "tackle",
+    "seismic toss"
+  ],
+  "Hariyama": [
+    "whirlwind",
+    "sand attack",
+    "tackle",
+    "seismic toss"
+  ],
+  "Azurill": [
+    "slam",
+    "tail whip",
+    "water gun",
+    "bubble beam"
+  ],
+  "Nosepass": [
+    "tackle",
+    "thunder wave",
+    "rock throw",
+    "harden"
+  ],
+  "Skitty": [
+    "double slap",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Delcatty": [
+    "double slap",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Sableye": [
+    "scratch",
+    "leer",
+    "disable",
+    "night shade"
+  ],
+  "Mawile": [
+    "vice grip",
+    "bite",
+    "growl",
+    "feint attack"
+  ],
+  "Aron": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Lairon": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Aggron": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Meditite": [
+    "pound",
+    "psybeam",
+    "low kick",
+    "counter"
+  ],
+  "Medicham": [
+    "pound",
+    "fire punch",
+    "ice punch",
+    "thunder punch"
+  ],
+  "Electrike": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Manectric": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Plusle": [
+    "growl",
+    "thunder wave",
+    "thunder",
+    "agility"
+  ],
+  "Minun": [
+    "growl",
+    "thunder wave",
+    "thunder",
+    "agility"
+  ],
+  "Volbeat": [
+    "tackle",
+    "double edge",
+    "quick attack",
+    "double team"
+  ],
+  "Illumise": [
+    "tackle",
+    "quick attack",
+    "charm",
+    "encore"
+  ],
+  "Roselia": [
+    "poison sting",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Gulpin": [
+    "pound",
+    "toxic",
+    "sludge",
+    "amnesia"
+  ],
+  "Swalot": [
+    "pound",
+    "body slam",
+    "toxic",
+    "sludge"
+  ],
+  "Carvanha": [
+    "take down",
+    "leer",
+    "bite",
+    "agility"
+  ],
+  "Sharpedo": [
+    "take down",
+    "leer",
+    "bite",
+    "agility"
+  ],
+  "Wailmer": [
+    "body slam",
+    "growl",
+    "mist",
+    "water gun"
+  ],
+  "Wailord": [
+    "body slam",
+    "growl",
+    "mist",
+    "water gun"
+  ],
+  "Numel": [
+    "tackle",
+    "take down",
+    "double edge",
+    "growl"
+  ],
+  "Camerupt": [
+    "tackle",
+    "take down",
+    "double edge",
+    "growl"
+  ],
+  "Torkoal": [
+    "body slam",
+    "ember",
+    "flamethrower",
+    "fire spin"
+  ],
+  "Spoink": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Grumpig": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "psychic"
+  ],
+  "Spinda": [
+    "tackle",
+    "body slam",
+    "thrash",
+    "double edge"
+  ],
+  "Trapinch": [
+    "sand attack",
+    "bite",
+    "hyper beam",
+    "earthquake"
+  ],
+  "Vibrava": [
+    "sand attack",
+    "bite",
+    "supersonic",
+    "sonic boom"
+  ],
+  "Flygon": [
+    "sand attack",
+    "bite",
+    "supersonic",
+    "sonic boom"
+  ],
+  "Cacnea": [
+    "sand attack",
+    "poison sting",
+    "pin missile",
+    "leer"
+  ],
+  "Cacturne": [
+    "sand attack",
+    "poison sting",
+    "pin missile",
+    "leer"
+  ],
+  "Swablu": [
+    "fury attack",
+    "take down",
+    "growl",
+    "sing"
+  ],
+  "Altaria": [
+    "fury attack",
+    "take down",
+    "growl",
+    "sing"
+  ],
+  "Zangoose": [
+    "scratch",
+    "swords dance",
+    "leer",
+    "quick attack"
+  ],
+  "Seviper": [
+    "swords dance",
+    "wrap",
+    "bite",
+    "screech"
+  ],
+  "Lunatone": [
+    "tackle",
+    "rock throw",
+    "confusion",
+    "psychic"
+  ],
+  "Solrock": [
+    "tackle",
+    "solar beam",
+    "fire spin",
+    "rock throw"
+  ],
+  "Barboach": [
+    "water gun",
+    "earthquake",
+    "fissure",
+    "amnesia"
+  ],
+  "Whiscash": [
+    "thrash",
+    "water gun",
+    "earthquake",
+    "fissure"
+  ],
+  "Corphish": [
+    "vice grip",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Crawdaunt": [
+    "vice grip",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Baltoy": [
+    "psybeam",
+    "confusion",
+    "harden",
+    "self destruct"
+  ],
+  "Claydol": [
+    "psybeam",
+    "hyper beam",
+    "confusion",
+    "teleport"
+  ],
+  "Lileep": [
+    "wrap",
+    "acid",
+    "mega drain",
+    "confuse ray"
+  ],
+  "Cradily": [
+    "wrap",
+    "acid",
+    "mega drain",
+    "leech seed"
+  ],
+  "Anorith": [
+    "scratch",
+    "water gun",
+    "harden",
+    "slash"
+  ],
+  "Armaldo": [
+    "scratch",
+    "water gun",
+    "harden",
+    "slash"
+  ],
+  "Feebas": [
+    "tackle",
+    "splash",
+    "flail",
+    "double edge"
+  ],
+  "Milotic": [
+    "tackle",
+    "wrap",
+    "water gun",
+    "hydro pump"
+  ],
+  "Castform": [
+    "headbutt",
+    "tackle",
+    "ember",
+    "water gun"
+  ],
+  "Kecleon": [
+    "scratch",
+    "bind",
+    "tail whip",
+    "disable"
+  ],
+  "Shuppet": [
+    "night shade",
+    "screech",
+    "curse",
+    "spite"
+  ],
+  "Banette": [
+    "night shade",
+    "screech",
+    "curse",
+    "spite"
+  ],
+  "Duskull": [
+    "leer",
+    "disable",
+    "absorb",
+    "psychic"
+  ],
+  "Dusclops": [
+    "fire punch",
+    "ice punch",
+    "thunder punch",
+    "bind"
+  ],
+  "Tropius": [
+    "gust",
+    "whirlwind",
+    "stomp",
+    "body slam"
+  ],
+  "Chimecho": [
+    "tackle",
+    "wrap",
+    "take down",
+    "double edge"
+  ],
+  "Absol": [
+    "scratch",
+    "razor wind",
+    "swords dance",
+    "leer"
+  ],
+  "Wynaut": [
+    "counter",
+    "amnesia",
+    "splash",
+    "destiny bond"
+  ],
+  "Snorunt": [
+    "headbutt",
+    "leer",
+    "bite",
+    "ice beam"
+  ],
+  "Glalie": [
+    "headbutt",
+    "leer",
+    "bite",
+    "ice beam"
+  ],
+  "Spheal": [
+    "body slam",
+    "growl",
+    "water gun",
+    "surf"
+  ],
+  "Sealeo": [
+    "body slam",
+    "growl",
+    "water gun",
+    "surf"
+  ],
+  "Walrein": [
+    "body slam",
+    "growl",
+    "water gun",
+    "surf"
+  ],
+  "Clamperl": [
+    "water gun",
+    "clamp",
+    "whirlpool",
+    "iron defense"
+  ],
+  "Huntail": [
+    "bite",
+    "water gun",
+    "hydro pump",
+    "screech"
+  ],
+  "Gorebyss": [
+    "water gun",
+    "hydro pump",
+    "confusion",
+    "psychic"
+  ],
+  "Relicanth": [
+    "tackle",
+    "take down",
+    "double edge",
+    "water gun"
+  ],
+  "Luvdisc": [
+    "tackle",
+    "take down",
+    "water gun",
+    "hydro pump"
+  ],
+  "Bagon": [
+    "headbutt",
+    "double edge",
+    "leer",
+    "bite"
+  ],
+  "Shelgon": [
+    "headbutt",
+    "double edge",
+    "leer",
+    "bite"
+  ],
+  "Salamence": [
+    "fly",
+    "headbutt",
+    "double edge",
+    "leer"
+  ],
+  "Beldum": [
+    "tackle",
+    "take down",
+    "iron defense",
+    "zen headbutt"
+  ],
+  "Metang": [
+    "tackle",
+    "take down",
+    "hyper beam",
+    "confusion"
+  ],
+  "Metagross": [
+    "tackle",
+    "take down",
+    "hyper beam",
+    "confusion"
+  ],
+  "Regirock": [
+    "stomp",
+    "hyper beam",
+    "rock throw",
+    "explosion"
+  ],
+  "Regice": [
+    "stomp",
+    "ice beam",
+    "blizzard",
+    "hyper beam"
+  ],
+  "Registeel": [
+    "stomp",
+    "hyper beam",
+    "amnesia",
+    "explosion"
+  ],
+  "Latias": [
+    "confusion",
+    "psychic",
+    "recover",
+    "psywave"
+  ],
+  "Latios": [
+    "confusion",
+    "psychic",
+    "recover",
+    "psywave"
+  ],
+  "Kyogre": [
+    "body slam",
+    "double edge",
+    "hydro pump",
+    "ice beam"
+  ],
+  "Groudon": [
+    "solar beam",
+    "earthquake",
+    "fissure",
+    "fire blast"
+  ],
+  "Rayquaza": [
+    "fly",
+    "hyper beam",
+    "rest",
+    "scary face"
+  ],
+  "Jirachi": [
+    "double edge",
+    "confusion",
+    "psychic",
+    "swift"
+  ],
+  "Turtwig": [
+    "tackle",
+    "double edge",
+    "bite",
+    "absorb"
+  ],
+  "Grotle": [
+    "tackle",
+    "double edge",
+    "bite",
+    "absorb"
+  ],
+  "Torterra": [
+    "tackle",
+    "double edge",
+    "bite",
+    "absorb"
+  ],
+  "Chimchar": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Monferno": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Infernape": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Piplup": [
+    "pound",
+    "fury attack",
+    "tackle",
+    "double edge"
+  ],
+  "Prinplup": [
+    "pound",
+    "fury attack",
+    "tackle",
+    "double edge"
+  ],
+  "Empoleon": [
+    "pound",
+    "swords dance",
+    "fury attack",
+    "tackle"
+  ],
+  "Starly": [
+    "gust",
+    "wing attack",
+    "whirlwind",
+    "tackle"
+  ],
+  "Staravia": [
+    "gust",
+    "wing attack",
+    "whirlwind",
+    "tackle"
+  ],
+  "Staraptor": [
+    "gust",
+    "wing attack",
+    "whirlwind",
+    "tackle"
+  ],
+  "Bidoof": [
+    "swords dance",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Bibarel": [
+    "swords dance",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Kricketot": [
+    "pound",
+    "tackle",
+    "growl",
+    "absorb"
+  ],
+  "Kricketune": [
+    "pound",
+    "swords dance",
+    "tackle",
+    "growl"
+  ],
+  "Shinx": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Luxio": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Luxray": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Budew": [
+    "poison sting",
+    "absorb",
+    "mega drain",
+    "growth"
+  ],
+  "Roserade": [
+    "poison sting",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Cranidos": [
+    "swords dance",
+    "slam",
+    "headbutt",
+    "tackle"
+  ],
+  "Rampardos": [
+    "swords dance",
+    "slam",
+    "headbutt",
+    "tackle"
+  ],
+  "Shieldon": [
+    "tackle",
+    "take down",
+    "double edge",
+    "rock slide"
+  ],
+  "Bastiodon": [
+    "tackle",
+    "take down",
+    "double edge",
+    "rock slide"
+  ],
+  "Burmy": [
+    "tackle",
+    "string shot",
+    "protect",
+    "hidden power"
+  ],
+  "Mothim": [
+    "gust",
+    "tackle",
+    "psybeam",
+    "poison powder"
+  ],
+  "Combee": [
+    "gust",
+    "sweet scent",
+    "bug buzz",
+    "bug bite"
+  ],
+  "Vespiquen": [
+    "gust",
+    "poison sting",
+    "pin missile",
+    "toxic"
+  ],
+  "Pachirisu": [
+    "bite",
+    "growl",
+    "thunder shock",
+    "thunder wave"
+  ],
+  "Buizel": [
+    "razor wind",
+    "tackle",
+    "tail whip",
+    "bite"
+  ],
+  "Floatzel": [
+    "razor wind",
+    "tackle",
+    "tail whip",
+    "bite"
+  ],
+  "Cherubi": [
+    "tackle",
+    "take down",
+    "double edge",
+    "absorb"
+  ],
+  "Cherrim": [
+    "tackle",
+    "take down",
+    "double edge",
+    "absorb"
+  ],
+  "Shellos": [
+    "tackle",
+    "body slam",
+    "water gun",
+    "hydro pump"
+  ],
+  "Gastrodon": [
+    "tackle",
+    "body slam",
+    "water gun",
+    "hydro pump"
+  ],
+  "Ambipom": [
+    "scratch",
+    "sand attack",
+    "double edge",
+    "tail whip"
+  ],
+  "Drifloon": [
+    "gust",
+    "confusion",
+    "hypnosis",
+    "minimize"
+  ],
+  "Drifblim": [
+    "gust",
+    "confusion",
+    "hypnosis",
+    "minimize"
+  ],
+  "Buneary": [
+    "pound",
+    "double kick",
+    "jump kick",
+    "headbutt"
+  ],
+  "Lopunny": [
+    "pound",
+    "double kick",
+    "jump kick",
+    "headbutt"
+  ],
+  "Mismagius": [
+    "growl",
+    "psybeam",
+    "confusion",
+    "hypnosis"
+  ],
+  "Honchkrow": [
+    "gust",
+    "wing attack",
+    "peck",
+    "night shade"
+  ],
+  "Glameow": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "growl"
+  ],
+  "Purugly": [
+    "scratch",
+    "tackle",
+    "body slam",
+    "double edge"
+  ],
+  "Chingling": [
+    "tackle",
+    "wrap",
+    "double edge",
+    "growl"
+  ],
+  "Stunky": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "bite"
+  ],
+  "Skuntank": [
+    "scratch",
+    "tackle",
+    "double edge",
+    "bite"
+  ],
+  "Bronzor": [
+    "tackle",
+    "confusion",
+    "hypnosis",
+    "confuse ray"
+  ],
+  "Bronzong": [
+    "tackle",
+    "confusion",
+    "hypnosis",
+    "confuse ray"
+  ],
+  "Bonsly": [
+    "slam",
+    "tackle",
+    "double edge",
+    "low kick"
+  ],
+  "Happiny": [
+    "pound",
+    "tackle",
+    "double edge",
+    "minimize"
+  ],
+  "Chatot": [
+    "gust",
+    "fury attack",
+    "growl",
+    "sing"
+  ],
+  "Spiritomb": [
+    "hypnosis",
+    "night shade",
+    "confuse ray",
+    "dream eater"
+  ],
+  "Gible": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Gabite": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Garchomp": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Munchlax": [
+    "tackle",
+    "body slam",
+    "double edge",
+    "bite"
+  ],
+  "Riolu": [
+    "swords dance",
+    "bite",
+    "counter",
+    "quick attack"
+  ],
+  "Lucario": [
+    "swords dance",
+    "bite",
+    "counter",
+    "quick attack"
+  ],
+  "Hippopotas": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Hippowdon": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Skorupi": [
+    "swords dance",
+    "poison sting",
+    "pin missile",
+    "leer"
+  ],
+  "Drapion": [
+    "swords dance",
+    "poison sting",
+    "pin missile",
+    "leer"
+  ],
+  "Croagunk": [
+    "poison sting",
+    "low kick",
+    "toxic",
+    "feint attack"
+  ],
+  "Toxicroak": [
+    "poison sting",
+    "low kick",
+    "toxic",
+    "feint attack"
+  ],
+  "Carnivine": [
+    "bind",
+    "vine whip",
+    "bite",
+    "absorb"
+  ],
+  "Finneon": [
+    "pound",
+    "gust",
+    "water gun",
+    "hydro pump"
+  ],
+  "Lumineon": [
+    "pound",
+    "gust",
+    "water gun",
+    "hydro pump"
+  ],
+  "Mantyke": [
+    "wing attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Snover": [
+    "leer",
+    "mist",
+    "blizzard",
+    "razor leaf"
+  ],
+  "Abomasnow": [
+    "ice punch",
+    "leer",
+    "mist",
+    "blizzard"
+  ],
+  "Weavile": [
+    "scratch",
+    "swords dance",
+    "leer",
+    "blizzard"
+  ],
+  "Magnezone": [
+    "tackle",
+    "supersonic",
+    "sonic boom",
+    "thunder shock"
+  ],
+  "Lickilicky": [
+    "slam",
+    "stomp",
+    "tackle",
+    "wrap"
+  ],
+  "Rhyperior": [
+    "stomp",
+    "horn attack",
+    "fury attack",
+    "horn drill"
+  ],
+  "Tangrowth": [
+    "bind",
+    "slam",
+    "vine whip",
+    "absorb"
+  ],
+  "Electivire": [
+    "fire punch",
+    "thunder punch",
+    "leer",
+    "low kick"
+  ],
+  "Magmortar": [
+    "fire punch",
+    "thunder punch",
+    "tackle",
+    "leer"
+  ],
+  "Togekiss": [
+    "pound",
+    "tackle",
+    "double edge",
+    "growl"
+  ],
+  "Yanmega": [
+    "gust",
+    "wing attack",
+    "tackle",
+    "supersonic"
+  ],
+  "Leafeon": [
+    "swords dance",
+    "sand attack",
+    "tackle",
+    "take down"
+  ],
+  "Glaceon": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Gliscor": [
+    "guillotine",
+    "swords dance",
+    "sand attack",
+    "poison sting"
+  ],
+  "Mamoswine": [
+    "fury attack",
+    "tackle",
+    "take down",
+    "thrash"
+  ],
+  "Gallade": [
+    "swords dance",
+    "leer",
+    "growl",
+    "psybeam"
+  ],
+  "Probopass": [
+    "tackle",
+    "thunder wave",
+    "rock throw",
+    "harden"
+  ],
+  "Dusknoir": [
+    "fire punch",
+    "ice punch",
+    "thunder punch",
+    "bind"
+  ],
+  "Froslass": [
+    "headbutt",
+    "leer",
+    "bite",
+    "blizzard"
+  ],
+  "Rotom": [
+    "thunder shock",
+    "thunderbolt",
+    "thunder wave",
+    "thunder"
+  ],
+  "Uxie": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "hypnosis"
+  ],
+  "Mesprit": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "recover"
+  ],
+  "Azelf": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "self destruct"
+  ],
+  "Dialga": [
+    "slash",
+    "scary face",
+    "dragon breath",
+    "iron tail"
+  ],
+  "Palkia": [
+    "hydro pump",
+    "slash",
+    "scary face",
+    "dragon breath"
+  ],
+  "Heatran": [
+    "leer",
+    "ember",
+    "fire spin",
+    "scary face"
+  ],
+  "Regigigas": [
+    "pound",
+    "mega punch",
+    "fire punch",
+    "ice punch"
+  ],
+  "Cresselia": [
+    "tackle",
+    "mist",
+    "psybeam",
+    "aurora beam"
+  ],
+  "Phione": [
+    "supersonic",
+    "water gun",
+    "hydro pump",
+    "bubble beam"
+  ],
+  "Manaphy": [
+    "supersonic",
+    "water gun",
+    "hydro pump",
+    "bubble beam"
+  ],
+  "Darkrai": [
+    "disable",
+    "psychic",
+    "hypnosis",
+    "quick attack"
+  ],
+  "Arceus": [
+    "hyper beam",
+    "seismic toss",
+    "confusion",
+    "quick attack"
+  ],
+  "Snivy": [
+    "slam",
+    "vine whip",
+    "tackle",
+    "wrap"
+  ],
+  "Servine": [
+    "slam",
+    "vine whip",
+    "tackle",
+    "wrap"
+  ],
+  "Serperior": [
+    "slam",
+    "vine whip",
+    "tackle",
+    "wrap"
+  ],
+  "Tepig": [
+    "tackle",
+    "take down",
+    "tail whip",
+    "roar"
+  ],
+  "Pignite": [
+    "tackle",
+    "take down",
+    "tail whip",
+    "roar"
+  ],
+  "Emboar": [
+    "tackle",
+    "take down",
+    "tail whip",
+    "roar"
+  ],
+  "Oshawott": [
+    "swords dance",
+    "tackle",
+    "tail whip",
+    "water gun"
+  ],
+  "Dewott": [
+    "swords dance",
+    "tackle",
+    "tail whip",
+    "water gun"
+  ],
+  "Samurott": [
+    "swords dance",
+    "tackle",
+    "tail whip",
+    "water gun"
+  ],
+  "Patrat": [
+    "slam",
+    "sand attack",
+    "tackle",
+    "leer"
+  ],
+  "Watchog": [
+    "slam",
+    "sand attack",
+    "tackle",
+    "leer"
+  ],
+  "Lillipup": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Herdier": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Stoutland": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Purrloin": [
+    "scratch",
+    "sand attack",
+    "growl",
+    "fury swipes"
+  ],
+  "Liepard": [
+    "scratch",
+    "sand attack",
+    "growl",
+    "fury swipes"
+  ],
+  "Pansage": [
+    "scratch",
+    "vine whip",
+    "leer",
+    "bite"
+  ],
+  "Simisage": [
+    "leer",
+    "lick",
+    "fury swipes",
+    "seed bomb"
+  ],
+  "Pansear": [
+    "scratch",
+    "leer",
+    "bite",
+    "lick"
+  ],
+  "Simisear": [
+    "leer",
+    "lick",
+    "fury swipes",
+    "flame burst"
+  ],
+  "Panpour": [
+    "scratch",
+    "leer",
+    "bite",
+    "water gun"
+  ],
+  "Simipour": [
+    "leer",
+    "lick",
+    "fury swipes",
+    "scald"
+  ],
+  "Munna": [
+    "psybeam",
+    "psychic",
+    "hypnosis",
+    "defense curl"
+  ],
+  "Musharna": [
+    "psybeam",
+    "psychic",
+    "hypnosis",
+    "defense curl"
+  ],
+  "Pidove": [
+    "razor wind",
+    "gust",
+    "leer",
+    "growl"
+  ],
+  "Tranquill": [
+    "razor wind",
+    "gust",
+    "leer",
+    "growl"
+  ],
+  "Unfezant": [
+    "razor wind",
+    "gust",
+    "leer",
+    "growl"
+  ],
+  "Blitzle": [
+    "stomp",
+    "thrash",
+    "tail whip",
+    "thunder wave"
+  ],
+  "Zebstrika": [
+    "stomp",
+    "thrash",
+    "tail whip",
+    "thunder wave"
+  ],
+  "Roggenrola": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "harden"
+  ],
+  "Boldore": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "harden"
+  ],
+  "Gigalith": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "harden"
+  ],
+  "Woobat": [
+    "gust",
+    "confusion",
+    "psychic",
+    "amnesia"
+  ],
+  "Swoobat": [
+    "gust",
+    "confusion",
+    "psychic",
+    "amnesia"
+  ],
+  "Drilbur": [
+    "scratch",
+    "swords dance",
+    "earthquake",
+    "fissure"
+  ],
+  "Excadrill": [
+    "scratch",
+    "swords dance",
+    "horn drill",
+    "earthquake"
+  ],
+  "Audino": [
+    "pound",
+    "double slap",
+    "take down",
+    "double edge"
+  ],
+  "Timburr": [
+    "pound",
+    "slam",
+    "leer",
+    "low kick"
+  ],
+  "Gurdurr": [
+    "pound",
+    "slam",
+    "leer",
+    "low kick"
+  ],
+  "Conkeldurr": [
+    "pound",
+    "slam",
+    "leer",
+    "low kick"
+  ],
+  "Tympole": [
+    "growl",
+    "supersonic",
+    "acid",
+    "hydro pump"
+  ],
+  "Palpitoad": [
+    "growl",
+    "supersonic",
+    "acid",
+    "hydro pump"
+  ],
+  "Seismitoad": [
+    "growl",
+    "supersonic",
+    "acid",
+    "hydro pump"
+  ],
+  "Throh": [
+    "bind",
+    "body slam",
+    "leer",
+    "seismic toss"
+  ],
+  "Sawk": [
+    "karate chop",
+    "double kick",
+    "leer",
+    "counter"
+  ],
+  "Sewaddle": [
+    "tackle",
+    "razor leaf",
+    "string shot",
+    "flail"
+  ],
+  "Swadloon": [
+    "tackle",
+    "razor leaf",
+    "string shot",
+    "flail"
+  ],
+  "Leavanny": [
+    "swords dance",
+    "tackle",
+    "razor leaf",
+    "string shot"
+  ],
+  "Venipede": [
+    "take down",
+    "double edge",
+    "poison sting",
+    "toxic"
+  ],
+  "Whirlipede": [
+    "take down",
+    "double edge",
+    "poison sting",
+    "toxic"
+  ],
+  "Scolipede": [
+    "take down",
+    "double edge",
+    "poison sting",
+    "toxic"
+  ],
+  "Cottonee": [
+    "absorb",
+    "mega drain",
+    "leech seed",
+    "growth"
+  ],
+  "Whimsicott": [
+    "gust",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Petilil": [
+    "absorb",
+    "mega drain",
+    "leech seed",
+    "growth"
+  ],
+  "Lilligant": [
+    "absorb",
+    "mega drain",
+    "leech seed",
+    "growth"
+  ],
+  "Sandile": [
+    "sand attack",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Krokorok": [
+    "sand attack",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Krookodile": [
+    "sand attack",
+    "thrash",
+    "leer",
+    "bite"
+  ],
+  "Darumaka": [
+    "fire punch",
+    "headbutt",
+    "tackle",
+    "thrash"
+  ],
+  "Maractus": [
+    "pin missile",
+    "peck",
+    "absorb",
+    "mega drain"
+  ],
+  "Dwebble": [
+    "sand attack",
+    "withdraw",
+    "rock slide",
+    "slash"
+  ],
+  "Crustle": [
+    "sand attack",
+    "withdraw",
+    "rock slide",
+    "slash"
+  ],
+  "Scraggy": [
+    "sand attack",
+    "headbutt",
+    "leer",
+    "low kick"
+  ],
+  "Scrafty": [
+    "sand attack",
+    "headbutt",
+    "leer",
+    "low kick"
+  ],
+  "Sigilyph": [
+    "gust",
+    "whirlwind",
+    "psybeam",
+    "confusion"
+  ],
+  "Yamask": [
+    "disable",
+    "night shade",
+    "haze",
+    "curse"
+  ],
+  "Cofagrigus": [
+    "disable",
+    "night shade",
+    "haze",
+    "curse"
+  ],
+  "Tirtouga": [
+    "bite",
+    "water gun",
+    "hydro pump",
+    "withdraw"
+  ],
+  "Carracosta": [
+    "bite",
+    "water gun",
+    "hydro pump",
+    "withdraw"
+  ],
+  "Archen": [
+    "wing attack",
+    "thrash",
+    "leer",
+    "rock throw"
+  ],
+  "Archeops": [
+    "wing attack",
+    "thrash",
+    "leer",
+    "rock throw"
+  ],
+  "Trubbish": [
+    "pound",
+    "double slap",
+    "take down",
+    "toxic"
+  ],
+  "Garbodor": [
+    "pound",
+    "double slap",
+    "body slam",
+    "take down"
+  ],
+  "Zorua": [
+    "scratch",
+    "leer",
+    "agility",
+    "fury swipes"
+  ],
+  "Zoroark": [
+    "scratch",
+    "leer",
+    "agility",
+    "fury swipes"
+  ],
+  "Minccino": [
+    "pound",
+    "double slap",
+    "slam",
+    "growl"
+  ],
+  "Cinccino": [
+    "pound",
+    "slam",
+    "sing",
+    "swift"
+  ],
+  "Gothita": [
+    "pound",
+    "double slap",
+    "psybeam",
+    "confusion"
+  ],
+  "Gothorita": [
+    "pound",
+    "double slap",
+    "psybeam",
+    "confusion"
+  ],
+  "Gothitelle": [
+    "pound",
+    "double slap",
+    "psybeam",
+    "confusion"
+  ],
+  "Solosis": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "recover"
+  ],
+  "Duosion": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "recover"
+  ],
+  "Reuniclus": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "recover"
+  ],
+  "Ducklett": [
+    "wing attack",
+    "water gun",
+    "bubble beam",
+    "rain dance"
+  ],
+  "Swanna": [
+    "wing attack",
+    "water gun",
+    "bubble beam",
+    "rain dance"
+  ],
+  "Vanillite": [
+    "mist",
+    "ice beam",
+    "blizzard",
+    "harden"
+  ],
+  "Vanillish": [
+    "mist",
+    "ice beam",
+    "blizzard",
+    "harden"
+  ],
+  "Vanilluxe": [
+    "mist",
+    "ice beam",
+    "blizzard",
+    "harden"
+  ],
+  "Deerling": [
+    "double kick",
+    "jump kick",
+    "sand attack",
+    "tackle"
+  ],
+  "Sawsbuck": [
+    "double kick",
+    "jump kick",
+    "sand attack",
+    "tackle"
+  ],
+  "Emolga": [
+    "tail whip",
+    "thunder shock",
+    "agility",
+    "quick attack"
+  ],
+  "Karrablast": [
+    "swords dance",
+    "headbutt",
+    "fury attack",
+    "take down"
+  ],
+  "Escavalier": [
+    "swords dance",
+    "headbutt",
+    "fury attack",
+    "take down"
+  ],
+  "Foongus": [
+    "absorb",
+    "mega drain",
+    "growth",
+    "solar beam"
+  ],
+  "Amoonguss": [
+    "absorb",
+    "mega drain",
+    "growth",
+    "solar beam"
+  ],
+  "Alomomola": [
+    "pound",
+    "double slap",
+    "hydro pump",
+    "protect"
+  ],
+  "Joltik": [
+    "absorb",
+    "string shot",
+    "thunder wave",
+    "agility"
+  ],
+  "Galvantula": [
+    "absorb",
+    "string shot",
+    "thunder wave",
+    "agility"
+  ],
+  "Ferroseed": [
+    "tackle",
+    "pin missile",
+    "harden",
+    "self destruct"
+  ],
+  "Ferrothorn": [
+    "tackle",
+    "pin missile",
+    "harden",
+    "self destruct"
+  ],
+  "Klink": [
+    "vice grip",
+    "bind",
+    "hyper beam",
+    "thunder shock"
+  ],
+  "Klang": [
+    "vice grip",
+    "bind",
+    "hyper beam",
+    "thunder shock"
+  ],
+  "Klinklang": [
+    "vice grip",
+    "bind",
+    "hyper beam",
+    "thunder shock"
+  ],
+  "Tynamo": [
+    "tackle",
+    "thunder wave",
+    "spark",
+    "charge beam"
+  ],
+  "Eelektrik": [
+    "bind",
+    "headbutt",
+    "thrash",
+    "acid"
+  ],
+  "Eelektross": [
+    "headbutt",
+    "thrash",
+    "acid",
+    "zap cannon"
+  ],
+  "Elgyem": [
+    "headbutt",
+    "growl",
+    "psybeam",
+    "confusion"
+  ],
+  "Beheeyem": [
+    "headbutt",
+    "growl",
+    "psybeam",
+    "confusion"
+  ],
+  "Litwick": [
+    "ember",
+    "fire spin",
+    "night shade",
+    "minimize"
+  ],
+  "Lampent": [
+    "ember",
+    "fire spin",
+    "night shade",
+    "minimize"
+  ],
+  "Chandelure": [
+    "ember",
+    "fire spin",
+    "night shade",
+    "minimize"
+  ],
+  "Axew": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Fraxure": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Haxorus": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Cubchoo": [
+    "thrash",
+    "growl",
+    "blizzard",
+    "bide"
+  ],
+  "Beartic": [
+    "thrash",
+    "growl",
+    "blizzard",
+    "bide"
+  ],
+  "Cryogonal": [
+    "bind",
+    "mist",
+    "ice beam",
+    "aurora beam"
+  ],
+  "Shelmet": [
+    "body slam",
+    "acid",
+    "absorb",
+    "mega drain"
+  ],
+  "Accelgor": [
+    "body slam",
+    "acid",
+    "absorb",
+    "mega drain"
+  ],
+  "Stunfisk": [
+    "tackle",
+    "water gun",
+    "thunder shock",
+    "thunderbolt"
+  ],
+  "Mienfoo": [
+    "pound",
+    "double slap",
+    "jump kick",
+    "meditate"
+  ],
+  "Mienshao": [
+    "pound",
+    "double slap",
+    "jump kick",
+    "meditate"
+  ],
+  "Druddigon": [
+    "scratch",
+    "leer",
+    "bite",
+    "dragon rage"
+  ],
+  "Golett": [
+    "pound",
+    "mega punch",
+    "earthquake",
+    "night shade"
+  ],
+  "Golurk": [
+    "pound",
+    "mega punch",
+    "earthquake",
+    "night shade"
+  ],
+  "Pawniard": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Bisharp": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Bouffalant": [
+    "swords dance",
+    "horn attack",
+    "fury attack",
+    "tackle"
+  ],
+  "Rufflet": [
+    "wing attack",
+    "whirlwind",
+    "fury attack",
+    "thrash"
+  ],
+  "Braviary": [
+    "wing attack",
+    "whirlwind",
+    "fury attack",
+    "thrash"
+  ],
+  "Vullaby": [
+    "gust",
+    "whirlwind",
+    "fury attack",
+    "leer"
+  ],
+  "Mandibuzz": [
+    "gust",
+    "whirlwind",
+    "fury attack",
+    "leer"
+  ],
+  "Heatmor": [
+    "bind",
+    "tackle",
+    "flamethrower",
+    "fire spin"
+  ],
+  "Durant": [
+    "vice grip",
+    "guillotine",
+    "sand attack",
+    "bite"
+  ],
+  "Deino": [
+    "slam",
+    "headbutt",
+    "tackle",
+    "body slam"
+  ],
+  "Zweilous": [
+    "slam",
+    "headbutt",
+    "tackle",
+    "body slam"
+  ],
+  "Hydreigon": [
+    "slam",
+    "headbutt",
+    "tackle",
+    "body slam"
+  ],
+  "Larvesta": [
+    "take down",
+    "thrash",
+    "double edge",
+    "ember"
+  ],
+  "Volcarona": [
+    "gust",
+    "whirlwind",
+    "take down",
+    "thrash"
+  ],
+  "Cobalion": [
+    "swords dance",
+    "double kick",
+    "take down",
+    "leer"
+  ],
+  "Terrakion": [
+    "swords dance",
+    "double kick",
+    "take down",
+    "leer"
+  ],
+  "Virizion": [
+    "swords dance",
+    "double kick",
+    "take down",
+    "leer"
+  ],
+  "Reshiram": [
+    "flamethrower",
+    "dragon rage",
+    "fire blast",
+    "slash"
+  ],
+  "Zekrom": [
+    "dragon rage",
+    "thunderbolt",
+    "thunder",
+    "slash"
+  ],
+  "Kyurem": [
+    "ice beam",
+    "blizzard",
+    "dragon rage",
+    "slash"
+  ],
+  "Genesect": [
+    "hyper beam",
+    "quick attack",
+    "screech",
+    "self destruct"
+  ],
+  "Chespin": [
+    "vine whip",
+    "tackle",
+    "body slam",
+    "take down"
+  ],
+  "Quilladin": [
+    "vine whip",
+    "tackle",
+    "body slam",
+    "take down"
+  ],
+  "Chesnaught": [
+    "vine whip",
+    "tackle",
+    "body slam",
+    "take down"
+  ],
+  "Fennekin": [
+    "scratch",
+    "tail whip",
+    "ember",
+    "flamethrower"
+  ],
+  "Braixen": [
+    "scratch",
+    "tail whip",
+    "ember",
+    "flamethrower"
+  ],
+  "Delphox": [
+    "scratch",
+    "tail whip",
+    "ember",
+    "flamethrower"
+  ],
+  "Froakie": [
+    "pound",
+    "growl",
+    "water gun",
+    "hydro pump"
+  ],
+  "Frogadier": [
+    "pound",
+    "growl",
+    "water gun",
+    "hydro pump"
+  ],
+  "Greninja": [
+    "pound",
+    "growl",
+    "water gun",
+    "hydro pump"
+  ],
+  "Bunnelby": [
+    "double slap",
+    "swords dance",
+    "double kick",
+    "tackle"
+  ],
+  "Diggersby": [
+    "double slap",
+    "swords dance",
+    "double kick",
+    "tackle"
+  ],
+  "Fletchling": [
+    "razor wind",
+    "fly",
+    "tackle",
+    "growl"
+  ],
+  "Fletchinder": [
+    "razor wind",
+    "fly",
+    "tackle",
+    "growl"
+  ],
+  "Talonflame": [
+    "razor wind",
+    "fly",
+    "tackle",
+    "growl"
+  ],
+  "Scatterbug": [
+    "tackle",
+    "stun spore",
+    "string shot",
+    "bug bite"
+  ],
+  "Spewpa": [
+    "harden",
+    "protect",
+    "iron defense",
+    "bug bite"
+  ],
+  "Vivillon": [
+    "gust",
+    "supersonic",
+    "psybeam",
+    "poison powder"
+  ],
+  "Litleo": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "leer"
+  ],
+  "Flabebe": [
+    "vine whip",
+    "tackle",
+    "razor leaf",
+    "solar beam"
+  ],
+  "Floette": [
+    "vine whip",
+    "tackle",
+    "razor leaf",
+    "solar beam"
+  ],
+  "Florges": [
+    "solar beam",
+    "petal dance",
+    "safeguard",
+    "synthesis"
+  ],
+  "Skiddo": [
+    "vine whip",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Gogoat": [
+    "vine whip",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Pancham": [
+    "karate chop",
+    "comet punch",
+    "tackle",
+    "body slam"
+  ],
+  "Pangoro": [
+    "karate chop",
+    "comet punch",
+    "tackle",
+    "body slam"
+  ],
+  "Furfrou": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Espurr": [
+    "scratch",
+    "leer",
+    "psybeam",
+    "confusion"
+  ],
+  "Honedge": [
+    "swords dance",
+    "tackle",
+    "slash",
+    "fury cutter"
+  ],
+  "Doublade": [
+    "swords dance",
+    "tackle",
+    "slash",
+    "fury cutter"
+  ],
+  "Spritzee": [
+    "psychic",
+    "flail",
+    "sweet kiss",
+    "charm"
+  ],
+  "Aromatisse": [
+    "psychic",
+    "reflect",
+    "flail",
+    "sweet kiss"
+  ],
+  "Swirlix": [
+    "tackle",
+    "string shot",
+    "light screen",
+    "cotton spore"
+  ],
+  "Slurpuff": [
+    "tackle",
+    "string shot",
+    "light screen",
+    "cotton spore"
+  ],
+  "Inkay": [
+    "tackle",
+    "wrap",
+    "psybeam",
+    "peck"
+  ],
+  "Malamar": [
+    "tackle",
+    "wrap",
+    "psybeam",
+    "peck"
+  ],
+  "Binacle": [
+    "scratch",
+    "sand attack",
+    "water gun",
+    "withdraw"
+  ],
+  "Barbaracle": [
+    "scratch",
+    "sand attack",
+    "water gun",
+    "withdraw"
+  ],
+  "Skrelp": [
+    "tackle",
+    "tail whip",
+    "acid",
+    "water gun"
+  ],
+  "Dragalge": [
+    "tackle",
+    "tail whip",
+    "acid",
+    "water gun"
+  ],
+  "Clauncher": [
+    "vice grip",
+    "swords dance",
+    "water gun",
+    "bubble beam"
+  ],
+  "Clawitzer": [
+    "vice grip",
+    "swords dance",
+    "water gun",
+    "bubble beam"
+  ],
+  "Helioptile": [
+    "pound",
+    "razor wind",
+    "tail whip",
+    "thunder shock"
+  ],
+  "Heliolisk": [
+    "pound",
+    "razor wind",
+    "tail whip",
+    "thunder shock"
+  ],
+  "Tyrunt": [
+    "stomp",
+    "horn drill",
+    "tackle",
+    "thrash"
+  ],
+  "Tyrantrum": [
+    "stomp",
+    "horn drill",
+    "tackle",
+    "thrash"
+  ],
+  "Amaura": [
+    "take down",
+    "growl",
+    "mist",
+    "ice beam"
+  ],
+  "Aurorus": [
+    "take down",
+    "growl",
+    "mist",
+    "ice beam"
+  ],
+  "Sylveon": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Hawlucha": [
+    "karate chop",
+    "swords dance",
+    "wing attack",
+    "tackle"
+  ],
+  "Dedenne": [
+    "tackle",
+    "tail whip",
+    "thunder shock",
+    "thunder wave"
+  ],
+  "Carbink": [
+    "tackle",
+    "rock throw",
+    "harden",
+    "light screen"
+  ],
+  "Goomy": [
+    "tackle",
+    "body slam",
+    "water gun",
+    "hydro pump"
+  ],
+  "Sliggoo": [
+    "tackle",
+    "body slam",
+    "water gun",
+    "absorb"
+  ],
+  "Goodra": [
+    "tackle",
+    "body slam",
+    "water gun",
+    "absorb"
+  ],
+  "Klefki": [
+    "tackle",
+    "spikes",
+    "torment",
+    "recycle"
+  ],
+  "Phantump": [
+    "tackle",
+    "leech seed",
+    "growth",
+    "confuse ray"
+  ],
+  "Trevenant": [
+    "tackle",
+    "leech seed",
+    "growth",
+    "confuse ray"
+  ],
+  "Bergmite": [
+    "tackle",
+    "take down",
+    "double edge",
+    "bite"
+  ],
+  "Avalugg": [
+    "tackle",
+    "body slam",
+    "take down",
+    "double edge"
+  ],
+  "Noibat": [
+    "razor wind",
+    "gust",
+    "wing attack",
+    "whirlwind"
+  ],
+  "Noivern": [
+    "razor wind",
+    "gust",
+    "wing attack",
+    "whirlwind"
+  ],
+  "Xerneas": [
+    "tackle",
+    "take down",
+    "aurora beam",
+    "light screen"
+  ],
+  "Yveltal": [
+    "razor wind",
+    "gust",
+    "disable",
+    "hyper beam"
+  ],
+  "Diancie": [
+    "tackle",
+    "rock throw",
+    "harden",
+    "light screen"
+  ],
+  "Hoopa": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "light screen"
+  ],
+  "Volcanion": [
+    "stomp",
+    "body slam",
+    "take down",
+    "leer"
+  ],
+  "Rowlet": [
+    "gust",
+    "fury attack",
+    "tackle",
+    "growl"
+  ],
+  "Dartrix": [
+    "gust",
+    "fury attack",
+    "tackle",
+    "growl"
+  ],
+  "Decidueye": [
+    "fury attack",
+    "tackle",
+    "growl",
+    "peck"
+  ],
+  "Litten": [
+    "scratch",
+    "double kick",
+    "thrash",
+    "leer"
+  ],
+  "Torracat": [
+    "scratch",
+    "double kick",
+    "thrash",
+    "leer"
+  ],
+  "Incineroar": [
+    "scratch",
+    "double kick",
+    "thrash",
+    "leer"
+  ],
+  "Popplio": [
+    "pound",
+    "double slap",
+    "growl",
+    "sing"
+  ],
+  "Brionne": [
+    "pound",
+    "double slap",
+    "growl",
+    "sing"
+  ],
+  "Primarina": [
+    "pound",
+    "double slap",
+    "growl",
+    "sing"
+  ],
+  "Pikipek": [
+    "fury attack",
+    "growl",
+    "supersonic",
+    "peck"
+  ],
+  "Trumbeak": [
+    "fury attack",
+    "growl",
+    "supersonic",
+    "peck"
+  ],
+  "Toucannon": [
+    "fury attack",
+    "growl",
+    "supersonic",
+    "peck"
+  ],
+  "Yungoos": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "thrash"
+  ],
+  "Gumshoos": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "thrash"
+  ],
+  "Grubbin": [
+    "vice grip",
+    "bite",
+    "string shot",
+    "dig"
+  ],
+  "Charjabug": [
+    "vice grip",
+    "bite",
+    "string shot",
+    "dig"
+  ],
+  "Vikavolt": [
+    "vice grip",
+    "guillotine",
+    "fly",
+    "bite"
+  ],
+  "Crabrawler": [
+    "slam",
+    "leer",
+    "bubble beam",
+    "bubble"
+  ],
+  "Crabominable": [
+    "ice punch",
+    "slam",
+    "leer",
+    "bubble beam"
+  ],
+  "Cutiefly": [
+    "absorb",
+    "stun spore",
+    "sweet scent",
+    "aromatherapy"
+  ],
+  "Ribombee": [
+    "absorb",
+    "stun spore",
+    "sweet scent",
+    "aromatherapy"
+  ],
+  "Rockruff": [
+    "sand attack",
+    "tackle",
+    "leer",
+    "bite"
+  ],
+  "Mareanie": [
+    "poison sting",
+    "pin missile",
+    "bite",
+    "peck"
+  ],
+  "Toxapex": [
+    "poison sting",
+    "pin missile",
+    "bite",
+    "peck"
+  ],
+  "Mudbray": [
+    "stomp",
+    "double kick",
+    "mega kick",
+    "counter"
+  ],
+  "Mudsdale": [
+    "stomp",
+    "double kick",
+    "mega kick",
+    "counter"
+  ],
+  "Dewpider": [
+    "headbutt",
+    "bite",
+    "water gun",
+    "bubble beam"
+  ],
+  "Araquanid": [
+    "headbutt",
+    "bite",
+    "water gun",
+    "bubble beam"
+  ],
+  "Fomantis": [
+    "growth",
+    "razor leaf",
+    "solar beam",
+    "slash"
+  ],
+  "Lurantis": [
+    "growth",
+    "razor leaf",
+    "solar beam",
+    "slash"
+  ],
+  "Morelull": [
+    "absorb",
+    "mega drain",
+    "sleep powder",
+    "confuse ray"
+  ],
+  "Shiinotic": [
+    "absorb",
+    "mega drain",
+    "sleep powder",
+    "confuse ray"
+  ],
+  "Salandit": [
+    "double slap",
+    "scratch",
+    "ember",
+    "flamethrower"
+  ],
+  "Salazzle": [
+    "pound",
+    "double slap",
+    "scratch",
+    "disable"
+  ],
+  "Stufful": [
+    "tackle",
+    "take down",
+    "thrash",
+    "double edge"
+  ],
+  "Bewear": [
+    "bind",
+    "tackle",
+    "take down",
+    "thrash"
+  ],
+  "Bounsweet": [
+    "razor leaf",
+    "splash",
+    "flail",
+    "rapid spin"
+  ],
+  "Steenee": [
+    "double slap",
+    "stomp",
+    "razor leaf",
+    "splash"
+  ],
+  "Tsareena": [
+    "double slap",
+    "stomp",
+    "razor leaf",
+    "high jump kick"
+  ],
+  "Comfey": [
+    "bind",
+    "vine whip",
+    "wrap",
+    "leech seed"
+  ],
+  "Oranguru": [
+    "confusion",
+    "psychic",
+    "feint attack",
+    "psych up"
+  ],
+  "Passimian": [
+    "tackle",
+    "take down",
+    "thrash",
+    "double edge"
+  ],
+  "Wimpod": [
+    "sand attack",
+    "defense curl",
+    "struggle bug",
+    "surf"
+  ],
+  "Golisopod": [
+    "swords dance",
+    "sand attack",
+    "pin missile",
+    "defense curl"
+  ],
+  "Sandygast": [
+    "sand attack",
+    "absorb",
+    "mega drain",
+    "hypnosis"
+  ],
+  "Palossand": [
+    "sand attack",
+    "absorb",
+    "mega drain",
+    "hypnosis"
+  ],
+  "Pyukumuku": [
+    "counter",
+    "toxic",
+    "recover",
+    "harden"
+  ],
+  "Silvally": [
+    "razor wind",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Komala": [
+    "slam",
+    "thrash",
+    "defense curl",
+    "flail"
+  ],
+  "Turtonator": [
+    "tackle",
+    "body slam",
+    "ember",
+    "flamethrower"
+  ],
+  "Togedemaru": [
+    "tackle",
+    "pin missile",
+    "thunder shock",
+    "defense curl"
+  ],
+  "Bruxish": [
+    "bite",
+    "disable",
+    "water gun",
+    "confusion"
+  ],
+  "Drampa": [
+    "fly",
+    "dragon rage",
+    "light screen",
+    "glare"
+  ],
+  "Dhelmise": [
+    "slam",
+    "wrap",
+    "absorb",
+    "mega drain"
+  ],
+  "Cosmog": [
+    "teleport",
+    "splash"
+  ],
+  "Cosmoem": [
+    "teleport",
+    "cosmic power"
+  ],
+  "Solgaleo": [
+    "solar beam",
+    "teleport",
+    "metal claw",
+    "morning sun"
+  ],
+  "Lunala": [
+    "hyper beam",
+    "confusion",
+    "psychic",
+    "hypnosis"
+  ],
+  "Nihilego": [
+    "pound",
+    "headbutt",
+    "wrap",
+    "acid"
+  ],
+  "Buzzwole": [
+    "comet punch",
+    "mega punch",
+    "ice punch",
+    "thunder punch"
+  ],
+  "Pheromosa": [
+    "stomp",
+    "double kick",
+    "jump kick",
+    "leer"
+  ],
+  "Xurkitree": [
+    "thunder punch",
+    "wrap",
+    "thunder shock",
+    "thunderbolt"
+  ],
+  "Celesteela": [
+    "tackle",
+    "double edge",
+    "absorb",
+    "mega drain"
+  ],
+  "Kartana": [
+    "guillotine",
+    "swords dance",
+    "cut",
+    "razor leaf"
+  ],
+  "Guzzlord": [
+    "stomp",
+    "body slam",
+    "thrash",
+    "bite"
+  ],
+  "Necrozma": [
+    "confusion",
+    "slash",
+    "metal claw",
+    "morning sun"
+  ],
+  "Magearna": [
+    "sonic boom",
+    "psybeam",
+    "aurora beam",
+    "defense curl"
+  ],
+  "Marshadow": [
+    "fire punch",
+    "ice punch",
+    "thunder punch",
+    "jump kick"
+  ],
+  "Poipole": [
+    "fury attack",
+    "growl",
+    "acid",
+    "peck"
+  ],
+  "Naganadel": [
+    "fury attack",
+    "growl",
+    "acid",
+    "peck"
+  ],
+  "Stakataka": [
+    "stomp",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Blacephalon": [
+    "ember",
+    "fire spin",
+    "hypnosis",
+    "night shade"
+  ],
+  "Zeraora": [
+    "thunder punch",
+    "scratch",
+    "agility",
+    "quick attack"
+  ],
+  "Meltan": [
+    "headbutt",
+    "tail whip",
+    "thunder shock",
+    "thunder wave"
+  ],
+  "Melmetal": [
+    "mega punch",
+    "thunder punch",
+    "headbutt",
+    "tail whip"
+  ],
+  "Grookey": [
+    "scratch",
+    "slam",
+    "growl",
+    "razor leaf"
+  ],
+  "Thwackey": [
+    "scratch",
+    "slam",
+    "growl",
+    "razor leaf"
+  ],
+  "Rillaboom": [
+    "scratch",
+    "slam",
+    "growl",
+    "razor leaf"
+  ],
+  "Scorbunny": [
+    "double kick",
+    "headbutt",
+    "tackle",
+    "double edge"
+  ],
+  "Raboot": [
+    "double kick",
+    "headbutt",
+    "tackle",
+    "double edge"
+  ],
+  "Cinderace": [
+    "double kick",
+    "headbutt",
+    "tackle",
+    "double edge"
+  ],
+  "Sobble": [
+    "pound",
+    "bind",
+    "growl",
+    "water gun"
+  ],
+  "Drizzile": [
+    "pound",
+    "bind",
+    "growl",
+    "water gun"
+  ],
+  "Inteleon": [
+    "pound",
+    "bind",
+    "growl",
+    "water gun"
+  ],
+  "Skwovet": [
+    "tackle",
+    "body slam",
+    "tail whip",
+    "bite"
+  ],
+  "Greedent": [
+    "tackle",
+    "body slam",
+    "tail whip",
+    "bite"
+  ],
+  "Rookidee": [
+    "fury attack",
+    "leer",
+    "peck",
+    "drill peck"
+  ],
+  "Corvisquire": [
+    "fury attack",
+    "leer",
+    "peck",
+    "drill peck"
+  ],
+  "Corviknight": [
+    "fury attack",
+    "leer",
+    "peck",
+    "drill peck"
+  ],
+  "Blipbug": [
+    "struggle bug"
+  ],
+  "Dottler": [
+    "confusion",
+    "light screen",
+    "reflect",
+    "struggle bug"
+  ],
+  "Orbeetle": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "hypnosis"
+  ],
+  "Nickit": [
+    "tail whip",
+    "quick attack",
+    "beat up",
+    "assurance"
+  ],
+  "Thievul": [
+    "tail whip",
+    "quick attack",
+    "thief",
+    "beat up"
+  ],
+  "Gossifleur": [
+    "sing",
+    "razor leaf",
+    "rapid spin",
+    "sweet scent"
+  ],
+  "Eldegoss": [
+    "sing",
+    "razor leaf",
+    "cotton spore",
+    "rapid spin"
+  ],
+  "Wooloo": [
+    "double kick",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Dubwool": [
+    "double kick",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Chewtle": [
+    "headbutt",
+    "tackle",
+    "body slam",
+    "bite"
+  ],
+  "Drednaw": [
+    "headbutt",
+    "tackle",
+    "body slam",
+    "bite"
+  ],
+  "Yamper": [
+    "tackle",
+    "tail whip",
+    "bite",
+    "roar"
+  ],
+  "Boltund": [
+    "tackle",
+    "tail whip",
+    "bite",
+    "roar"
+  ],
+  "Rolycoly": [
+    "tackle",
+    "smokescreen",
+    "rapid spin",
+    "ancient power"
+  ],
+  "Carkol": [
+    "tackle",
+    "smokescreen",
+    "rapid spin",
+    "ancient power"
+  ],
+  "Coalossal": [
+    "tackle",
+    "smokescreen",
+    "rapid spin",
+    "ancient power"
+  ],
+  "Applin": [
+    "withdraw",
+    "astonish",
+    "attract",
+    "tera blast"
+  ],
+  "Flapple": [
+    "wing attack",
+    "fly",
+    "leech seed",
+    "growth"
+  ],
+  "Appletun": [
+    "stomp",
+    "headbutt",
+    "body slam",
+    "leech seed"
+  ],
+  "Silicobra": [
+    "slam",
+    "sand attack",
+    "headbutt",
+    "wrap"
+  ],
+  "Sandaconda": [
+    "slam",
+    "sand attack",
+    "headbutt",
+    "wrap"
+  ],
+  "Cramorant": [
+    "fury attack",
+    "thrash",
+    "water gun",
+    "hydro pump"
+  ],
+  "Arrokuda": [
+    "fury attack",
+    "double edge",
+    "bite",
+    "peck"
+  ],
+  "Barraskewda": [
+    "fury attack",
+    "double edge",
+    "bite",
+    "peck"
+  ],
+  "Toxel": [
+    "growl",
+    "acid",
+    "flail",
+    "belch"
+  ],
+  "Sizzlipede": [
+    "slam",
+    "wrap",
+    "bite",
+    "ember"
+  ],
+  "Centiskorch": [
+    "slam",
+    "wrap",
+    "bite",
+    "ember"
+  ],
+  "Clobbopus": [
+    "bind",
+    "leer",
+    "submission",
+    "reversal"
+  ],
+  "Grapploct": [
+    "bind",
+    "leer",
+    "submission",
+    "reversal"
+  ],
+  "Sinistea": [
+    "mega drain",
+    "withdraw",
+    "protect",
+    "giga drain"
+  ],
+  "Polteageist": [
+    "mega drain",
+    "withdraw",
+    "curse",
+    "protect"
+  ],
+  "Hatenna": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "aromatherapy"
+  ],
+  "Hattrem": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "aromatherapy"
+  ],
+  "Hatterene": [
+    "psybeam",
+    "confusion",
+    "psychic",
+    "aromatherapy"
+  ],
+  "Impidimp": [
+    "bite",
+    "swagger",
+    "fake out",
+    "torment"
+  ],
+  "Morgrem": [
+    "bite",
+    "swagger",
+    "fake out",
+    "torment"
+  ],
+  "Grimmsnarl": [
+    "bite",
+    "swagger",
+    "fake out",
+    "torment"
+  ],
+  "Obstagoon": [
+    "sand attack",
+    "headbutt",
+    "tackle",
+    "take down"
+  ],
+  "Perrserker": [
+    "pay day",
+    "scratch",
+    "thrash",
+    "growl"
+  ],
+  "Cursola": [
+    "tackle",
+    "disable",
+    "night shade",
+    "harden"
+  ],
+  "Sirfetchd": [
+    "swords dance",
+    "slam",
+    "sand attack",
+    "leer"
+  ],
+  "Runerigus": [
+    "slam",
+    "disable",
+    "earthquake",
+    "night shade"
+  ],
+  "Milcery": [
+    "tackle",
+    "recover",
+    "acid armor",
+    "sweet kiss"
+  ],
+  "Alcremie": [
+    "tackle",
+    "recover",
+    "acid armor",
+    "sweet kiss"
+  ],
+  "Falinks": [
+    "headbutt",
+    "tackle",
+    "counter",
+    "focus energy"
+  ],
+  "Pincurchin": [
+    "fury attack",
+    "water gun",
+    "bubble beam",
+    "peck"
+  ],
+  "Snom": [
+    "powder snow",
+    "struggle bug",
+    "rest",
+    "substitute"
+  ],
+  "Frosmoth": [
+    "mist",
+    "blizzard",
+    "aurora beam",
+    "stun spore"
+  ],
+  "Stonjourner": [
+    "stomp",
+    "mega kick",
+    "body slam",
+    "rock throw"
+  ],
+  "Cufant": [
+    "stomp",
+    "tackle",
+    "growl",
+    "strength"
+  ],
+  "Copperajah": [
+    "stomp",
+    "tackle",
+    "growl",
+    "strength"
+  ],
+  "Dracozolt": [
+    "slam",
+    "stomp",
+    "tackle",
+    "thunder shock"
+  ],
+  "Arctozolt": [
+    "slam",
+    "blizzard",
+    "thunder shock",
+    "powder snow"
+  ],
+  "Dracovish": [
+    "stomp",
+    "tackle",
+    "bite",
+    "water gun"
+  ],
+  "Arctovish": [
+    "bite",
+    "water gun",
+    "blizzard",
+    "super fang"
+  ],
+  "Duraludon": [
+    "leer",
+    "hyper beam",
+    "focus energy",
+    "metal claw"
+  ],
+  "Dreepy": [
+    "bite",
+    "quick attack",
+    "astonish",
+    "infestation"
+  ],
+  "Drakloak": [
+    "take down",
+    "double edge",
+    "bite",
+    "agility"
+  ],
+  "Dragapult": [
+    "take down",
+    "double edge",
+    "bite",
+    "agility"
+  ],
+  "Zacian": [
+    "swords dance",
+    "bite",
+    "quick attack",
+    "slash"
+  ],
+  "Zamazenta": [
+    "bite",
+    "quick attack",
+    "slash",
+    "metal claw"
+  ],
+  "Eternatus": [
+    "flamethrower",
+    "hyper beam",
+    "toxic",
+    "agility"
+  ],
+  "Kubfu": [
+    "headbutt",
+    "leer",
+    "counter",
+    "focus energy"
+  ],
+  "Zarude": [
+    "scratch",
+    "bind",
+    "vine whip",
+    "thrash"
+  ],
+  "Regieleki": [
+    "thrash",
+    "hyper beam",
+    "thunder shock",
+    "thunderbolt"
+  ],
+  "Regidrago": [
+    "vice grip",
+    "thrash",
+    "bite",
+    "hyper beam"
+  ],
+  "Glastrier": [
+    "swords dance",
+    "stomp",
+    "double kick",
+    "tackle"
+  ],
+  "Spectrier": [
+    "stomp",
+    "double kick",
+    "tackle",
+    "take down"
+  ],
+  "Calyrex": [
+    "pound",
+    "mega drain",
+    "leech seed",
+    "growth"
+  ],
+  "Sprigatito": [
+    "scratch",
+    "tail whip",
+    "bite",
+    "quick attack"
+  ],
+  "Floragato": [
+    "scratch",
+    "tail whip",
+    "bite",
+    "quick attack"
+  ],
+  "Meowscarada": [
+    "scratch",
+    "tail whip",
+    "bite",
+    "quick attack"
+  ],
+  "Fuecoco": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Crocalor": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Skeledirge": [
+    "tackle",
+    "leer",
+    "bite",
+    "roar"
+  ],
+  "Quaxly": [
+    "pound",
+    "wing attack",
+    "growl",
+    "water gun"
+  ],
+  "Quaxwell": [
+    "pound",
+    "wing attack",
+    "growl",
+    "water gun"
+  ],
+  "Quaquaval": [
+    "pound",
+    "wing attack",
+    "mega kick",
+    "growl"
+  ],
+  "Lechonk": [
+    "headbutt",
+    "tackle",
+    "take down",
+    "double edge"
+  ],
+  "Tarountula": [
+    "headbutt",
+    "tackle",
+    "counter",
+    "string shot"
+  ],
+  "Spidops": [
+    "headbutt",
+    "tackle",
+    "counter",
+    "string shot"
+  ],
+  "Nymble": [
+    "double kick",
+    "tackle",
+    "leer",
+    "agility"
+  ],
+  "Lokix": [
+    "double kick",
+    "tackle",
+    "leer",
+    "low kick"
+  ],
+  "Pawmi": [
+    "scratch",
+    "slam",
+    "bite",
+    "growl"
+  ],
+  "Pawmot": [
+    "scratch",
+    "slam",
+    "bite",
+    "growl"
+  ],
+  "Tandemaus": [
+    "pound",
+    "super fang",
+    "charm",
+    "encore"
+  ],
+  "Fidough": [
+    "tackle",
+    "double edge",
+    "tail whip",
+    "bite"
+  ],
+  "Dachsbun": [
+    "tackle",
+    "double edge",
+    "tail whip",
+    "bite"
+  ],
+  "Smoliv": [
+    "tackle",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Dolliv": [
+    "tackle",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Arboliva": [
+    "tackle",
+    "absorb",
+    "mega drain",
+    "leech seed"
+  ],
+  "Nacli": [
+    "headbutt",
+    "tackle",
+    "rock throw",
+    "earthquake"
+  ],
+  "Naclstack": [
+    "headbutt",
+    "tackle",
+    "rock throw",
+    "earthquake"
+  ],
+  "Garganacl": [
+    "headbutt",
+    "tackle",
+    "rock throw",
+    "earthquake"
+  ],
+  "Charcadet": [
+    "leer",
+    "ember",
+    "fire spin",
+    "night shade"
+  ],
+  "Armarouge": [
+    "leer",
+    "ember",
+    "flamethrower",
+    "fire spin"
+  ],
+  "Ceruledge": [
+    "swords dance",
+    "leer",
+    "ember",
+    "fire spin"
+  ],
+  "Tadbulb": [
+    "tackle",
+    "water gun",
+    "thunder shock",
+    "flail"
+  ],
+  "Bellibolt": [
+    "tackle",
+    "water gun",
+    "thunder shock",
+    "flail"
+  ],
+  "Wattrel": [
+    "growl",
+    "peck",
+    "thunder shock",
+    "agility"
+  ],
+  "Kilowattrel": [
+    "growl",
+    "peck",
+    "thunder shock",
+    "agility"
+  ],
+  "Maschiff": [
+    "headbutt",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Mabosstiff": [
+    "headbutt",
+    "tackle",
+    "double edge",
+    "leer"
+  ],
+  "Shroodle": [
+    "scratch",
+    "leer",
+    "bite",
+    "fury swipes"
+  ],
+  "Grafaiai": [
+    "scratch",
+    "leer",
+    "fury swipes",
+    "slash"
+  ],
+  "Brambleghast": [
+    "disable",
+    "absorb",
+    "mega drain",
+    "defense curl"
+  ],
+  "Toedscool": [
+    "tackle",
+    "wrap",
+    "supersonic",
+    "absorb"
+  ],
+  "Toedscruel": [
+    "tackle",
+    "wrap",
+    "supersonic",
+    "absorb"
+  ],
+  "Klawf": [
+    "guillotine",
+    "swords dance",
+    "rock throw",
+    "harden"
+  ],
+  "Capsakid": [
+    "headbutt",
+    "leer",
+    "bite",
+    "growth"
+  ],
+  "Scovillain": [
+    "headbutt",
+    "leer",
+    "bite",
+    "flamethrower"
+  ],
+  "Rellor": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "dig"
+  ],
+  "Rabsca": [
+    "sand attack",
+    "tackle",
+    "take down",
+    "psybeam"
+  ],
+  "Flittle": [
+    "growl",
+    "psybeam",
+    "peck",
+    "confusion"
+  ],
+  "Espathra": [
+    "growl",
+    "psybeam",
+    "peck",
+    "drill peck"
+  ],
+  "Tinkatink": [
+    "slam",
+    "sweet kiss",
+    "metal claw",
+    "rock smash"
+  ],
+  "Tinkatuff": [
+    "slam",
+    "sweet kiss",
+    "metal claw",
+    "rock smash"
+  ],
+  "Tinkaton": [
+    "slam",
+    "sweet kiss",
+    "metal claw",
+    "rock smash"
+  ],
+  "Wiglett": [
+    "slam",
+    "sand attack",
+    "headbutt",
+    "wrap"
+  ],
+  "Wugtrio": [
+    "slam",
+    "sand attack",
+    "headbutt",
+    "wrap"
+  ],
+  "Bombirdier": [
+    "wing attack",
+    "whirlwind",
+    "leer",
+    "peck"
+  ],
+  "Finizen": [
+    "supersonic",
+    "mist",
+    "water gun",
+    "hydro pump"
+  ],
+  "Varoom": [
+    "headbutt",
+    "screech",
+    "lick",
+    "smog"
+  ],
+  "Revavroom": [
+    "headbutt",
+    "screech",
+    "lick",
+    "smog"
+  ],
+  "Cyclizar": [
+    "tackle",
+    "double edge",
+    "bite",
+    "growl"
+  ],
+  "Orthworm": [
+    "tackle",
+    "wrap",
+    "take down",
+    "earthquake"
+  ],
+  "Glimmet": [
+    "rock throw",
+    "harden",
+    "self destruct",
+    "acid armor"
+  ],
+  "Glimmora": [
+    "rock throw",
+    "harden",
+    "self destruct",
+    "acid armor"
+  ],
+  "Greavard": [
+    "headbutt",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Houndstone": [
+    "headbutt",
+    "tackle",
+    "double edge",
+    "tail whip"
+  ],
+  "Flamigo": [
+    "wing attack",
+    "double kick",
+    "mega kick",
+    "peck"
+  ],
+  "Cetoddle": [
+    "tackle",
+    "body slam",
+    "take down",
+    "double edge"
+  ],
+  "Cetitan": [
+    "tackle",
+    "body slam",
+    "take down",
+    "double edge"
+  ],
+  "Veluza": [
+    "tackle",
+    "focus energy",
+    "slash",
+    "crunch"
+  ],
+  "Dondozo": [
+    "tackle",
+    "body slam",
+    "double edge",
+    "supersonic"
+  ],
+  "Annihilape": [
+    "scratch",
+    "thrash",
+    "leer",
+    "low kick"
+  ],
+  "Clodsire": [
+    "slam",
+    "tail whip",
+    "poison sting",
+    "earthquake"
+  ],
+  "Farigiraf": [
+    "stomp",
+    "tackle",
+    "growl",
+    "psybeam"
+  ],
+  "Kingambit": [
+    "scratch",
+    "guillotine",
+    "swords dance",
+    "leer"
+  ],
+  "Frigibax": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Arctibax": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Baxcalibur": [
+    "tackle",
+    "take down",
+    "leer",
+    "bite"
+  ],
+  "Gimmighoul": [
+    "tackle",
+    "astonish",
+    "take down",
+    "night shade"
+  ],
+  "Gholdengo": [
+    "tackle",
+    "night shade",
+    "recover",
+    "confuse ray"
+  ],
+  "Koraidon": [
+    "flamethrower",
+    "counter",
+    "agility",
+    "screech"
+  ],
+  "Miraidon": [
+    "hyper beam",
+    "thunder shock",
+    "thunder",
+    "agility"
+  ]
+}

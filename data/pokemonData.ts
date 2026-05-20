@@ -1,5 +1,7 @@
 import type { BattleStatStageKey, BattleStatStages, PendingMove, Pokemon, PokemonIVs, StatusCondition } from "../hooks/useGameState"
 import { getPokemonSpriteSet, getPokemonSpriteUrl, type PokemonSpriteSet, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
+import enrichedMoves from "./pokedex/enriched-moves.json"
+import missingSprites from "./pokedex/missing-sprites.json"
 
 // Rarity configuration - moved to top for better visibility
 export const POKEMON_RARITY_CONFIG = {
@@ -337,6 +339,55 @@ Object.keys(starterPokemon).forEach((name) => {
   starterPokemon[name].sprite = spriteSet.original
   starterPokemon[name].spriteSet = spriteSet
 })
+
+// Merge per-generation species lists (minimal defaults) so we can add species by generation.
+import gen1 from "./pokedex/gen1.json"
+import gen2 from "./pokedex/gen2.json"
+import gen3 from "./pokedex/gen3.json"
+import gen4 from "./pokedex/gen4.json"
+import gen5 from "./pokedex/gen5.json"
+import gen6 from "./pokedex/gen6.json"
+import gen7 from "./pokedex/gen7.json"
+import gen8 from "./pokedex/gen8.json"
+import gen9 from "./pokedex/gen9.json"
+
+const ensureSpeciesInWild = (name: string) => {
+  if ((wildPokemon as any)[name]) return
+
+  // Default minimal entry for newly added species
+  const defaultEntry = {
+    sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
+    type: "Normal",
+    baseHP: 40,
+    attacks: { Investida: [8, 15] },
+    rarity: "comum" as PokemonRarity,
+    speed: 50,
+  }
+
+  ;(wildPokemon as any)[name] = defaultEntry
+
+  try {
+    const spriteSet = getPokemonSpriteSet(name, defaultEntry.sprite)
+    pokemonSpriteCatalog[name] = spriteSet
+    ;(wildPokemon as any)[name].sprite = spriteSet.original
+    ;(wildPokemon as any)[name].spriteSet = spriteSet
+  } catch {}
+}
+
+// Add Gen 1 species (skip existing ones)
+const allGenLists: string[][] = [
+  Array.isArray(gen1) ? gen1 : [],
+  Array.isArray(gen2) ? gen2 : [],
+  Array.isArray(gen3) ? gen3 : [],
+  Array.isArray(gen4) ? gen4 : [],
+  Array.isArray(gen5) ? gen5 : [],
+  Array.isArray(gen6) ? gen6 : [],
+  Array.isArray(gen7) ? gen7 : [],
+  Array.isArray(gen8) ? gen8 : [],
+  Array.isArray(gen9) ? gen9 : [],
+]
+
+allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
 
 export const wildPokemon: Record<
   string,
@@ -2133,6 +2184,65 @@ export const MOVE_PP: Record<string, number> = {
   "Stone Edge": 5,
   "Gunk Shot": 5,
 }
+
+// === Ultra Beasts additions ===
+// Adiciona um conjunto de Ultra Beasts ao pool de pokémons selvagens e registra sprites
+const ultraBeasts: Record<string, any> = {
+  Nihilego: { sprite: "https://play.pokemonshowdown.com/sprites/ani/nihilego.gif", type: "Pedra/Veneno", baseHP: 45, attacks: { "Bola Sombria": [18, 30], "Anomalia": [14, 26] }, rarity: "lendario", speed: 70 },
+  Buzzwole: { sprite: "https://play.pokemonshowdown.com/sprites/ani/buzzwole.gif", type: "Inseto/Lutador", baseHP: 95, attacks: { "Soco Pesado": [30, 50], "Garra de Metal": [20, 36] }, rarity: "lendario", speed: 45 },
+  Pheromosa: { sprite: "https://play.pokemonshowdown.com/sprites/ani/pheromosa.gif", type: "Inseto/Lutador", baseHP: 71, attacks: { "Chute Veloz": [28, 48], "Ataque Rápido": [18, 34] }, rarity: "lendario", speed: 137 },
+  Xurkitree: { sprite: "https://play.pokemonshowdown.com/sprites/ani/xurkitree.gif", type: "Elétrico", baseHP: 83, attacks: { "Choque do Trovão": [28, 48], "Raio": [30, 52] }, rarity: "lendario", speed: 101 },
+  Celesteela: { sprite: "https://play.pokemonshowdown.com/sprites/ani/celesteela.gif", type: "Aço/Voador", baseHP: 97, attacks: { "Lança Metálica": [26, 46], "Raio de Gelo": [20, 38] }, rarity: "lendario", speed: 55 },
+  Kartana: { sprite: "https://play.pokemonshowdown.com/sprites/ani/kartana.gif", type: "Grama/Aço", baseHP: 59, attacks: { "Corte": [32, 54], "Golpe de Lâmina": [30, 52] }, rarity: "lendario", speed: 109 },
+  Guzzlord: { sprite: "https://play.pokemonshowdown.com/sprites/ani/guzzlord.gif", type: "Noturno/Dragão", baseHP: 120, attacks: { "Devoração": [36, 68], "Mordida": [26, 50] }, rarity: "lendario", speed: 38 },
+  Poipole: { sprite: "https://play.pokemonshowdown.com/sprites/ani/poipole.gif", type: "Veneno", baseHP: 67, attacks: { "Agulha Venenosa": [20, 36], "Bomba Venenosa": [26, 46] }, rarity: "lendario", speed: 87 },
+  Naganadel: { sprite: "https://play.pokemonshowdown.com/sprites/ani/naganadel.gif", type: "Veneno/Dragão", baseHP: 73, attacks: { "Lança Venenosa": [30, 56], "Dragão Pulsante": [28, 52] }, rarity: "lendario", speed: 117 },
+  Stakataka: { sprite: "https://play.pokemonshowdown.com/sprites/ani/stakataka.gif", type: "Pedra/Aço", baseHP: 123, attacks: { "Arremesso de Pedras": [36, 68], "Escudo": [0, 0] }, rarity: "lendario", speed: 28 },
+  Blacephalon: { sprite: "https://play.pokemonshowdown.com/sprites/ani/blacephalon.gif", type: "Fogo/Fantasma", baseHP: 73, attacks: { "Explosão de Cabeça": [36, 70], "Bola Sombria": [26, 50] }, rarity: "lendario", speed: 97 },
+}
+
+Object.assign(wildPokemon as any, ultraBeasts as any)
+
+// Registrar sprites no catálogo para manter consistência com starters
+Object.keys(ultraBeasts).forEach((name) => {
+  try {
+    const spriteSet = getPokemonSpriteSet(name, (ultraBeasts as any)[name].sprite)
+    pokemonSpriteCatalog[name] = spriteSet
+    ;(wildPokemon as any)[name].sprite = spriteSet.original
+    ;(wildPokemon as any)[name].spriteSet = spriteSet
+  } catch (e) {
+    // Ignore sprite registration failures - fallback para URLs brutas
+  }
+})
+
+// Merge enriched canonical movesets (generated by scripts/enrich-moves.js)
+try {
+  Object.entries(enrichedMoves as Record<string, string[]>).forEach(([name, moves]) => {
+    if (!(wildPokemon as any)[name]) return
+    const existing = (wildPokemon as any)[name].attacks || {}
+    if (Object.keys(existing).length > 0) return
+
+    ;(wildPokemon as any)[name].attacks = Object.fromEntries(
+      (moves || []).slice(0, 4).map((m) => [m, [12, 24]]),
+    )
+  })
+} catch (e) {
+  // ignore if enrichedMoves absent or malformed
+}
+
+// Remove species that do not have an available Showdown sprite
+try {
+  const missingNames = new Set((missingSprites as Array<any>).map((m) => m.name))
+  for (const name of Object.keys(wildPokemon)) {
+    if (missingNames.has(name)) {
+      delete (wildPokemon as any)[name]
+      delete (pokemonSpriteCatalog as any)[name]
+    }
+  }
+} catch (e) {
+  // ignore if missing-sprites file missing or malformed
+}
+
 
 export const getMovePP = (moveName: string): number => {
   return MOVE_PP[moveName] || 20 // Default 20 PP for unlisted moves

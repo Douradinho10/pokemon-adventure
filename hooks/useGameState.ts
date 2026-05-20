@@ -72,7 +72,7 @@ export interface Battle {
 export interface GameState {
   playerTeam: Record<string, Pokemon>
   activePokemon: string | null
-  currentEnvironment: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas"
+  currentEnvironment: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas" | "ultrabeast_zone"
   money: number
   battles: number
   inventory: Record<string, number>

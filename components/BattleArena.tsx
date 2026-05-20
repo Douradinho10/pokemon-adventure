@@ -22,7 +22,7 @@ interface BattleArenaProps {
   playerPokemon: Pokemon
   playerName: string
   battle: Battle
-  environment?: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas"
+  environment?: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas" | "ultrabeast_zone"
   className?: string
   attackAnimation?: AttackAnimationState | null
 }
@@ -112,6 +112,11 @@ export const BattleArena = memo(
       sky: "bg-[linear-gradient(180deg,#a4c9f4_0%,#a4c9f4_28%,#c6def7_28%,#c6def7_58%,#e6f1ff_58%,#e6f1ff_100%)]",
       ground: "bg-[linear-gradient(180deg,#8993a3_0%,#8993a3_24%,#798493_24%,#798493_48%,#687382_48%,#687382_72%,#56606f_72%,#56606f_100%)]",
       horizon: "bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.36)_0_13px,rgba(206,223,250,0.18)_13px_28px)]",
+    },
+    ultrabeast_zone: {
+      sky: "bg-[linear-gradient(180deg,#1b1b2f_0%,#1b1b2f_28%,#2b1636_28%,#2b1636_58%,#3b1b4a_58%,#3b1b4a_100%)]",
+      ground: "bg-[linear-gradient(180deg,#271823_0%,#271823_24%,#2f1830_24%,#2f1830_48%,#1f1722_48%,#1f1722_72%,#161218_72%,#161218_100%)]",
+      horizon: "bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.06)_0_12px,rgba(167,139,255,0.06)_12px_26px)]",
     },
   } as const
   const battlefieldPalette = environmentStyles[environment]

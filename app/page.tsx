@@ -109,7 +109,7 @@ type Modal =
   | "move-vendor"
   | null
 
-type BattleEnvironment = "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas"
+type BattleEnvironment = "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas" | "ultrabeast_zone"
 
 type AttackAnimationState = {
   id: number
@@ -360,12 +360,13 @@ const getBattleStageTone = (stage: number) => {
 }
 
 const persistentStatusWaveDuration: Partial<Record<StatusCondition, number>> = {
-  poisoned: 3,
-  burned: 3,
-  paralyzed: 4,
-  asleep: 3,
-  frozen: 3,
-  confused: 2,
+  // Elevado para 10 ondas para que efeitos temporários persistam mesmo após fuga
+  poisoned: 10,
+  burned: 10,
+  paralyzed: 10,
+  asleep: 10,
+  frozen: 10,
+  confused: 10,
 }
 
 const getClassicCatchChance = (
@@ -455,15 +456,17 @@ const environmentLabels: Record<BattleEnvironment, string> = {
   floresta: "Floresta",
   caverna: "Caverna",
   alturas: "Alturas",
+  ultrabeast_zone: "Zona Ultra Beasts",
 }
 
-const allBattleEnvironments: BattleEnvironment[] = ["planicie", "vulcanico", "costeiro", "floresta", "caverna", "alturas"]
+const allBattleEnvironments: BattleEnvironment[] = ["planicie", "vulcanico", "costeiro", "floresta", "caverna", "alturas", "ultrabeast_zone"]
 
 const environmentRoutes: Record<BattleEnvironment, [BattleEnvironment, BattleEnvironment]> = {
   planicie: ["floresta", "costeiro"],
   floresta: ["planicie", "caverna"],
   caverna: ["floresta", "vulcanico"],
   vulcanico: ["caverna", "alturas"],
+  ultrabeast_zone: ["alturas", "vulcanico"],
   alturas: ["vulcanico", "costeiro"],
   costeiro: ["planicie", "alturas"],
 }
@@ -505,6 +508,7 @@ const environmentPreferredTypes: Record<BattleEnvironment, string[]> = {
   floresta: ["grama", "inseto", "veneno"],
   caverna: ["pedra", "terra", "veneno", "fantasma"],
   alturas: ["voador", "dragao", "eletrico"],
+  ultrabeast_zone: ["veneno", "pedra", "psiquico", "inseto", "aco", "noturno", "dragao", "fantasma", "eletrico", "grama", "fogo", "lutador"],
 }
 
 const environmentTypeWeights: Record<BattleEnvironment, Record<string, number>> = {
@@ -543,6 +547,20 @@ const environmentTypeWeights: Record<BattleEnvironment, Record<string, number>> 
     dragao: 2.4,
     eletrico: 2.0,
     gelo: 1.4,
+  },
+  ultrabeast_zone: {
+    veneno: 3.6,
+    pedra: 2.8,
+    psiquico: 2.6,
+    inseto: 2.4,
+    aco: 2.2,
+    noturno: 2.0,
+    dragao: 2.0,
+    fantasma: 1.8,
+    eletrico: 1.6,
+    grama: 1.4,
+    fogo: 1.4,
+    lutador: 1.2,
   },
 }
 
@@ -800,6 +818,39 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
   const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
   const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
   const [multiplayerMode, setMultiplayerMode] = useState(false)
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    if (initialScreen === "main-menu") {
+      return
+    }
+
+    const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined
+    const navigationType = navigationEntry?.type || (window.performance as Performance & { navigation?: { type?: number } }).navigation?.type
+    const isReload = navigationType === "reload" || navigationType === 1
+
+    if (isReload) {
+      router.replace("/")
+      setCurrentScreen("main-menu")
+    }
+  }, [initialScreen, router])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    if (initialScreen !== "solo-menu" || currentScreen !== "main-menu") {
+      return
+    }
+
+    if (window.location.pathname === "/solo") {
+      router.replace("/")
+    }
+  }, [currentScreen, initialScreen, router])
+
   const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
   const [multiplayerBusy, setMultiplayerBusy] = useState(false)
   const [multiplayerError, setMultiplayerError] = useState<string | null>(null)
@@ -1905,6 +1956,57 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     router.push("/")
   }, [clearLog, clearPendingInviteJoin, gameState.activePokemon, handleLeaveMultiplayerRoom, multiplayerJoinedRoomId, router, setGameState])
 
+  const handleExitMultiplayerToSoloMenu = useCallback(async () => {
+    clearPendingInviteJoin()
+
+    if (multiplayerJoinedRoomId) {
+      await handleLeaveMultiplayerRoom()
+      if (gameState.activePokemon) {
+        clearLog()
+        setGameState({
+          playerTeam: {},
+          activePokemon: null,
+          currentEnvironment: "planicie",
+          money: 50,
+          battles: 0,
+          inventory: { Pokébola: 5, "Scanner Tático": 3 },
+          capturedPokemon: [],
+          currentBattle: null,
+        })
+      }
+      setMultiplayerJoinedRoomId(null)
+      setMultiplayerRoom(null)
+      setMultiplayerMode(false)
+      setMultiplayerIsCasual(false)
+    }
+
+    setCurrentScreen("solo-menu")
+    router.push("/solo")
+  }, [clearLog, clearPendingInviteJoin, gameState.activePokemon, handleLeaveMultiplayerRoom, multiplayerJoinedRoomId, router, setGameState])
+
+  const handleGoToSoloMode = useCallback(() => {
+    if (screenNoticeTimeoutRef.current) {
+      window.clearTimeout(screenNoticeTimeoutRef.current)
+      screenNoticeTimeoutRef.current = null
+    }
+
+    if (defeatResetTimeoutRef.current) {
+      window.clearTimeout(defeatResetTimeoutRef.current)
+      defeatResetTimeoutRef.current = null
+    }
+
+    if (defeatHideTimeoutRef.current) {
+      window.clearTimeout(defeatHideTimeoutRef.current)
+      defeatHideTimeoutRef.current = null
+    }
+
+    setScreenNotice(null)
+    setShowModal(null)
+    setDefeatAnimationVisible(false)
+    setCurrentScreen("solo-menu")
+    router.push("/solo")
+  }, [router])
+
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
       return false
@@ -2537,7 +2639,10 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         })
         clearLog()
         setCurrentScreen("main-menu")
+        router.replace("/")
         setShowModal(null)
+        // hide defeat animation immediately to ensure main menu is interactive
+        setDefeatAnimationVisible(false)
         setMultiplayerMode(false)
         setMultiplayerIsCasual(false)
         multiplayerResultSubmittedRef.current = null
@@ -2569,6 +2674,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
       setScreenNotice,
       setShowModal,
       submitSoloFarthestRun,
+      router,
     ],
   )
 
@@ -4136,8 +4242,12 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     }, 1200)
   }, [captureThrowAnimation, handlePokeball])
 
-  const endBattle = useCallback((openDestinationChoice = false) => {
-    advanceStatusWaves()
+  const endBattle = useCallback((openDestinationChoice = false, options?: { advanceStatus?: boolean }) => {
+    // by default advance status waves, but callers can opt-out (e.g. successful flee)
+    const shouldAdvance = options?.advanceStatus ?? true
+    if (shouldAdvance) {
+      advanceStatusWaves()
+    }
     updateGameState({ currentBattle: null })
     setCurrentScreen("menu")
 
@@ -4551,7 +4661,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
 
       <div className="main-menu-actions mt-2.5 flex w-full max-w-sm flex-col gap-2 sm:mt-3">
         <Button asChild className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#059669_50%,#059669_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-16 sm:text-[12px]">
-          <Link href="/solo">🎮 Modo Solo</Link>
+          <button type="button" onClick={handleGoToSoloMode}>🎮 Modo Solo</button>
         </Button>
 
         <Button asChild className="pixel-menu-button h-14 bg-[linear-gradient(180deg,#f59e0b_0%,#f59e0b_50%,#d97706_50%,#d97706_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[11px] leading-relaxed sm:h-16 sm:text-[12px]">
@@ -4908,22 +5018,30 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
               {!multiplayerRoom ? (
                 <>
                   {!lockCompetitiveTabs && !multiplayerJoinedRoomId && (
-                    <Button
-                      onClick={() => setMultiplayerSection("competitive")}
-                      className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "competitive" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
-                    >
-                      Competitivo
-                    {/** Hide Casual button when already joined to a room to avoid confusion. */}
-                    {!multiplayerJoinedRoomId && (
+                    <>
+                      <Button
+                        onClick={() => setMultiplayerSection("competitive")}
+                        className={`pixel-menu-button h-10 sm:h-11 ${
+                          multiplayerSection === "competitive"
+                            ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"
+                            : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"
+                        } px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
+                      >
+                        Competitivo
+                      </Button>
+
                       <Button
                         onClick={() => setMultiplayerSection("casual")}
-                        className={`pixel-menu-button h-10 sm:h-11 ${multiplayerSection === "casual" ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]" : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]`} px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
+                        className={`pixel-menu-button h-10 sm:h-11 ${
+                          multiplayerSection === "casual"
+                            ? "bg-[linear-gradient(180deg,#ef4444_0%,#ef4444_50%,#b91c1c_50%,#b91c1c_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"
+                            : "bg-[linear-gradient(180deg,#94a3b8_0%,#94a3b8_50%,#64748b_50%,#64748b_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)]"
+                        } px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs`}
                       >
                         Casual
                       </Button>
-                    )}
-                    Casual
-                  </Button>
+                    </>
+                  )}
                 </>
               ) : (
                 <Badge className="pixel-badge border-2 border-slate-900 bg-white/90 px-3 py-1 text-slate-800 shadow-[3px_3px_0_rgba(15,23,42,0.18)]">
@@ -5712,7 +5830,8 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
               if (success) {
                 addLog(`✅ Fugiu da batalha com sucesso! (${Math.floor(fleeChance * 100)}% chance)`)
                 updateGameState({ battles: Math.max(0, gameState.battles - 1) })
-                endBattle()
+                // Não decrementar as durações de status quando o jogador foge
+                endBattle(false, { advanceStatus: false })
               } else {
                 addLog(`❌ Não conseguiu fugir! (${Math.floor(fleeChance * 100)}% chance)`)
                 addLog("💥 O Pokemon selvagem atacou!")
