@@ -832,6 +832,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     const isReload = navigationType === "reload" || navigationType === 1
 
     if (isReload) {
+      window.history.replaceState({}, "", "/")
       router.replace("/")
       setCurrentScreen("main-menu")
     }
@@ -847,6 +848,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     }
 
     if (window.location.pathname === "/solo") {
+      window.history.replaceState({}, "", "/")
       router.replace("/")
     }
   }, [currentScreen, initialScreen, router])
@@ -2639,6 +2641,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         })
         clearLog()
         setCurrentScreen("main-menu")
+        window.history.replaceState({}, "", "/")
         router.replace("/")
         setShowModal(null)
         // hide defeat animation immediately to ensure main menu is interactive
