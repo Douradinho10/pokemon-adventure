@@ -839,21 +839,6 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     }
   }, [initialScreen, router])
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
-
-    if (initialScreen !== "solo-menu" || currentScreen !== "main-menu") {
-      return
-    }
-
-    if (window.location.pathname === "/solo") {
-      window.history.replaceState({}, "", "/")
-      router.replace("/")
-    }
-  }, [currentScreen, initialScreen, router])
-
   const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
   const [multiplayerBusy, setMultiplayerBusy] = useState(false)
   const [multiplayerError, setMultiplayerError] = useState<string | null>(null)
@@ -2658,8 +2643,6 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         })
         clearLog()
         setCurrentScreen("main-menu")
-        window.history.replaceState({}, "", "/")
-        router.replace("/")
         setShowModal("solo-defeat")
         // hide defeat animation immediately to ensure main menu is interactive
         setDefeatAnimationVisible(false)
