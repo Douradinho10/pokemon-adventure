@@ -766,7 +766,7 @@ const getRandomWildPokemonForEnvironmentWithType = (
   return environmentPool[0] || getRandomWildPokemon(battleCount)
 }
 
-export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
+function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
   const {
     gameState,
     updateGameState,
