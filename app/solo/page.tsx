@@ -1,12 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import { PokemonAdventureApp } from "../page"
+
+const PokemonAdventureApp = dynamic(() => import("../../components/PokemonAdventureClient"), {
+  ssr: false,
+})
 
 export default function SoloPage() {
   const router = useRouter()
-  const [allowSoloRoute, setAllowSoloRoute] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -21,13 +24,7 @@ export default function SoloPage() {
       router.replace("/")
       return
     }
-
-    setAllowSoloRoute(true)
   }, [router])
-
-  if (!allowSoloRoute) {
-    return null
-  }
 
   return <PokemonAdventureApp initialScreen="solo-menu" />
 }

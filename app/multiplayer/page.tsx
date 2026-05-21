@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 
 const PokemonAdventureAppNoSSR = dynamic(
-  () => import("../page").then((mod) => mod.PokemonAdventureApp),
+  () => import("../../components/PokemonAdventureClient"),
   { ssr: false }
 )
 
