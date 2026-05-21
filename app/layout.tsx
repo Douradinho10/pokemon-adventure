@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { Noto_Sans, Noto_Sans_Mono, Press_Start_2P } from 'next/font/google'
 import './globals.css'
+import dynamic from 'next/dynamic'
+
+const ClientErrorLogger = dynamic(() => import('../components/ClientErrorLogger'), { ssr: false })
 
 const notoSans = Noto_Sans({
   subsets: ['latin'],
@@ -48,7 +51,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt">
-      <body className={`${notoSans.variable} ${notoSansMono.variable} ${pressStart2P.variable} font-sans`}>{children}</body>
+      <body className={`${notoSans.variable} ${notoSansMono.variable} ${pressStart2P.variable} font-sans`}>
+        <ClientErrorLogger />
+        {children}
+      </body>
     </html>
   )
 }
