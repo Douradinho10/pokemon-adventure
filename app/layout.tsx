@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { Noto_Sans, Noto_Sans_Mono, Press_Start_2P } from 'next/font/google'
 import './globals.css'
-import dynamic from 'next/dynamic'
-
-const ClientErrorLogger = dynamic(() => import('../components/ClientErrorLogger'), { ssr: false })
+import ClientErrorLogger from '../components/ClientErrorLogger'
 
 const notoSans = Noto_Sans({
   subsets: ['latin'],
