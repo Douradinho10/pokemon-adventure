@@ -11,7 +11,6 @@
     "lint": "eslint .",
     "start": "next start",
     "socket:server": "node server/socket-server.js"
-    ,"test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -76,7 +75,6 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
-  "@playwright/test": "1.39.1",
     "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",

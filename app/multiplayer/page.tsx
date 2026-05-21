@@ -1,5 +1,12 @@
-import { PokemonAdventureApp } from "../page"
+"use client"
+
+import dynamic from "next/dynamic"
+
+const PokemonAdventureAppNoSSR = dynamic(
+  () => import("../page").then((mod) => mod.PokemonAdventureApp),
+  { ssr: false }
+)
 
 export default function MultiplayerPage() {
-  return <PokemonAdventureApp initialScreen="multiplayer" />
+  return <PokemonAdventureAppNoSSR initialScreen="multiplayer" />
 }
