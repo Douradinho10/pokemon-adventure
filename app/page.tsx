@@ -107,6 +107,7 @@ type Modal =
   | "destination"
   | "type-chart"
   | "move-vendor"
+  | "solo-defeat"
   | null
 
 type BattleEnvironment = "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas" | "ultrabeast_zone"
@@ -2009,6 +2010,22 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     router.push("/solo")
   }, [router])
 
+  const handleSoloDefeatGoToMainMenu = useCallback(() => {
+    setShowModal(null)
+    setDefeatAnimationVisible(false)
+    setCurrentScreen("main-menu")
+    window.history.replaceState({}, "", "/")
+    router.replace("/")
+  }, [router])
+
+  const handleSoloDefeatStartAnotherRun = useCallback(() => {
+    setShowModal(null)
+    setDefeatAnimationVisible(false)
+    setCurrentScreen("select-slot")
+    window.history.replaceState({}, "", "/solo")
+    router.replace("/solo")
+  }, [router])
+
   const handleStartMultiplayerRoom = useCallback(async () => {
     if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) {
       return false
@@ -2643,7 +2660,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
         setCurrentScreen("main-menu")
         window.history.replaceState({}, "", "/")
         router.replace("/")
-        setShowModal(null)
+        setShowModal("solo-defeat")
         // hide defeat animation immediately to ensure main menu is interactive
         setDefeatAnimationVisible(false)
         setMultiplayerMode(false)
@@ -6855,6 +6872,31 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
             </div>
           )
 
+        case "solo-defeat":
+          return (
+            <div className="space-y-4 text-center">
+              <div className="text-5xl">💀</div>
+              <h3 className="font-bold text-white text-2xl">Perdeste a run</h3>
+              <p className="text-white/80">Queres voltar ao menu principal ou começar outra run?</p>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Button
+                  onClick={handleSoloDefeatGoToMainMenu}
+                  className="h-12 bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                >
+                  Voltar ao menu principal
+                </Button>
+
+                <Button
+                  onClick={handleSoloDefeatStartAnotherRun}
+                  className="h-12 bg-[linear-gradient(180deg,#22c55e_0%,#22c55e_50%,#16a34a_50%,#16a34a_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                >
+                  Começar outra run
+                </Button>
+              </div>
+            </div>
+          )
+
         case "evolution-attacks":
           if (!gameState.activePokemon) return null
           const pokemonForEvolution = gameState.playerTeam[gameState.activePokemon]
@@ -7016,7 +7058,7 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
                 showModal === "switch" &&
                 gameState.activePokemon &&
                 gameState.playerTeam[gameState.activePokemon].HP <= 0
-              ) && showModal !== "move-vendor" && showModal !== "capture-success" && showModal !== "destination" && (
+              ) && showModal !== "move-vendor" && showModal !== "capture-success" && showModal !== "destination" && showModal !== "solo-defeat" && (
                 <Button onClick={closeModal} className="pixel-menu-button bg-[linear-gradient(180deg,#6b7280_0%,#6b7280_50%,#4b5563_50%,#4b5563_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs">
                   ❌ Fechar
                 </Button>
