@@ -839,6 +839,24 @@ export function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialSc
     }
   }, [initialScreen, router])
 
+  // Debug helper: open the solo defeat modal when ?debug_solo_defeat=1 is present.
+  // Useful to reproduce the defeat flow without playing.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("debug_solo_defeat") === "1") {
+        setCurrentScreen("main-menu")
+        setShowModal("solo-defeat")
+        setDefeatAnimationVisible(false)
+        // keep the query param so the tester knows it's a debug run
+        window.history.replaceState({}, "", window.location.href)
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [])
+
   const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
   const [multiplayerBusy, setMultiplayerBusy] = useState(false)
   const [multiplayerError, setMultiplayerError] = useState<string | null>(null)
