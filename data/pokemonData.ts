@@ -2,6 +2,15 @@ import type { BattleStatStageKey, BattleStatStages, PendingMove, Pokemon, Pokemo
 import { getPokemonSpriteSet, getPokemonSpriteUrl, type PokemonSpriteSet, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import enrichedMoves from "./pokedex/enriched-moves.json"
 import missingSprites from "./pokedex/missing-sprites.json"
+import gen1 from "./pokedex/gen1.json"
+import gen2 from "./pokedex/gen2.json"
+import gen3 from "./pokedex/gen3.json"
+import gen4 from "./pokedex/gen4.json"
+import gen5 from "./pokedex/gen5.json"
+import gen6 from "./pokedex/gen6.json"
+import gen7 from "./pokedex/gen7.json"
+import gen8 from "./pokedex/gen8.json"
+import gen9 from "./pokedex/gen9.json"
 
 // Rarity configuration - moved to top for better visibility
 export const POKEMON_RARITY_CONFIG = {
@@ -339,54 +348,6 @@ Object.keys(starterPokemon).forEach((name) => {
   starterPokemon[name].sprite = spriteSet.original
   starterPokemon[name].spriteSet = spriteSet
 })
-
-// Merge per-generation species lists (minimal defaults) so we can add species by generation.
-import gen1 from "./pokedex/gen1.json"
-import gen2 from "./pokedex/gen2.json"
-import gen3 from "./pokedex/gen3.json"
-import gen4 from "./pokedex/gen4.json"
-import gen5 from "./pokedex/gen5.json"
-import gen6 from "./pokedex/gen6.json"
-import gen7 from "./pokedex/gen7.json"
-import gen8 from "./pokedex/gen8.json"
-import gen9 from "./pokedex/gen9.json"
-
-const ensureSpeciesInWild = (name: string) => {
-  if ((wildPokemon as any)[name]) return
-
-  // Default minimal entry for newly added species
-  const defaultEntry = {
-    sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
-    type: "Normal",
-    baseHP: 40,
-    attacks: { Investida: [8, 15] },
-    rarity: "comum" as PokemonRarity,
-    speed: 50,
-  }
-
-  ;(wildPokemon as any)[name] = defaultEntry
-
-  try {
-    const spriteSet = getPokemonSpriteSet(name, defaultEntry.sprite)
-    pokemonSpriteCatalog[name] = spriteSet
-    ;(wildPokemon as any)[name].sprite = spriteSet.original
-    ;(wildPokemon as any)[name].spriteSet = spriteSet
-  } catch {}
-}
-
-// Add Gen 1 species (skip existing ones)
-const allGenLists: string[][] = [
-  Array.isArray(gen1) ? gen1 : [],
-  Array.isArray(gen2) ? gen2 : [],
-  Array.isArray(gen3) ? gen3 : [],
-  Array.isArray(gen4) ? gen4 : [],
-  Array.isArray(gen5) ? gen5 : [],
-  Array.isArray(gen6) ? gen6 : [],
-  Array.isArray(gen7) ? gen7 : [],
-  Array.isArray(gen8) ? gen8 : [],
-  Array.isArray(gen9) ? gen9 : [],
-]
-
 
 export const wildPokemon: Record<
   string,
@@ -1871,6 +1832,44 @@ Object.keys(wildPokemon).forEach((name) => {
   wildPokemon[name].sprite = spriteSet.original
   wildPokemon[name].spriteSet = spriteSet
 })
+
+// Merge per-generation species lists (minimal defaults) so we can add species by generation.
+const ensureSpeciesInWild = (name: string) => {
+  if ((wildPokemon as any)[name]) return
+
+  const defaultEntry = {
+    sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
+    type: "Normal",
+    baseHP: 40,
+    attacks: { Investida: [8, 15] },
+    rarity: "comum" as PokemonRarity,
+    speed: 50,
+  }
+
+  ;(wildPokemon as any)[name] = defaultEntry
+
+  try {
+    const spriteSet = getPokemonSpriteSet(name, defaultEntry.sprite)
+    pokemonSpriteCatalog[name] = spriteSet
+    ;(wildPokemon as any)[name].sprite = spriteSet.original
+    ;(wildPokemon as any)[name].spriteSet = spriteSet
+  } catch {}
+}
+
+// Add species from every generation list once wildPokemon exists.
+const allGenLists: string[][] = [
+  Array.isArray(gen1) ? gen1 : [],
+  Array.isArray(gen2) ? gen2 : [],
+  Array.isArray(gen3) ? gen3 : [],
+  Array.isArray(gen4) ? gen4 : [],
+  Array.isArray(gen5) ? gen5 : [],
+  Array.isArray(gen6) ? gen6 : [],
+  Array.isArray(gen7) ? gen7 : [],
+  Array.isArray(gen8) ? gen8 : [],
+  Array.isArray(gen9) ? gen9 : [],
+]
+
+allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
 
 // Ensure species from per-generation lists are present before we finalize sprites
 allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
