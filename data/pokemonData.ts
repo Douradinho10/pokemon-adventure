@@ -387,7 +387,6 @@ const allGenLists: string[][] = [
   Array.isArray(gen9) ? gen9 : [],
 ]
 
-allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
 
 export const wildPokemon: Record<
   string,
@@ -1872,6 +1871,9 @@ Object.keys(wildPokemon).forEach((name) => {
   wildPokemon[name].sprite = spriteSet.original
   wildPokemon[name].spriteSet = spriteSet
 })
+
+// Ensure species from per-generation lists are present before we finalize sprites
+allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
 
 export const wildPokemonStats: Record<string, { baseHP: number; hpMultiplier: number }> = {
   // Comuns
