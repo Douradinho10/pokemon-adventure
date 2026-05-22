@@ -819,25 +819,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   const [multiplayerJoinedRoomId, setMultiplayerJoinedRoomId] = useState<string | null>(null)
   const [multiplayerRoom, setMultiplayerRoom] = useState<MultiplayerRoom | null>(null)
   const [multiplayerMode, setMultiplayerMode] = useState(false)
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
 
-    if (initialScreen === "main-menu") {
-      return
-    }
-
-    const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined
-    const navigationType = navigationEntry?.type || (window.performance as Performance & { navigation?: { type?: number } }).navigation?.type
-    const isReload = navigationType === "reload" || navigationType === 1
-
-    if (isReload) {
-      window.history.replaceState({}, "", "/")
-      router.replace("/")
-      setCurrentScreen("main-menu")
-    }
-  }, [initialScreen, router])
 
   // Debug helper: open the solo defeat modal when ?debug_solo_defeat=1 is present.
   // Useful to reproduce the defeat flow without playing.
