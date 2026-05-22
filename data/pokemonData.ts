@@ -2713,6 +2713,8 @@ const moveBattleEffects: Record<string, MoveBattleEffect> = {
   minimize: { target: "self", statChanges: { evasion: 2 } },
   "self-destruct": { target: "opponent", selfDestruct: true },
   explosion: { target: "opponent", selfDestruct: true },
+  transform: { target: "self", transform: true },
+  transformacao: { target: "self", transform: true },
 }
 
 export const scaleAttackSetForLevel = (attacks: Record<string, [number, number]>) =>

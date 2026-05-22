@@ -2873,6 +2873,66 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return { selfDestruct: false }
     }
 
+    // Handle transformation (e.g., Ditto/Transform) specially: copy target's
+    // visible template (attacks, type, sprite) but preserve IVs of the
+    // attacker. Player transformations update the playerTeam entry; enemy
+    // transformations update the battle enemy fields.
+    if ((effect as any).transform) {
+      try {
+        if (attacker === "player") {
+          const activeName = latestGameStateRef.current.activePokemon
+          if (activeName) {
+            const enemyDisplay = currentBattle.enemyDisplayName || currentBattle.enemyName
+            const template = getPokemonBattleTemplate(enemyDisplay)
+            if (template) {
+              const newAttacks = template.attacks
+              const newType = template.type
+              const sprite = getPokemonSpriteUrl(enemyDisplay, template.sprite || wildPokemon[enemyDisplay]?.sprite, "back", Boolean(currentBattle.enemyIsShiny))
+              const spriteSet = getPokemonSpriteSet(enemyDisplay, template.sprite || wildPokemon[enemyDisplay]?.sprite, Boolean(currentBattle.enemyIsShiny))
+
+              // Preserve IVs; reset PP for new moves
+              const newPP = initializePP(newAttacks)
+
+              updatePokemon(activeName, {
+                attacks: newAttacks,
+                type: newType,
+                sprite,
+                spriteSet,
+                attackPP: newPP,
+              })
+
+              updateBattle({ playerSprite: getPokemonSpriteUrl(activeName, sprite, "back", Boolean(gameState.playerTeam[activeName]?.isShiny)) })
+              addLog(`✨ ${activeName} transformou-se em ${enemyDisplay}!`)
+            }
+          }
+        } else {
+          // Enemy transforms into the player's active Pokémon
+          const playerActive = gameState.activePokemon
+          if (playerActive) {
+            const template = getPokemonBattleTemplate(playerActive)
+            if (template) {
+              const newAttacks = template.attacks
+              const newType = template.type
+              const enemySprite = getPokemonSpriteUrl(playerActive, template.sprite || wildPokemon[playerActive]?.sprite, "front", Boolean(gameState.playerTeam[playerActive]?.isShiny))
+
+              updateBattle({
+                enemyAttacks: newAttacks,
+                enemyType: newType || "Normal",
+                enemySprite,
+                enemyDisplayName: playerActive,
+                enemyIsDisguised: true,
+              })
+
+              addLog(`✨ ${currentBattle.enemyName} transformou-se em ${playerActive}!`)
+            }
+          }
+        }
+      } catch (e) {
+        // swallow transform errors to avoid breaking the battle loop
+        console.error("Transform effect failed:", e)
+      }
+    }
+
     if (effect.statChanges) {
       const targetSide = effect.target === "self" ? attacker : attacker === "player" ? "enemy" : "player"
       const currentStages = targetSide === "player" ? currentBattle.playerStatStages : currentBattle.enemyStatStages
