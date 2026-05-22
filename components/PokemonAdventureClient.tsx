@@ -688,6 +688,42 @@ const minWildLevelBySpecies = (() => {
   return computed
 })()
 
+// Resolve a species to the appropriate form for the given level by walking
+// backwards through evolution rules so evolved forms don't appear earlier
+// than their pre-evolutions in wild/enemy encounters.
+const getSpeciesAtLevel = (speciesName: string, level: number): string => {
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+
+  let current = speciesName
+  const maxIter = Object.keys(minWildLevelBySpecies).length + 5
+  let iter = 0
+
+  while (iter++ < maxIter) {
+    let found: string | null = null
+    for (const candidate of Object.keys(minWildLevelBySpecies)) {
+      const rule = (evolutionRules as Record<string, any>)[candidate]
+      if (rule && rule.evolvesTo === current) {
+        const candMin = minWildLevelBySpecies[candidate] || 1
+        if (candMin <= level) {
+          if (!found || (minWildLevelBySpecies[found] || 1) < candMin) {
+            found = candidate
+          }
+        }
+      }
+    }
+
+    if (!found) break
+    current = found
+    if ((minWildLevelBySpecies[current] || 1) <= level) return current
+  }
+
+  // Fallbacks
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+  const entries = Object.entries(minWildLevelBySpecies)
+  entries.sort((a, b) => (a[1] || 1) - (b[1] || 1))
+  return entries.length > 0 ? entries[0][0] : speciesName
+}
+
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
   const environmentPool = getEnvironmentWildPool(environment)
@@ -700,17 +736,17 @@ const getRandomWildPokemonForEnvironment = (battleCount: number, environment: Ba
     const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
     const fallbackPick = pickWeightedPokemon(fallbackByLevel, environment)
     if (fallbackPick) {
-      return fallbackPick
+      return getSpeciesAtLevel(fallbackPick, enemyLevel)
     }
   }
 
   const weightedPick = pickWeightedPokemon(selectedPool, environment)
 
   if (weightedPick) {
-    return weightedPick
+    return getSpeciesAtLevel(weightedPick, enemyLevel)
   }
 
-  return environmentPool[0] || getRandomWildPokemon(battleCount)
+  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 const getRandomWildPokemonForEnvironmentWithType = (
@@ -751,17 +787,17 @@ const getRandomWildPokemonForEnvironmentWithType = (
 
     const fallbackPick = pickWeightedPokemon(fallbackPool, environment)
     if (fallbackPick) {
-      return fallbackPick
+      return getSpeciesAtLevel(fallbackPick, enemyLevel)
     }
   }
 
   const weightedPick = pickWeightedPokemon(finalPool, environment)
 
   if (weightedPick) {
-    return weightedPick
+    return getSpeciesAtLevel(weightedPick, enemyLevel)
   }
 
-  return environmentPool[0] || getRandomWildPokemon(battleCount)
+  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
