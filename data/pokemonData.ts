@@ -1871,9 +1871,6 @@ const allGenLists: string[][] = [
 
 allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
 
-// Ensure species from per-generation lists are present before we finalize sprites
-allGenLists.forEach((genList) => genList.forEach((n: string) => ensureSpeciesInWild(n)))
-
 export const wildPokemonStats: Record<string, { baseHP: number; hpMultiplier: number }> = {
   // Comuns
   Pidgey: { baseHP: 35, hpMultiplier: 0.8 },
