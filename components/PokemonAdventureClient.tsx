@@ -37,6 +37,7 @@ import {
   getAttackType,
   getMovePriority,
   getMoveAccuracy,
+  evolutionRules,
   initializePP, // Import new helper
   MAX_TEAM_SIZE,
   scaleAttackSetForLevel,
@@ -3786,6 +3787,11 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
   const enemyAttack = useCallback(async (forcedAttackName?: string) => {
     if (!gameState.currentBattle || !gameState.activePokemon || gameState.currentBattle.enemyHP <= 0) {
+      return { playerFainted: false, enemyFainted: false }
+    }
+
+    const currentBattle = gameState.currentBattle
+    if (!currentBattle) {
       return { playerFainted: false, enemyFainted: false }
     }
 

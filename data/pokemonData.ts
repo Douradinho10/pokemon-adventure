@@ -2377,6 +2377,7 @@ export interface MoveBattleEffect {
   target: "self" | "opponent"
   statChanges?: Partial<Record<BattleStatStageKey, number>>
   selfDestruct?: boolean
+  transform?: boolean
 }
 
 export interface LevelUpMove extends PendingMove {
