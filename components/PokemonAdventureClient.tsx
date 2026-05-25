@@ -28,6 +28,7 @@ import {
   getLegalBattleAttacksForPokemon,
   getMoveStatusEffect,
   getMoveBattleEffect,
+  normalizeMoveLookupKey,
   getMoveHitChance,
   getPokemonDefenseDamageMultiplier,
   wildPokemonStats,
@@ -3492,6 +3493,54 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           return { shouldEnemyAttack: true, enemyDefeated: false }
         }
 
+        // Special-case: Counter / Mirror Coat reflect the most recent damage
+        const normalizedMove = normalizeMoveLookupKey(attackName)
+        if (normalizedMove === "counter" || normalizedMove === "mirrorcoat") {
+          const lastPlayerDamage = (currentBattle as any).playerLastDamageTaken ?? 0
+          if (!lastPlayerDamage || lastPlayerDamage <= 0) {
+            await playAttackAnimation({
+              id: attackAnimationCounter + 1,
+              attacker: "player",
+              target: "enemy",
+              moveName: attackName,
+              attackType,
+            })
+            setAttackAnimationCounter((current) => current + 1)
+            addLog(`⚠️ ${normalizeDisplayText(attackName)} falhou (sem dano recebido recentemente)!`)
+            // consume PP already done above; enemy still gets to attack
+            return { shouldEnemyAttack: true, enemyDefeated: false }
+          }
+
+          const reflected = Math.max(1, Math.floor(lastPlayerDamage * 2))
+
+          await playAttackAnimation({
+            id: attackAnimationCounter + 1,
+            attacker: "player",
+            target: "enemy",
+            moveName: attackName,
+            attackType,
+          })
+          setAttackAnimationCounter((current) => current + 1)
+
+          const latestEnemyHP = latestGameStateRef.current.currentBattle?.enemyHP ?? currentBattle.enemyHP
+          const newEnemyHP = Math.max(0, latestEnemyHP - reflected)
+          updateBattle({ enemyHP: newEnemyHP, enemyLastDamageTaken: reflected, enemyLastDamageMove: attackName })
+          // clear the stored player last-damage so it can't be reused
+          updateBattle({ playerLastDamageTaken: 0, playerLastDamageMove: undefined })
+
+          addLog(`🪞 ${normalizeDisplayText(attackName)} refletiu ${reflected} de dano!`)
+
+          applyStatusEffect(attackName, "enemy")
+          applyBattleMoveEffect(attackName, "player")
+
+          if (newEnemyHP <= 0) {
+            handleEnemyDefeat(currentBattle.enemyName)
+            return { shouldEnemyAttack: false, enemyDefeated: true }
+          }
+
+          return { shouldEnemyAttack: true, enemyDefeated: false }
+        }
+
         const finalDamage = Math.max(
           0,
           Math.floor(
@@ -3517,7 +3566,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
         const latestEnemyHP = latestGameStateRef.current.currentBattle?.enemyHP ?? currentBattle.enemyHP
         const newEnemyHP = Math.max(0, latestEnemyHP - finalDamage)
-        updateBattle({ enemyHP: newEnemyHP })
+        updateBattle({ enemyHP: newEnemyHP, enemyLastDamageTaken: finalDamage, enemyLastDamageMove: attackName })
 
         const damageTags = []
         if (stabMultiplier > 1) damageTags.push("STAB")
@@ -3868,6 +3917,50 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return { playerFainted: false, enemyFainted: false }
     }
 
+    // Special-case: Counter / Mirror Coat used by enemy reflect the most recent damage
+    const normalizedMove = normalizeMoveLookupKey(attackName)
+    if (normalizedMove === "counter" || normalizedMove === "mirrorcoat") {
+      const lastEnemyDamage = (currentBattle as any).enemyLastDamageTaken ?? 0
+      if (!lastEnemyDamage || lastEnemyDamage <= 0) {
+        await playAttackAnimation({
+          id: attackAnimationCounter + 1,
+          attacker: "enemy",
+          target: "player",
+          moveName: attackName,
+          attackType: getAttackType(attackName),
+        })
+        setAttackAnimationCounter((current) => current + 1)
+        addLog(`⚠️ ${currentBattle.enemyDisplayName || currentBattle.enemyName} tentou ${normalizeDisplayText(attackName)} mas falhou!`)
+        return { playerFainted: false, enemyFainted: false }
+      }
+
+      const reflected = Math.max(1, Math.floor(lastEnemyDamage * 2))
+      await playAttackAnimation({
+        id: attackAnimationCounter + 1,
+        attacker: "enemy",
+        target: "player",
+        moveName: attackName,
+        attackType: getAttackType(attackName),
+      })
+      setAttackAnimationCounter((current) => current + 1)
+
+      const newHP = Math.max(0, playerPokemon.HP - reflected)
+      updatePokemon(gameState.activePokemon, { HP: newHP })
+      updateBattle({ playerLastDamageTaken: reflected, playerLastDamageMove: attackName, enemyLastDamageTaken: 0, enemyLastDamageMove: undefined })
+      addLog(`🪞 ${currentBattle.enemyDisplayName || currentBattle.enemyName} refletiu ${reflected} de dano em você!`)
+
+      applyStatusEffect(attackName, "player")
+      applyBattleMoveEffect(attackName, "enemy")
+
+      if (newHP <= 0) {
+        addLog(`😵 ${gameState.activePokemon} desmaiou!`)
+        handlePlayerKnockout(gameState.activePokemon, newHP)
+        return { playerFainted: true, enemyFainted: false }
+      }
+
+      return { playerFainted: false, enemyFainted: false }
+    }
+
     const [minDamage, maxDamage] = gameState.currentBattle.enemyAttacks[attackName]
     const baseDamage = random(minDamage, maxDamage)
 
@@ -3906,6 +3999,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const newHP = Math.max(0, playerPokemon.HP - damage)
     updatePokemon(gameState.activePokemon, { HP: newHP })
+    updateBattle({ playerLastDamageTaken: damage, playerLastDamageMove: attackName })
 
     const enemyDamageTags = []
     if (stabMultiplier > 1) enemyDamageTags.push("STAB")

@@ -3069,7 +3069,7 @@ const attackTypeLookup: Record<string, string> = {
   zenheadbutt: "Psíquico",
 }
 
-const normalizeMoveLookupKey = (moveName: string) =>
+export const normalizeMoveLookupKey = (moveName: string) =>
   normalizeDisplayText(moveName).replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
 
 export const getAttackType = (attackName: string): string => {
