@@ -67,6 +67,11 @@ export interface Battle {
   enemyStatusTurns?: number
   playerStatStages?: BattleStatStages
   enemyStatStages?: BattleStatStages
+  // last-damage tracking for reflection moves (Counter, Mirror Coat)
+  playerLastDamageTaken?: number
+  playerLastDamageMove?: string | undefined
+  enemyLastDamageTaken?: number
+  enemyLastDamageMove?: string | undefined
 }
 
 export interface GameState {

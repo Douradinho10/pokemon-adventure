@@ -11,6 +11,7 @@ import gen6 from "./pokedex/gen6.json"
 import gen7 from "./pokedex/gen7.json"
 import gen8 from "./pokedex/gen8.json"
 import gen9 from "./pokedex/gen9.json"
+import generatedEvolutionRules from "./pokedex/evolution-rules.generated.json"
 
 // Rarity configuration - moved to top for better visibility
 export const POKEMON_RARITY_CONFIG = {
@@ -2564,7 +2565,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   ],
 }
 
-const evolutionRules: Record<string, EvolutionRule> = {
+const manualEvolutionRules: Record<string, EvolutionRule> = {
   Charmander: { level: 16, evolvesTo: "Charmeleon" },
   Charmeleon: { level: 36, evolvesTo: "Charizard" },
   Squirtle: { level: 16, evolvesTo: "Wartortle" },
@@ -2588,6 +2589,7 @@ const evolutionRules: Record<string, EvolutionRule> = {
   Paras: { level: 24, evolvesTo: "Parasect" },
   Venonat: { level: 31, evolvesTo: "Venomoth" },
   Diglett: { level: 26, evolvesTo: "Dugtrio" },
+  Drilbur: { level: 31, evolvesTo: "Excadrill" },
   Meowth: { level: 28, evolvesTo: "Persian" },
   Psyduck: { level: 33, evolvesTo: "Golduck" },
   Mankey: { level: 28, evolvesTo: "Primeape" },
@@ -2649,6 +2651,11 @@ const evolutionRules: Record<string, EvolutionRule> = {
   Kirlia: { level: 30, evolvesTo: "Gardevoir" },
   Beldum: { level: 20, evolvesTo: "Metang" },
   Metang: { level: 45, evolvesTo: "Metagross" },
+}
+
+const evolutionRules: Record<string, EvolutionRule> = {
+  ...manualEvolutionRules,
+  ...(generatedEvolutionRules as Record<string, EvolutionRule>),
 }
 
 const moveStatusEffects: Record<string, MoveStatusEffect> = {

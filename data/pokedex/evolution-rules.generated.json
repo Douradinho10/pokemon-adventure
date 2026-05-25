@@ -1,0 +1,1234 @@
+{
+  "Bulbasaur": {
+    "level": 16,
+    "evolvesTo": "Ivysaur"
+  },
+  "Ivysaur": {
+    "level": 32,
+    "evolvesTo": "Venusaur"
+  },
+  "Charmander": {
+    "level": 16,
+    "evolvesTo": "Charmeleon"
+  },
+  "Charmeleon": {
+    "level": 36,
+    "evolvesTo": "Charizard"
+  },
+  "Squirtle": {
+    "level": 16,
+    "evolvesTo": "Wartortle"
+  },
+  "Wartortle": {
+    "level": 36,
+    "evolvesTo": "Blastoise"
+  },
+  "Caterpie": {
+    "level": 7,
+    "evolvesTo": "Metapod"
+  },
+  "Metapod": {
+    "level": 10,
+    "evolvesTo": "Butterfree"
+  },
+  "Weedle": {
+    "level": 7,
+    "evolvesTo": "Kakuna"
+  },
+  "Kakuna": {
+    "level": 10,
+    "evolvesTo": "Beedrill"
+  },
+  "Pidgey": {
+    "level": 18,
+    "evolvesTo": "Pidgeotto"
+  },
+  "Pidgeotto": {
+    "level": 36,
+    "evolvesTo": "Pidgeot"
+  },
+  "Spearow": {
+    "level": 20,
+    "evolvesTo": "Fearow"
+  },
+  "Ekans": {
+    "level": 22,
+    "evolvesTo": "Arbok"
+  },
+  "Sandshrew": {
+    "level": 22,
+    "evolvesTo": "Sandslash"
+  },
+  "Zubat": {
+    "level": 22,
+    "evolvesTo": "Golbat"
+  },
+  "Oddish": {
+    "level": 21,
+    "evolvesTo": "Gloom"
+  },
+  "Paras": {
+    "level": 24,
+    "evolvesTo": "Parasect"
+  },
+  "Venonat": {
+    "level": 31,
+    "evolvesTo": "Venomoth"
+  },
+  "Psyduck": {
+    "level": 33,
+    "evolvesTo": "Golduck"
+  },
+  "Mankey": {
+    "level": 28,
+    "evolvesTo": "Primeape"
+  },
+  "Poliwag": {
+    "level": 25,
+    "evolvesTo": "Poliwhirl"
+  },
+  "Abra": {
+    "level": 16,
+    "evolvesTo": "Kadabra"
+  },
+  "Machop": {
+    "level": 28,
+    "evolvesTo": "Machoke"
+  },
+  "Bellsprout": {
+    "level": 21,
+    "evolvesTo": "Weepinbell"
+  },
+  "Tentacool": {
+    "level": 30,
+    "evolvesTo": "Tentacruel"
+  },
+  "Magnemite": {
+    "level": 30,
+    "evolvesTo": "Magneton"
+  },
+  "Doduo": {
+    "level": 31,
+    "evolvesTo": "Dodrio"
+  },
+  "Seel": {
+    "level": 34,
+    "evolvesTo": "Dewgong"
+  },
+  "Gastly": {
+    "level": 25,
+    "evolvesTo": "Haunter"
+  },
+  "Drowzee": {
+    "level": 26,
+    "evolvesTo": "Hypno"
+  },
+  "Krabby": {
+    "level": 28,
+    "evolvesTo": "Kingler"
+  },
+  "Voltorb": {
+    "level": 30,
+    "evolvesTo": "Electrode"
+  },
+  "Rhyhorn": {
+    "level": 42,
+    "evolvesTo": "Rhydon"
+  },
+  "Horsea": {
+    "level": 32,
+    "evolvesTo": "Seadra"
+  },
+  "Goldeen": {
+    "level": 33,
+    "evolvesTo": "Seaking"
+  },
+  "Mr_Mime": {
+    "level": 42,
+    "evolvesTo": "Mr_Rime"
+  },
+  "Smoochum": {
+    "level": 30,
+    "evolvesTo": "Jynx"
+  },
+  "Elekid": {
+    "level": 30,
+    "evolvesTo": "Electabuzz"
+  },
+  "Magby": {
+    "level": 30,
+    "evolvesTo": "Magmar"
+  },
+  "Magikarp": {
+    "level": 20,
+    "evolvesTo": "Gyarados"
+  },
+  "Omanyte": {
+    "level": 40,
+    "evolvesTo": "Omastar"
+  },
+  "Kabuto": {
+    "level": 40,
+    "evolvesTo": "Kabutops"
+  },
+  "Dratini": {
+    "level": 30,
+    "evolvesTo": "Dragonair"
+  },
+  "Dragonair": {
+    "level": 55,
+    "evolvesTo": "Dragonite"
+  },
+  "Chikorita": {
+    "level": 16,
+    "evolvesTo": "Bayleef"
+  },
+  "Bayleef": {
+    "level": 32,
+    "evolvesTo": "Meganium"
+  },
+  "Totodile": {
+    "level": 18,
+    "evolvesTo": "Croconaw"
+  },
+  "Croconaw": {
+    "level": 30,
+    "evolvesTo": "Feraligatr"
+  },
+  "Sentret": {
+    "level": 15,
+    "evolvesTo": "Furret"
+  },
+  "Hoothoot": {
+    "level": 20,
+    "evolvesTo": "Noctowl"
+  },
+  "Ledyba": {
+    "level": 18,
+    "evolvesTo": "Ledian"
+  },
+  "Spinarak": {
+    "level": 22,
+    "evolvesTo": "Ariados"
+  },
+  "Chinchou": {
+    "level": 27,
+    "evolvesTo": "Lanturn"
+  },
+  "Natu": {
+    "level": 25,
+    "evolvesTo": "Xatu"
+  },
+  "Mareep": {
+    "level": 15,
+    "evolvesTo": "Flaaffy"
+  },
+  "Flaaffy": {
+    "level": 30,
+    "evolvesTo": "Ampharos"
+  },
+  "Marill": {
+    "level": 18,
+    "evolvesTo": "Azumarill"
+  },
+  "Hoppip": {
+    "level": 18,
+    "evolvesTo": "Skiploom"
+  },
+  "Skiploom": {
+    "level": 27,
+    "evolvesTo": "Jumpluff"
+  },
+  "Wynaut": {
+    "level": 15,
+    "evolvesTo": "Wobbuffet"
+  },
+  "Pineco": {
+    "level": 31,
+    "evolvesTo": "Forretress"
+  },
+  "Snubbull": {
+    "level": 23,
+    "evolvesTo": "Granbull"
+  },
+  "Teddiursa": {
+    "level": 30,
+    "evolvesTo": "Ursaring"
+  },
+  "Slugma": {
+    "level": 38,
+    "evolvesTo": "Magcargo"
+  },
+  "Swinub": {
+    "level": 33,
+    "evolvesTo": "Piloswine"
+  },
+  "Corsola": {
+    "level": 38,
+    "evolvesTo": "Cursola"
+  },
+  "Remoraid": {
+    "level": 25,
+    "evolvesTo": "Octillery"
+  },
+  "Houndour": {
+    "level": 24,
+    "evolvesTo": "Houndoom"
+  },
+  "Phanpy": {
+    "level": 25,
+    "evolvesTo": "Donphan"
+  },
+  "Larvitar": {
+    "level": 30,
+    "evolvesTo": "Pupitar"
+  },
+  "Pupitar": {
+    "level": 55,
+    "evolvesTo": "Tyranitar"
+  },
+  "Treecko": {
+    "level": 16,
+    "evolvesTo": "Grovyle"
+  },
+  "Grovyle": {
+    "level": 36,
+    "evolvesTo": "Sceptile"
+  },
+  "Torchic": {
+    "level": 16,
+    "evolvesTo": "Combusken"
+  },
+  "Combusken": {
+    "level": 36,
+    "evolvesTo": "Blaziken"
+  },
+  "Mudkip": {
+    "level": 16,
+    "evolvesTo": "Marshtomp"
+  },
+  "Marshtomp": {
+    "level": 36,
+    "evolvesTo": "Swampert"
+  },
+  "Poochyena": {
+    "level": 18,
+    "evolvesTo": "Mightyena"
+  },
+  "Linoone": {
+    "level": 35,
+    "evolvesTo": "Obstagoon"
+  },
+  "Silcoon": {
+    "level": 10,
+    "evolvesTo": "Beautifly"
+  },
+  "Cascoon": {
+    "level": 10,
+    "evolvesTo": "Dustox"
+  },
+  "Lotad": {
+    "level": 14,
+    "evolvesTo": "Lombre"
+  },
+  "Seedot": {
+    "level": 14,
+    "evolvesTo": "Nuzleaf"
+  },
+  "Taillow": {
+    "level": 22,
+    "evolvesTo": "Swellow"
+  },
+  "Wingull": {
+    "level": 25,
+    "evolvesTo": "Pelipper"
+  },
+  "Ralts": {
+    "level": 20,
+    "evolvesTo": "Kirlia"
+  },
+  "Surskit": {
+    "level": 22,
+    "evolvesTo": "Masquerain"
+  },
+  "Shroomish": {
+    "level": 23,
+    "evolvesTo": "Breloom"
+  },
+  "Slakoth": {
+    "level": 18,
+    "evolvesTo": "Vigoroth"
+  },
+  "Vigoroth": {
+    "level": 36,
+    "evolvesTo": "Slaking"
+  },
+  "Whismur": {
+    "level": 20,
+    "evolvesTo": "Loudred"
+  },
+  "Loudred": {
+    "level": 40,
+    "evolvesTo": "Exploud"
+  },
+  "Makuhita": {
+    "level": 24,
+    "evolvesTo": "Hariyama"
+  },
+  "Aron": {
+    "level": 32,
+    "evolvesTo": "Lairon"
+  },
+  "Lairon": {
+    "level": 42,
+    "evolvesTo": "Aggron"
+  },
+  "Meditite": {
+    "level": 37,
+    "evolvesTo": "Medicham"
+  },
+  "Electrike": {
+    "level": 26,
+    "evolvesTo": "Manectric"
+  },
+  "Gulpin": {
+    "level": 26,
+    "evolvesTo": "Swalot"
+  },
+  "Carvanha": {
+    "level": 30,
+    "evolvesTo": "Sharpedo"
+  },
+  "Wailmer": {
+    "level": 40,
+    "evolvesTo": "Wailord"
+  },
+  "Numel": {
+    "level": 33,
+    "evolvesTo": "Camerupt"
+  },
+  "Spoink": {
+    "level": 32,
+    "evolvesTo": "Grumpig"
+  },
+  "Trapinch": {
+    "level": 35,
+    "evolvesTo": "Vibrava"
+  },
+  "Vibrava": {
+    "level": 45,
+    "evolvesTo": "Flygon"
+  },
+  "Cacnea": {
+    "level": 32,
+    "evolvesTo": "Cacturne"
+  },
+  "Swablu": {
+    "level": 35,
+    "evolvesTo": "Altaria"
+  },
+  "Barboach": {
+    "level": 30,
+    "evolvesTo": "Whiscash"
+  },
+  "Corphish": {
+    "level": 30,
+    "evolvesTo": "Crawdaunt"
+  },
+  "Baltoy": {
+    "level": 36,
+    "evolvesTo": "Claydol"
+  },
+  "Lileep": {
+    "level": 40,
+    "evolvesTo": "Cradily"
+  },
+  "Anorith": {
+    "level": 40,
+    "evolvesTo": "Armaldo"
+  },
+  "Shuppet": {
+    "level": 37,
+    "evolvesTo": "Banette"
+  },
+  "Duskull": {
+    "level": 37,
+    "evolvesTo": "Dusclops"
+  },
+  "Spheal": {
+    "level": 32,
+    "evolvesTo": "Sealeo"
+  },
+  "Sealeo": {
+    "level": 44,
+    "evolvesTo": "Walrein"
+  },
+  "Bagon": {
+    "level": 30,
+    "evolvesTo": "Shelgon"
+  },
+  "Shelgon": {
+    "level": 50,
+    "evolvesTo": "Salamence"
+  },
+  "Beldum": {
+    "level": 20,
+    "evolvesTo": "Metang"
+  },
+  "Metang": {
+    "level": 45,
+    "evolvesTo": "Metagross"
+  },
+  "Turtwig": {
+    "level": 18,
+    "evolvesTo": "Grotle"
+  },
+  "Grotle": {
+    "level": 32,
+    "evolvesTo": "Torterra"
+  },
+  "Chimchar": {
+    "level": 14,
+    "evolvesTo": "Monferno"
+  },
+  "Monferno": {
+    "level": 36,
+    "evolvesTo": "Infernape"
+  },
+  "Piplup": {
+    "level": 16,
+    "evolvesTo": "Prinplup"
+  },
+  "Prinplup": {
+    "level": 36,
+    "evolvesTo": "Empoleon"
+  },
+  "Starly": {
+    "level": 14,
+    "evolvesTo": "Staravia"
+  },
+  "Staravia": {
+    "level": 34,
+    "evolvesTo": "Staraptor"
+  },
+  "Bidoof": {
+    "level": 15,
+    "evolvesTo": "Bibarel"
+  },
+  "Kricketot": {
+    "level": 10,
+    "evolvesTo": "Kricketune"
+  },
+  "Shinx": {
+    "level": 15,
+    "evolvesTo": "Luxio"
+  },
+  "Luxio": {
+    "level": 30,
+    "evolvesTo": "Luxray"
+  },
+  "Cranidos": {
+    "level": 30,
+    "evolvesTo": "Rampardos"
+  },
+  "Shieldon": {
+    "level": 30,
+    "evolvesTo": "Bastiodon"
+  },
+  "Combee": {
+    "level": 21,
+    "evolvesTo": "Vespiquen"
+  },
+  "Buizel": {
+    "level": 26,
+    "evolvesTo": "Floatzel"
+  },
+  "Cherubi": {
+    "level": 25,
+    "evolvesTo": "Cherrim"
+  },
+  "Shellos": {
+    "level": 30,
+    "evolvesTo": "Gastrodon"
+  },
+  "Drifloon": {
+    "level": 28,
+    "evolvesTo": "Drifblim"
+  },
+  "Glameow": {
+    "level": 38,
+    "evolvesTo": "Purugly"
+  },
+  "Stunky": {
+    "level": 34,
+    "evolvesTo": "Skuntank"
+  },
+  "Bronzor": {
+    "level": 33,
+    "evolvesTo": "Bronzong"
+  },
+  "Gible": {
+    "level": 24,
+    "evolvesTo": "Gabite"
+  },
+  "Gabite": {
+    "level": 48,
+    "evolvesTo": "Garchomp"
+  },
+  "Hippopotas": {
+    "level": 34,
+    "evolvesTo": "Hippowdon"
+  },
+  "Skorupi": {
+    "level": 40,
+    "evolvesTo": "Drapion"
+  },
+  "Croagunk": {
+    "level": 37,
+    "evolvesTo": "Toxicroak"
+  },
+  "Finneon": {
+    "level": 31,
+    "evolvesTo": "Lumineon"
+  },
+  "Snover": {
+    "level": 40,
+    "evolvesTo": "Abomasnow"
+  },
+  "Snivy": {
+    "level": 17,
+    "evolvesTo": "Servine"
+  },
+  "Servine": {
+    "level": 36,
+    "evolvesTo": "Serperior"
+  },
+  "Tepig": {
+    "level": 17,
+    "evolvesTo": "Pignite"
+  },
+  "Pignite": {
+    "level": 36,
+    "evolvesTo": "Emboar"
+  },
+  "Oshawott": {
+    "level": 17,
+    "evolvesTo": "Dewott"
+  },
+  "Patrat": {
+    "level": 20,
+    "evolvesTo": "Watchog"
+  },
+  "Lillipup": {
+    "level": 16,
+    "evolvesTo": "Herdier"
+  },
+  "Herdier": {
+    "level": 32,
+    "evolvesTo": "Stoutland"
+  },
+  "Purrloin": {
+    "level": 20,
+    "evolvesTo": "Liepard"
+  },
+  "Pidove": {
+    "level": 21,
+    "evolvesTo": "Tranquill"
+  },
+  "Tranquill": {
+    "level": 32,
+    "evolvesTo": "Unfezant"
+  },
+  "Blitzle": {
+    "level": 27,
+    "evolvesTo": "Zebstrika"
+  },
+  "Roggenrola": {
+    "level": 25,
+    "evolvesTo": "Boldore"
+  },
+  "Drilbur": {
+    "level": 31,
+    "evolvesTo": "Excadrill"
+  },
+  "Timburr": {
+    "level": 25,
+    "evolvesTo": "Gurdurr"
+  },
+  "Tympole": {
+    "level": 25,
+    "evolvesTo": "Palpitoad"
+  },
+  "Palpitoad": {
+    "level": 36,
+    "evolvesTo": "Seismitoad"
+  },
+  "Sewaddle": {
+    "level": 20,
+    "evolvesTo": "Swadloon"
+  },
+  "Venipede": {
+    "level": 22,
+    "evolvesTo": "Whirlipede"
+  },
+  "Whirlipede": {
+    "level": 30,
+    "evolvesTo": "Scolipede"
+  },
+  "Sandile": {
+    "level": 29,
+    "evolvesTo": "Krokorok"
+  },
+  "Krokorok": {
+    "level": 40,
+    "evolvesTo": "Krookodile"
+  },
+  "Darumaka": {
+    "level": 35,
+    "evolvesTo": "Darmanitan"
+  },
+  "Dwebble": {
+    "level": 34,
+    "evolvesTo": "Crustle"
+  },
+  "Scraggy": {
+    "level": 39,
+    "evolvesTo": "Scrafty"
+  },
+  "Tirtouga": {
+    "level": 37,
+    "evolvesTo": "Carracosta"
+  },
+  "Archen": {
+    "level": 37,
+    "evolvesTo": "Archeops"
+  },
+  "Trubbish": {
+    "level": 36,
+    "evolvesTo": "Garbodor"
+  },
+  "Gothita": {
+    "level": 32,
+    "evolvesTo": "Gothorita"
+  },
+  "Gothorita": {
+    "level": 41,
+    "evolvesTo": "Gothitelle"
+  },
+  "Solosis": {
+    "level": 32,
+    "evolvesTo": "Duosion"
+  },
+  "Duosion": {
+    "level": 41,
+    "evolvesTo": "Reuniclus"
+  },
+  "Ducklett": {
+    "level": 35,
+    "evolvesTo": "Swanna"
+  },
+  "Vanillite": {
+    "level": 35,
+    "evolvesTo": "Vanillish"
+  },
+  "Vanillish": {
+    "level": 47,
+    "evolvesTo": "Vanilluxe"
+  },
+  "Deerling": {
+    "level": 34,
+    "evolvesTo": "Sawsbuck"
+  },
+  "Foongus": {
+    "level": 39,
+    "evolvesTo": "Amoonguss"
+  },
+  "Frillish": {
+    "level": 40,
+    "evolvesTo": "Jellicent"
+  },
+  "Joltik": {
+    "level": 36,
+    "evolvesTo": "Galvantula"
+  },
+  "Ferroseed": {
+    "level": 40,
+    "evolvesTo": "Ferrothorn"
+  },
+  "Klink": {
+    "level": 38,
+    "evolvesTo": "Klang"
+  },
+  "Klang": {
+    "level": 49,
+    "evolvesTo": "Klinklang"
+  },
+  "Tynamo": {
+    "level": 39,
+    "evolvesTo": "Eelektrik"
+  },
+  "Elgyem": {
+    "level": 42,
+    "evolvesTo": "Beheeyem"
+  },
+  "Litwick": {
+    "level": 41,
+    "evolvesTo": "Lampent"
+  },
+  "Axew": {
+    "level": 38,
+    "evolvesTo": "Fraxure"
+  },
+  "Fraxure": {
+    "level": 48,
+    "evolvesTo": "Haxorus"
+  },
+  "Cubchoo": {
+    "level": 37,
+    "evolvesTo": "Beartic"
+  },
+  "Mienfoo": {
+    "level": 50,
+    "evolvesTo": "Mienshao"
+  },
+  "Golett": {
+    "level": 43,
+    "evolvesTo": "Golurk"
+  },
+  "Pawniard": {
+    "level": 52,
+    "evolvesTo": "Bisharp"
+  },
+  "Vullaby": {
+    "level": 54,
+    "evolvesTo": "Mandibuzz"
+  },
+  "Deino": {
+    "level": 50,
+    "evolvesTo": "Zweilous"
+  },
+  "Zweilous": {
+    "level": 64,
+    "evolvesTo": "Hydreigon"
+  },
+  "Larvesta": {
+    "level": 59,
+    "evolvesTo": "Volcarona"
+  },
+  "Chespin": {
+    "level": 16,
+    "evolvesTo": "Quilladin"
+  },
+  "Quilladin": {
+    "level": 36,
+    "evolvesTo": "Chesnaught"
+  },
+  "Fennekin": {
+    "level": 16,
+    "evolvesTo": "Braixen"
+  },
+  "Braixen": {
+    "level": 36,
+    "evolvesTo": "Delphox"
+  },
+  "Froakie": {
+    "level": 16,
+    "evolvesTo": "Frogadier"
+  },
+  "Frogadier": {
+    "level": 36,
+    "evolvesTo": "Greninja"
+  },
+  "Bunnelby": {
+    "level": 20,
+    "evolvesTo": "Diggersby"
+  },
+  "Fletchling": {
+    "level": 17,
+    "evolvesTo": "Fletchinder"
+  },
+  "Fletchinder": {
+    "level": 35,
+    "evolvesTo": "Talonflame"
+  },
+  "Scatterbug": {
+    "level": 9,
+    "evolvesTo": "Spewpa"
+  },
+  "Spewpa": {
+    "level": 12,
+    "evolvesTo": "Vivillon"
+  },
+  "Litleo": {
+    "level": 35,
+    "evolvesTo": "Pyroar"
+  },
+  "Flabebe": {
+    "level": 19,
+    "evolvesTo": "Floette"
+  },
+  "Skiddo": {
+    "level": 32,
+    "evolvesTo": "Gogoat"
+  },
+  "Pancham": {
+    "level": 32,
+    "evolvesTo": "Pangoro"
+  },
+  "Espurr": {
+    "level": 25,
+    "evolvesTo": "Meowstic"
+  },
+  "Honedge": {
+    "level": 35,
+    "evolvesTo": "Doublade"
+  },
+  "Inkay": {
+    "level": 30,
+    "evolvesTo": "Malamar"
+  },
+  "Binacle": {
+    "level": 39,
+    "evolvesTo": "Barbaracle"
+  },
+  "Skrelp": {
+    "level": 48,
+    "evolvesTo": "Dragalge"
+  },
+  "Clauncher": {
+    "level": 37,
+    "evolvesTo": "Clawitzer"
+  },
+  "Tyrunt": {
+    "level": 39,
+    "evolvesTo": "Tyrantrum"
+  },
+  "Amaura": {
+    "level": 39,
+    "evolvesTo": "Aurorus"
+  },
+  "Noibat": {
+    "level": 48,
+    "evolvesTo": "Noivern"
+  },
+  "Rowlet": {
+    "level": 17,
+    "evolvesTo": "Dartrix"
+  },
+  "Litten": {
+    "level": 17,
+    "evolvesTo": "Torracat"
+  },
+  "Torracat": {
+    "level": 34,
+    "evolvesTo": "Incineroar"
+  },
+  "Popplio": {
+    "level": 17,
+    "evolvesTo": "Brionne"
+  },
+  "Brionne": {
+    "level": 34,
+    "evolvesTo": "Primarina"
+  },
+  "Pikipek": {
+    "level": 14,
+    "evolvesTo": "Trumbeak"
+  },
+  "Trumbeak": {
+    "level": 28,
+    "evolvesTo": "Toucannon"
+  },
+  "Yungoos": {
+    "level": 20,
+    "evolvesTo": "Gumshoos"
+  },
+  "Grubbin": {
+    "level": 20,
+    "evolvesTo": "Charjabug"
+  },
+  "Cutiefly": {
+    "level": 25,
+    "evolvesTo": "Ribombee"
+  },
+  "Mareanie": {
+    "level": 38,
+    "evolvesTo": "Toxapex"
+  },
+  "Mudbray": {
+    "level": 30,
+    "evolvesTo": "Mudsdale"
+  },
+  "Dewpider": {
+    "level": 22,
+    "evolvesTo": "Araquanid"
+  },
+  "Fomantis": {
+    "level": 34,
+    "evolvesTo": "Lurantis"
+  },
+  "Morelull": {
+    "level": 24,
+    "evolvesTo": "Shiinotic"
+  },
+  "Salandit": {
+    "level": 33,
+    "evolvesTo": "Salazzle"
+  },
+  "Stufful": {
+    "level": 27,
+    "evolvesTo": "Bewear"
+  },
+  "Bounsweet": {
+    "level": 18,
+    "evolvesTo": "Steenee"
+  },
+  "Wimpod": {
+    "level": 30,
+    "evolvesTo": "Golisopod"
+  },
+  "Sandygast": {
+    "level": 42,
+    "evolvesTo": "Palossand"
+  },
+  "Jangmo_o": {
+    "level": 35,
+    "evolvesTo": "Hakamo_o"
+  },
+  "Hakamo_o": {
+    "level": 45,
+    "evolvesTo": "Kommo_o"
+  },
+  "Cosmog": {
+    "level": 43,
+    "evolvesTo": "Cosmoem"
+  },
+  "Grookey": {
+    "level": 16,
+    "evolvesTo": "Thwackey"
+  },
+  "Thwackey": {
+    "level": 35,
+    "evolvesTo": "Rillaboom"
+  },
+  "Scorbunny": {
+    "level": 16,
+    "evolvesTo": "Raboot"
+  },
+  "Raboot": {
+    "level": 35,
+    "evolvesTo": "Cinderace"
+  },
+  "Sobble": {
+    "level": 16,
+    "evolvesTo": "Drizzile"
+  },
+  "Drizzile": {
+    "level": 35,
+    "evolvesTo": "Inteleon"
+  },
+  "Skwovet": {
+    "level": 24,
+    "evolvesTo": "Greedent"
+  },
+  "Rookidee": {
+    "level": 18,
+    "evolvesTo": "Corvisquire"
+  },
+  "Corvisquire": {
+    "level": 38,
+    "evolvesTo": "Corviknight"
+  },
+  "Blipbug": {
+    "level": 10,
+    "evolvesTo": "Dottler"
+  },
+  "Dottler": {
+    "level": 30,
+    "evolvesTo": "Orbeetle"
+  },
+  "Nickit": {
+    "level": 18,
+    "evolvesTo": "Thievul"
+  },
+  "Gossifleur": {
+    "level": 20,
+    "evolvesTo": "Eldegoss"
+  },
+  "Wooloo": {
+    "level": 24,
+    "evolvesTo": "Dubwool"
+  },
+  "Chewtle": {
+    "level": 22,
+    "evolvesTo": "Drednaw"
+  },
+  "Yamper": {
+    "level": 25,
+    "evolvesTo": "Boltund"
+  },
+  "Rolycoly": {
+    "level": 18,
+    "evolvesTo": "Carkol"
+  },
+  "Carkol": {
+    "level": 34,
+    "evolvesTo": "Coalossal"
+  },
+  "Silicobra": {
+    "level": 36,
+    "evolvesTo": "Sandaconda"
+  },
+  "Arrokuda": {
+    "level": 26,
+    "evolvesTo": "Barraskewda"
+  },
+  "Toxel": {
+    "level": 30,
+    "evolvesTo": "Toxtricity"
+  },
+  "Sizzlipede": {
+    "level": 28,
+    "evolvesTo": "Centiskorch"
+  },
+  "Hatenna": {
+    "level": 32,
+    "evolvesTo": "Hattrem"
+  },
+  "Hattrem": {
+    "level": 42,
+    "evolvesTo": "Hatterene"
+  },
+  "Impidimp": {
+    "level": 32,
+    "evolvesTo": "Morgrem"
+  },
+  "Morgrem": {
+    "level": 42,
+    "evolvesTo": "Grimmsnarl"
+  },
+  "Cufant": {
+    "level": 34,
+    "evolvesTo": "Copperajah"
+  },
+  "Dreepy": {
+    "level": 50,
+    "evolvesTo": "Drakloak"
+  },
+  "Drakloak": {
+    "level": 60,
+    "evolvesTo": "Dragapult"
+  },
+  "Sprigatito": {
+    "level": 16,
+    "evolvesTo": "Floragato"
+  },
+  "Floragato": {
+    "level": 36,
+    "evolvesTo": "Meowscarada"
+  },
+  "Fuecoco": {
+    "level": 16,
+    "evolvesTo": "Crocalor"
+  },
+  "Crocalor": {
+    "level": 36,
+    "evolvesTo": "Skeledirge"
+  },
+  "Quaxly": {
+    "level": 16,
+    "evolvesTo": "Quaxwell"
+  },
+  "Quaxwell": {
+    "level": 36,
+    "evolvesTo": "Quaquaval"
+  },
+  "Lechonk": {
+    "level": 18,
+    "evolvesTo": "Oinkologne"
+  },
+  "Tarountula": {
+    "level": 15,
+    "evolvesTo": "Spidops"
+  },
+  "Nymble": {
+    "level": 24,
+    "evolvesTo": "Lokix"
+  },
+  "Fidough": {
+    "level": 26,
+    "evolvesTo": "Dachsbun"
+  },
+  "Smoliv": {
+    "level": 25,
+    "evolvesTo": "Dolliv"
+  },
+  "Dolliv": {
+    "level": 35,
+    "evolvesTo": "Arboliva"
+  },
+  "Nacli": {
+    "level": 24,
+    "evolvesTo": "Naclstack"
+  },
+  "Naclstack": {
+    "level": 38,
+    "evolvesTo": "Garganacl"
+  },
+  "Wattrel": {
+    "level": 25,
+    "evolvesTo": "Kilowattrel"
+  },
+  "Maschiff": {
+    "level": 30,
+    "evolvesTo": "Mabosstiff"
+  },
+  "Shroodle": {
+    "level": 28,
+    "evolvesTo": "Grafaiai"
+  },
+  "Toedscool": {
+    "level": 30,
+    "evolvesTo": "Toedscruel"
+  },
+  "Flittle": {
+    "level": 35,
+    "evolvesTo": "Espathra"
+  },
+  "Tinkatink": {
+    "level": 24,
+    "evolvesTo": "Tinkatuff"
+  },
+  "Tinkatuff": {
+    "level": 38,
+    "evolvesTo": "Tinkaton"
+  },
+  "Wiglett": {
+    "level": 26,
+    "evolvesTo": "Wugtrio"
+  },
+  "Finizen": {
+    "level": 38,
+    "evolvesTo": "Palafin"
+  },
+  "Varoom": {
+    "level": 40,
+    "evolvesTo": "Revavroom"
+  },
+  "Glimmet": {
+    "level": 35,
+    "evolvesTo": "Glimmora"
+  },
+  "Greavard": {
+    "level": 30,
+    "evolvesTo": "Houndstone"
+  },
+  "Frigibax": {
+    "level": 35,
+    "evolvesTo": "Arctibax"
+  },
+  "Arctibax": {
+    "level": 54,
+    "evolvesTo": "Baxcalibur"
+  }
+}
