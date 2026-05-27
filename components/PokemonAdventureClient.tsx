@@ -2366,8 +2366,13 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const shouldUseImpostor = canRollImpostor && impostorRoll < IMPOSTOR_CHANCE
 
       const canUseZoroark = enemyLevel >= ZOROARK_MIN_LEVEL && Boolean(wildPokemon.Zoroark)
-      const impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
+      let impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
+
+      // Safety: ensure the resolved species respects canonical wild minimums
+      // so evolved forms don't appear at levels below their pre-evolutions.
+      enemyName = getSpeciesAtLevel(enemyName, enemyLevel)
+      impostorName = getSpeciesAtLevel(impostorName, enemyLevel)
       const isShiny = Math.random() < SHINY_CHANCE
       const enemyIVs = createPokemonIVs()
 

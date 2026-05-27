@@ -2654,7 +2654,7 @@ const manualEvolutionRules: Record<string, EvolutionRule> = {
   Metang: { level: 45, evolvesTo: "Metagross" },
 }
 
-const evolutionRules: Record<string, EvolutionRule> = {
+export const evolutionRules: Record<string, EvolutionRule> = {
   ...manualEvolutionRules,
   ...(generatedEvolutionRules as Record<string, EvolutionRule>),
 }
