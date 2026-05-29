@@ -295,6 +295,10 @@ export const getPokemonDefenseDamageMultiplier = (ivs?: Partial<PokemonIVs> | nu
   return 1 - (clampValue(resolvedIVs.defense, 0, 31) / 31) * 0.08
 }
 
+export const getCanonicalPokemonType = (pokemonName: string, fallbackType?: string): string => {
+  return (generatedWildTypes as Record<string, string>)[pokemonName] || fallbackType || "Normal"
+}
+
 export const starterPokemon: Record<string, Pokemon> = {
   Charmander: {
     HP: 45,
@@ -341,6 +345,11 @@ export const starterPokemon: Record<string, Pokemon> = {
     speed: 55,
   },
 }
+
+Object.keys(starterPokemon).forEach((name) => {
+  const canonicalType = getCanonicalPokemonType(name, starterPokemon[name].type)
+  starterPokemon[name].type = canonicalType
+})
 
 export const pokemonSpriteCatalog: Record<string, PokemonSpriteSet> = {}
 
@@ -2788,7 +2797,7 @@ export const getPokemonBattleTemplate = (pokemonName: string): PokemonBattleTemp
     return {
       sprite: starterData.sprite,
       spriteSet: starterData.spriteSet,
-      type: starterData.type,
+      type: getCanonicalPokemonType(pokemonName, starterData.type),
       baseHP: starterData.maxHP,
       attacks: starterData.attacks,
       speed: starterData.speed || 50,
@@ -2803,7 +2812,7 @@ export const getPokemonBattleTemplate = (pokemonName: string): PokemonBattleTemp
   return {
     sprite: wildData.sprite,
     spriteSet: wildData.spriteSet,
-    type: wildData.type,
+    type: getCanonicalPokemonType(pokemonName, wildData.type),
     baseHP: wildData.baseHP,
     attacks: wildData.attacks,
     speed: wildData.speed || 50,

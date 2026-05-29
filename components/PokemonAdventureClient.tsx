@@ -38,6 +38,7 @@ import {
   getMovePriority,
   getMoveAccuracy,
   evolutionRules,
+  getCanonicalPokemonType,
   initializePP, // Import new helper
   MAX_TEAM_SIZE,
   scaleAttackSetForLevel,
@@ -4256,7 +4257,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         attackPP: syncAttackPP(pokemon.attackPP, evolvedAttacks),
         sprite: evolutionTemplate?.sprite || getPokemonSpriteUrl(evolvedName, undefined, "front", Boolean(pokemon.isShiny)),
         spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate?.sprite, Boolean(pokemon.isShiny)),
-        type: evolutionTemplate?.type ?? pokemon.type,
+        type: evolutionTemplate?.type ?? getCanonicalPokemonType(evolvedName, pokemon.type),
         speed: Math.max(1, evolutionTemplate?.speed ?? pokemon.speed ?? 50),
         isShiny: pokemon.isShiny,
         ivs: resolvedPokemonIVs,

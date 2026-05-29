@@ -6,7 +6,7 @@ import { useGameState } from "./useGameState"
 import type { GameState } from "./useGameState"
 import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from "../lib/firebaseRtdbService"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
-import { starterPokemon, wildPokemon } from "../data/pokemonData"
+import { starterPokemon, wildPokemon, getCanonicalPokemonType } from "../data/pokemonData"
 import generatedWildTypes from "../data/pokedex/wild-types.generated.json"
 import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
 
@@ -51,7 +51,7 @@ function migrateGameStateSprites(gameState: GameState): GameState {
     Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
       const datasetSprite = starterPokemon[name]?.sprite || wildPokemon[name]?.sprite
       // Normalize stored type using canonical generated types to avoid stale save data
-      const canonicalType = (generatedWildTypes as Record<string, string>)[name]
+      const canonicalType = getCanonicalPokemonType(name, pokemon.type)
       const nextType = canonicalType || pokemon.type || starterPokemon[name]?.type || wildPokemon[name]?.type
       return [
         name,
@@ -82,9 +82,10 @@ function migrateGameStateSprites(gameState: GameState): GameState {
           Boolean(gameState.currentBattle.enemyIsShiny),
         ),
         // Normalize enemy type from canonical mapping when present
-        enemyType:
-          (generatedWildTypes as Record<string, string>)[gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName] ||
+        enemyType: getCanonicalPokemonType(
+          gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
           gameState.currentBattle.enemyType,
+        ),
       }
     : null
 
@@ -142,6 +143,17 @@ export const useLocalGameState = () => {
   const lastSavedSnapshotRef = useRef<string>("")
   const authRetryTimeoutRef = useRef<number | null>(null)
   const saveRetryTimeoutRef = useRef<number | null>(null)
+  const gameStateRef = useRef(gameState)
+  const saveSlotsRef = useRef(saveSlots)
+  const currentSlotRef = useRef(currentSlot)
+  const authenticatedUserIdRef = useRef(authenticatedUserId)
+
+  useEffect(() => {
+    gameStateRef.current = gameState
+    saveSlotsRef.current = saveSlots
+    currentSlotRef.current = currentSlot
+    authenticatedUserIdRef.current = authenticatedUserId
+  }, [authenticatedUserId, currentSlot, gameState, saveSlots])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -235,12 +247,31 @@ export const useLocalGameState = () => {
         const hasFirebaseData = firebaseSlots.some((slot) => slot.gameState?.activePokemon)
         const localMirrorSlots = loadSlotsFromAccountLocal(authenticatedUserId)
         const hasLocalMirrorData = localMirrorSlots.some((slot) => slot.gameState?.activePokemon)
-        const resolvedSlots = hasFirebaseData
-          ? firebaseSlots
-          : localMirrorSlots.map((slot) => ({
-              ...slot,
-              gameState: slot.gameState ? migrateGameStateSprites(slot.gameState) : null,
-            }))
+        const resolvedSlots = firebaseSlots.map((firebaseSlot, index) => {
+          const localSlot = localMirrorSlots[index]
+          const firebaseState = firebaseSlot.gameState
+          const localState = localSlot?.gameState ? migrateGameStateSprites(localSlot.gameState) : null
+
+          if (!firebaseState) {
+            return { ...firebaseSlot, gameState: localState }
+          }
+
+          if (!localState) {
+            return firebaseSlot
+          }
+
+          const firebaseBattle = firebaseState.currentBattle
+          const localBattle = localState.currentBattle
+          const firebaseProgress = (firebaseState.battles || 0) + (firebaseBattle ? 0.5 : 0)
+          const localProgress = (localState.battles || 0) + (localBattle ? 0.5 : 0)
+
+          const preferLocal =
+            Boolean(localBattle && !firebaseBattle) ||
+            localProgress > firebaseProgress ||
+            Boolean(localState.activePokemon && !firebaseState.activePokemon)
+
+          return preferLocal ? { ...firebaseSlot, gameState: localState } : firebaseSlot
+        })
 
         // Rehydrate cloud slots from local mirror when Firebase returns empty but local has progress.
         if (!hasFirebaseData && hasLocalMirrorData) {
@@ -346,6 +377,38 @@ export const useLocalGameState = () => {
 
     return () => window.clearTimeout(timeoutId)
   }, [authenticatedUserId, currentSlot, gameState, isLoading, saveRetryTick])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const flushCurrentState = () => {
+      const userId = authenticatedUserIdRef.current
+      const slotId = currentSlotRef.current
+      const currentGameState = gameStateRef.current
+
+      if (!userId || slotId === null || !currentGameState.activePokemon) {
+        return
+      }
+
+      const nextSlots = normalizeSaveSlots(saveSlotsRef.current)
+      nextSlots[slotId] = {
+        ...nextSlots[slotId],
+        gameState: migrateGameStateSprites(currentGameState),
+      }
+
+      saveSlotsToAccountLocal(userId, nextSlots)
+    }
+
+    window.addEventListener("pagehide", flushCurrentState)
+    window.addEventListener("beforeunload", flushCurrentState)
+
+    return () => {
+      window.removeEventListener("pagehide", flushCurrentState)
+      window.removeEventListener("beforeunload", flushCurrentState)
+    }
+  }, [])
 
   useEffect(() => {
     if (!authenticatedUserId) {
