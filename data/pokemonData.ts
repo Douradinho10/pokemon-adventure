@@ -1858,7 +1858,7 @@ Object.keys(wildPokemon).forEach((name) => {
       wildPokemon[name].type = typeOverride
     }
 
-    const allowedRarities: string[] = Object.keys(POKEMON_RARITY_CONFIG)ilter(Boolean)
+    const allowedRarities: string[] = Object.keys(POKEMON_RARITY_CONFIG).filter(Boolean)
     if (!allowedRarities.includes(wildPokemon[name].rarity)) {
       // eslint-disable-next-line no-console
       console.warn(`[data/pokemonData] normalizing rarity for ${name}: ${wildPokemon[name].rarity} -> comum`)
@@ -3189,6 +3189,66 @@ export const getDamageMultiplier = (attackerType: string, defenderType: string):
   }, 1)
 }
 
+// Build min wild level mapping using generated evolution rules so evolved
+// forms don't appear in the wild earlier than their pre-evolutions.
+export const buildMinWildLevelBySpecies = (): Record<string, number> => {
+  const cache: Record<string, number> = {}
+  const visiting = new Set<string>()
+
+  const speciesNames = new Set<string>([...Object.keys(wildPokemon || {}), ...Object.keys(generatedEvolutionRules || {})])
+  Object.values(generatedEvolutionRules || {}).forEach((r: any) => { if (r?.evolvesTo) speciesNames.add(r.evolvesTo) })
+
+  const resolveMinLevel = (s: string): number => {
+    if (cache[s]) return cache[s]
+    if (visiting.has(s)) return 1
+    visiting.add(s)
+    const pres = Object.keys(generatedEvolutionRules).filter((k) => (generatedEvolutionRules as Record<string, any>)[k]?.evolvesTo === s)
+    const levels = pres.map((p) => Math.max(typeof (generatedEvolutionRules as Record<string, any>)[p]?.level === 'number' ? (generatedEvolutionRules as Record<string, any>)[p].level : 1, resolveMinLevel(p)))
+    visiting.delete(s)
+    const min = levels.length ? Math.max(...levels) : 1
+    cache[s] = min
+    return min
+  }
+
+  Array.from(speciesNames).forEach((s) => resolveMinLevel(s))
+  return cache
+}
+
+export const minWildLevelBySpecies = buildMinWildLevelBySpecies()
+
+export const getSpeciesAtLevel = (speciesName: string, level: number): string => {
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+
+  let current = speciesName
+  const maxIter = Object.keys(minWildLevelBySpecies).length + 5
+  let iter = 0
+
+  while (iter++ < maxIter) {
+    let found: string | null = null
+    for (const candidate of Object.keys(minWildLevelBySpecies)) {
+      const rule = (generatedEvolutionRules as Record<string, any>)[candidate]
+      if (rule && rule.evolvesTo === current) {
+        const candMin = minWildLevelBySpecies[candidate] || 1
+        if (candMin <= level) {
+          if (!found || (minWildLevelBySpecies[found] || 1) < candMin) {
+            found = candidate
+          }
+        }
+      }
+    }
+
+    if (!found) break
+    current = found
+    if ((minWildLevelBySpecies[current] || 1) <= level) return current
+  }
+
+  // Fallbacks
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+  const entries = Object.entries(minWildLevelBySpecies)
+  entries.sort((a, b) => (a[1] || 1) - (b[1] || 1))
+  return entries.length > 0 ? entries[0][0] : speciesName
+}
+
 // FunÃ¯Â¿Â½Ã¯Â¿Â½o para selecionar PokÃƒÂ©mon selvagem baseado na raridade e progresso do jogo
 export const getRandomWildPokemon = (battleCount = 0) => {
   const rand = Math.random()
@@ -3202,7 +3262,10 @@ export const getRandomWildPokemon = (battleCount = 0) => {
     availablePokemon = Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === "comum")
   }
 
-  return availablePokemon[Math.floor(Math.random() * availablePokemon.length)]
+  const pick = availablePokemon[Math.floor(Math.random() * availablePokemon.length)]
+  // default to base form appropriate for level 1 (fallback) to avoid evolved forms showing early
+  return getSpeciesAtLevel(pick, 1)
 }
+
 
 

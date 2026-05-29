@@ -728,14 +728,23 @@ const getSpeciesAtLevel = (speciesName: string, level: number): string => {
 
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
+  const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
-  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+  const levelFilteredPool = environmentPool.filter(
+    (name) =>
+      enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
+      (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+  )
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
   const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
 
   if (selectedPool.length === 0) {
-    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+    const fallbackByLevel = Object.keys(wildPokemon).filter(
+      (name) =>
+        enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
+        (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+    )
     const fallbackPick = pickWeightedPokemon(fallbackByLevel, environment)
     if (fallbackPick) {
       return getSpeciesAtLevel(fallbackPick, enemyLevel)
@@ -758,8 +767,13 @@ const getRandomWildPokemonForEnvironmentWithType = (
   preferredTypeToken: string | null,
 ) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
+  const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
-  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+  const levelFilteredPool = environmentPool.filter(
+    (name) =>
+      enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
+      (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+  )
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
   const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
@@ -776,7 +790,11 @@ const getRandomWildPokemonForEnvironmentWithType = (
   const finalPool = typeFilteredPool.length > 0 ? typeFilteredPool : selectedPool
 
   if (finalPool.length === 0) {
-    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
+    const fallbackByLevel = Object.keys(wildPokemon).filter(
+      (name) =>
+        enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
+        (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+    )
     const fallbackByType = preferredTypeToken
       ? fallbackByLevel.filter((name) =>
           normalizeTypeText(wildPokemon[name].type)
@@ -4322,8 +4340,14 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
       const enemyData = wildPokemon[currentBattle.enemyName]
       const rarity = enemyData.rarity
-      const isLegendaryBoss = rarity === "lendario"
+      const isLegendaryBoss = rarity === "lendario" && Boolean(currentBattle.enemyIsBoss)
+      const isNonBossLegendary = rarity === "lendario" && !currentBattle.enemyIsBoss
       const belowHalfHP = currentBattle.enemyHP <= Math.floor(currentBattle.enemyMaxHP / 2)
+
+      if (isNonBossLegendary) {
+        showScreenNotice("👑 Lendários só podem ser capturados quando aparecem como boss na wave 100.")
+        return
+      }
 
       if (isLegendaryBoss && !belowHalfHP) {
         showScreenNotice("👑 Chefes lendários só podem ser capturados após ficarem com metade da vida.")
@@ -6471,7 +6495,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           const teamSize = Object.keys(gameState.playerTeam).length
           const teamIsFull = teamSize >= MAX_TEAM_SIZE
           const isLegendaryBoss = gameState.currentBattle
-            ? wildPokemon[gameState.currentBattle.enemyName]?.rarity === "lendario"
+            ? wildPokemon[gameState.currentBattle.enemyName]?.rarity === "lendario" && Boolean(gameState.currentBattle.enemyIsBoss)
             : false
           const legendaryCanCapture = gameState.currentBattle
             ? gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
