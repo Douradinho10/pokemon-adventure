@@ -7,6 +7,7 @@ import type { GameState } from "./useGameState"
 import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from "../lib/firebaseRtdbService"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { starterPokemon, wildPokemon } from "../data/pokemonData"
+import generatedWildTypes from "../data/pokedex/wild-types.generated.json"
 import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
 
 const GAME_SAVE_KEY = "pokemon-adventure-saves"
@@ -49,10 +50,14 @@ function migrateGameStateSprites(gameState: GameState): GameState {
   const migratedTeam = Object.fromEntries(
     Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
       const datasetSprite = starterPokemon[name]?.sprite || wildPokemon[name]?.sprite
+      // Normalize stored type using canonical generated types to avoid stale save data
+      const canonicalType = (generatedWildTypes as Record<string, string>)[name]
+      const nextType = canonicalType || pokemon.type || starterPokemon[name]?.type || wildPokemon[name]?.type
       return [
         name,
         {
           ...pokemon,
+          type: nextType,
           sprite: getPokemonSpriteUrl(name, datasetSprite || pokemon.sprite, "original", Boolean(pokemon.isShiny)),
           spriteSet: getPokemonSpriteSet(name, datasetSprite || pokemon.sprite, Boolean(pokemon.isShiny)),
         },
@@ -76,6 +81,10 @@ function migrateGameStateSprites(gameState: GameState): GameState {
           "front",
           Boolean(gameState.currentBattle.enemyIsShiny),
         ),
+        // Normalize enemy type from canonical mapping when present
+        enemyType:
+          (generatedWildTypes as Record<string, string>)[gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName] ||
+          gameState.currentBattle.enemyType,
       }
     : null
 

@@ -1844,8 +1844,43 @@ Object.keys(wildPokemon).forEach((name) => {
   }
 })
 
+// Normalize rarity values and ensure any remaining type mismatches are fixed.
+// This prevents malformed manually authored entries from leaking into gameplay
+// (e.g. showing a Pokémon as "Normal" when canonical data says otherwise).
+Object.keys(wildPokemon).forEach((name) => {
+  try {
+    const typeOverride = (generatedWildTypes as Record<string, string>)[name]
+    if (typeOverride && wildPokemon[name].type !== typeOverride) {
+      // keep a console warning for developers so it's visible when running locally
+      // (harmless in production bundles but useful during debugging)
+      // eslint-disable-next-line no-console
+      console.warn(`[data/pokemonData] overriding type for ${name}: ${wildPokemon[name].type} -> ${typeOverride}`)
+      wildPokemon[name].type = typeOverride
+    }
+
+    const allowedRarities: string[] = Object.keys(POKEMON_RARITY_CONFIG)ilter(Boolean)
+    if (!allowedRarities.includes(wildPokemon[name].rarity)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[data/pokemonData] normalizing rarity for ${name}: ${wildPokemon[name].rarity} -> comum`)
+      wildPokemon[name].rarity = "comum"
+    }
+  } catch (e) {
+    // safety: ignore any unexpected shape and continue
+  }
+})
+
 const ensureSpeciesInWild = (name: string) => {
   if ((wildPokemon as any)[name]) return
+  // Known legendary species list (covers across gens 1-9)
+  const LEGENDARY_SPECIES = new Set([
+    "Articuno","Zapdos","Moltres","Mewtwo","Mew","Lugia","HoOh","Raikou","Entei","Suicune","Celebi",
+    "Regirock","Regice","Registeel","Latias","Latios","Kyogre","Groudon","Rayquaza","Jirachi","Deoxys",
+    "Uxie","Mesprit","Azelf","Dialga","Palkia","Giratina","Heatran","Regigigas","Cresselia","Phione","Manaphy","Darkrai","Shaymin","Arceus",
+    "Victini","Cobalion","Terrakion","Virizion","Tornadus","Thundurus","Landorus","Reshiram","Zekrom","Kyurem","Keldeo","Meloetta","Genesect",
+    "Xerneas","Yveltal","Zygarde","Diancie","Hoopa","Volcanion","Type_Null","Silvally","Tapu_Koko","Tapu_Lele","Tapu_Bulu","Tapu_Fini",
+    "Cosmog","Cosmoem","Solgaleo","Lunala","Necrozma","Magearna","Marshadow","Zacian","Zamazenta","Eternatus","Kubfu","Urshifu","Zarude",
+    "Regieleki","Regidrago","Glastrier","Spectrier","Calyrex","Koraidon","Miraidon","Wo_Chien","Roaring_Steppe","Great_Karina",
+  ])
 
   const typeOverride = (generatedWildTypes as Record<string, string>)[name]
 
@@ -1854,7 +1889,7 @@ const ensureSpeciesInWild = (name: string) => {
     type: typeOverride || "Normal",
     baseHP: 40,
     attacks: { Investida: [8, 15] },
-    rarity: "comum" as PokemonRarity,
+    rarity: (LEGENDARY_SPECIES.has(name) ? "lendario" : "comum") as PokemonRarity,
     speed: 50,
   }
 
