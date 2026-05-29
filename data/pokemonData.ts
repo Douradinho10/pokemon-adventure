@@ -1835,6 +1835,15 @@ Object.keys(wildPokemon).forEach((name) => {
   wildPokemon[name].spriteSet = spriteSet
 })
 
+// Apply canonical type data to every wild Pokémon entry so manually authored
+// defaults do not leak incorrect typings into the UI.
+Object.keys(wildPokemon).forEach((name) => {
+  const typeOverride = (generatedWildTypes as Record<string, string>)[name]
+  if (typeOverride) {
+    wildPokemon[name].type = typeOverride
+  }
+})
+
 const ensureSpeciesInWild = (name: string) => {
   if ((wildPokemon as any)[name]) return
 
