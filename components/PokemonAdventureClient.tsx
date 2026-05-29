@@ -1300,6 +1300,14 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const hasSavedRun = saveSlots.some((slot) => slot.gameState?.activePokemon)
 
     if (gameState.activePokemon) {
+      if (gameState.currentBattle) {
+        hasAutoRoutedAfterAuthRef.current = true
+        if (currentScreen !== "battle") {
+          setCurrentScreen("battle")
+        }
+        return
+      }
+
       hasAutoRoutedAfterAuthRef.current = true
       if (
         currentScreen !== "menu" &&
@@ -1327,7 +1335,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     if (currentScreen === "select-slot" || currentScreen === "select-continue" || currentScreen === "game") {
       setCurrentScreen("main-menu")
     }
-  }, [accountEmail, currentScreen, gameState.activePokemon, isAuthChecking, isLoading, saveSlots])
+  }, [accountEmail, currentScreen, gameState.activePokemon, gameState.currentBattle, isAuthChecking, isLoading, saveSlots])
 
   useEffect(() => {
     if (forceMainMenuAfterPerfilRef.current) {
@@ -3355,6 +3363,11 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [chooseStarter, multiplayerRoom?.mode, multiplayerRoom?.starterMode, showModal])
 
   const startBattle = useCallback(() => {
+    if (gameState.currentBattle) {
+      setCurrentScreen("battle")
+      return
+    }
+
     if (!gameState.activePokemon) {
       addLog("⚠️ Erro: Nenhum Pokémon ativo!")
       return
@@ -3457,7 +3470,15 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const bossTag = isBossWave ? " 👑BOSS" : ""
     const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
     addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
-  }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, hiddenEncounterPreview, buildNextEncounterPreview])
+  }, [
+    gameState,
+    updateGameState,
+    addLog,
+    showScreenNotice,
+    nextEncounterPreview,
+    hiddenEncounterPreview,
+    buildNextEncounterPreview,
+  ])
 
   const handleAttack = useCallback(
     async (attackName: string) => {
