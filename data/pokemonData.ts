@@ -1835,12 +1835,17 @@ Object.keys(wildPokemon).forEach((name) => {
 })
 
 // Merge per-generation species lists (minimal defaults) so we can add species by generation.
+const wildPokemonTypeOverrides: Record<string, string> = {
+  Cacnea: "Grama",
+  Cacturne: "Grama/Sombrio",
+}
+
 const ensureSpeciesInWild = (name: string) => {
   if ((wildPokemon as any)[name]) return
 
   const defaultEntry = {
     sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
-    type: "Normal",
+    type: wildPokemonTypeOverrides[name] || "Normal",
     baseHP: 40,
     attacks: { Investida: [8, 15] },
     rarity: "comum" as PokemonRarity,
