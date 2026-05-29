@@ -235,7 +235,12 @@ export const useLocalGameState = () => {
         const hasFirebaseData = firebaseSlots.some((slot) => slot.gameState?.activePokemon)
         const localMirrorSlots = loadSlotsFromAccountLocal(authenticatedUserId)
         const hasLocalMirrorData = localMirrorSlots.some((slot) => slot.gameState?.activePokemon)
-        const resolvedSlots = hasFirebaseData ? firebaseSlots : localMirrorSlots
+        const resolvedSlots = hasFirebaseData
+          ? firebaseSlots
+          : localMirrorSlots.map((slot) => ({
+              ...slot,
+              gameState: slot.gameState ? migrateGameStateSprites(slot.gameState) : null,
+            }))
 
         // Rehydrate cloud slots from local mirror when Firebase returns empty but local has progress.
         if (!hasFirebaseData && hasLocalMirrorData) {
@@ -366,9 +371,9 @@ export const useLocalGameState = () => {
     (slotId: number) => {
       const slot = saveSlots[slotId]
       if (slot.gameState) {
-        setGameState(slot.gameState)
+        setGameState(migrateGameStateSprites(slot.gameState))
         setCurrentSlot(slotId)
-        lastSavedSnapshotRef.current = JSON.stringify(slot.gameState)
+        lastSavedSnapshotRef.current = JSON.stringify(migrateGameStateSprites(slot.gameState))
       }
     },
     [saveSlots, setGameState],
