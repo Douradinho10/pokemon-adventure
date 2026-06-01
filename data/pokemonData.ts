@@ -1888,14 +1888,13 @@ const ensureSpeciesInWild = (name: string) => {
     "Victini","Cobalion","Terrakion","Virizion","Tornadus","Thundurus","Landorus","Reshiram","Zekrom","Kyurem","Keldeo","Meloetta","Genesect",
     "Xerneas","Yveltal","Zygarde","Diancie","Hoopa","Volcanion","Type_Null","Silvally","Tapu_Koko","Tapu_Lele","Tapu_Bulu","Tapu_Fini",
     "Cosmog","Cosmoem","Solgaleo","Lunala","Necrozma","Magearna","Marshadow","Zacian","Zamazenta","Eternatus","Kubfu","Urshifu","Zarude",
-    "Regieleki","Regidrago","Glastrier","Spectrier","Calyrex","Koraidon","Miraidon","Wo_Chien","Roaring_Steppe","Great_Karina",
+    "Regieleki","Regidrago","Glastrier","Spectrier","Calyrex","Koraidon","Miraidon","Wo_Chien","Chien_Pao","Ting_Lu","Chi_Yu","Roaring_Steppe","Great_Karina",
+    "Terapagos","Ogerpon","Okidogi","Munkidori","Fezandipiti","Pecharunt",
   ])
-
-  const typeOverride = (generatedWildTypes as Record<string, string>)[name]
 
   const defaultEntry = {
     sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
-    type: typeOverride || "Normal",
+    type: getCanonicalPokemonType(name, "Normal"),
     baseHP: 40,
     attacks: { Investida: [8, 15] },
     rarity: (LEGENDARY_SPECIES.has(name) ? "lendario" : "comum") as PokemonRarity,

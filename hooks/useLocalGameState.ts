@@ -6,7 +6,7 @@ import { useGameState } from "./useGameState"
 import type { GameState } from "./useGameState"
 import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from "../lib/firebaseRtdbService"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
-import { starterPokemon, wildPokemon, getCanonicalPokemonType } from "../data/pokemonData"
+import { starterPokemon, wildPokemon, getCanonicalPokemonType, minWildLevelBySpecies } from "../data/pokemonData"
 import generatedWildTypes from "../data/pokedex/wild-types.generated.json"
 import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
 
@@ -56,8 +56,13 @@ function normalizeLoadedBattle(gameState: GameState, battle: GameState["currentB
   const visibleSpeciesName = battle.enemyDisplayName || battle.enemyName
   const battleRarity = wildPokemon[battleSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
   const isLegendaryWave = battleWave > 0 && battleWave % 100 === 0
+  const battleMinLevel = minWildLevelBySpecies[battleSpeciesName] || 1
 
   if (battleRarity === "lendario" && !isLegendaryWave) {
+    return null
+  }
+
+  if (battleRarity !== "lendario" && Math.max(0, battle.enemyLevel || 0) < battleMinLevel) {
     return null
   }
 

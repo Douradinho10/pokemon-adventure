@@ -39,6 +39,7 @@ import {
   getMoveAccuracy,
   evolutionRules,
   getCanonicalPokemonType,
+  minWildLevelBySpecies as dataMinWildLevelBySpecies,
   initializePP, // Import new helper
   MAX_TEAM_SIZE,
   scaleAttackSetForLevel,
@@ -3371,8 +3372,10 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const loadedBattleRarity = wildPokemon[loadedSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
       const loadedBattleWave = Math.max(0, gameState.battles)
       const legendaryWave = loadedBattleWave > 0 && loadedBattleWave % 100 === 0
+      const loadedBattleMinLevel = dataMinWildLevelBySpecies[loadedSpeciesName] || 1
       const loadedBattleIsValid =
-        loadedBattleRarity !== "lendario" || (legendaryWave && Boolean(loadedBattle.enemyIsBoss))
+        (loadedBattleRarity === "lendario" && legendaryWave && Boolean(loadedBattle.enemyIsBoss)) ||
+        (loadedBattleRarity !== "lendario" && Math.max(0, loadedBattle.enemyLevel || 0) >= loadedBattleMinLevel)
 
       if (loadedBattleIsValid) {
         setCurrentScreen("battle")
