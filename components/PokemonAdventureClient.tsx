@@ -2371,7 +2371,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       )
 
       return {
-        forBattles: gameState.battles,
+        forBattles: nextWave,
         forActivePokemon: activePokemonName,
         enemyName: impostorName,
         enemyDisplayName: displayEnemyName,
@@ -3276,12 +3276,12 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const nextWave = gameState.battles + 1
     const hasValidHiddenPreview =
       hiddenEncounterPreview &&
-      hiddenEncounterPreview.forBattles === gameState.battles &&
+      hiddenEncounterPreview.forBattles === nextWave &&
       hiddenEncounterPreview.forActivePokemon === gameState.activePokemon
 
     const hasValidPreview =
       nextEncounterPreview &&
-      nextEncounterPreview.forBattles === gameState.battles &&
+      nextEncounterPreview.forBattles === nextWave &&
       nextEncounterPreview.forActivePokemon === gameState.activePokemon
 
     const encounterPreview = hasValidHiddenPreview
@@ -3325,7 +3325,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const newBattle = {
       enemyName,
-      enemyType: wildPokemon[enemyName].type,
+      enemyType: encounterPreview.enemyType,
       enemyDisplayName,
       enemyIsBoss: isBossWave,
       enemyDisplayType: encounterPreview.enemyDisplayType,
@@ -3647,9 +3647,10 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return
     }
 
+    const nextWave = gameState.battles + 1
     const hasValidPreview =
       nextEncounterPreview &&
-      nextEncounterPreview.forBattles === gameState.battles &&
+      nextEncounterPreview.forBattles === nextWave &&
       nextEncounterPreview.forActivePokemon === gameState.activePokemon
 
     const preview = hasValidPreview
