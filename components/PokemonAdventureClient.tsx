@@ -608,14 +608,17 @@ const getEnvironmentWildPool = (environment: BattleEnvironment) => {
   })
 }
 
-const getTargetRarityForBattle = (battleCount: number) => {
-  const rarityRoll = Math.random()
+const getTargetRarityForBattle = (battleCount: number, seed: number = 0) => {
+  // Use a deterministic random based on battle count and seed to avoid multiple random calls
+  const pseudoRandom = Math.sin(battleCount * 12.9898 + seed * 78.233) * 43758.5453
+  const rarityRoll = pseudoRandom - Math.floor(pseudoRandom)
 
-  if (battleCount > 0 && battleCount % 100 === 0) {
+  // Lendários appear at specific milestones (every 150 battles starting from battle 50)
+  if (battleCount > 0 && battleCount >= 50 && (battleCount - 50) % 150 === 0) {
     return "lendario" as const
   }
 
-  if (rarityRoll < 0.2) {
+  if (rarityRoll < 0.15) {
     return "raro" as const
   }
 
@@ -852,6 +855,16 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       // ignore
     }
   }, [])
+
+  // Fix for F5 refresh during battle causing wave advancement issues
+  useEffect(() => {
+    if (gameState.currentBattle && gameState.battles > 0) {
+      // If we're in a loaded battle state, reset to correct screen
+      if (initialScreen !== "battle" && currentScreen !== "battle") {
+        setCurrentScreen("battle")
+      }
+    }
+  }, [gameState.currentBattle, gameState.battles, currentScreen, initialScreen])
 
   const [multiplayerIsCasual, setMultiplayerIsCasual] = useState(false)
   const [multiplayerBusy, setMultiplayerBusy] = useState(false)
@@ -2322,7 +2335,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(gameState.battles, random)
       const preferredTypeToken = options?.preferredTypeToken || null
       const baseEnemyName = getRandomWildPokemonForEnvironmentWithType(
-        nextWave,
+        gameState.battles,
         gameState.currentEnvironment,
         enemyLevel,
         preferredTypeToken,
