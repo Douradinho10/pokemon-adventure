@@ -6,7 +6,7 @@ import { GlassCard } from "./GlassCard"
 import { AnimatedSprite } from "./AnimatedSprite"
 import { AnimatedProgress } from "./AnimatedProgress"
 import { Badge } from "@/components/ui/badge"
-import { wildPokemon, typeColors, POKEMON_RARITY_CONFIG } from "../data/pokemonData"
+import { typeColors, POKEMON_RARITY_CONFIG, type PokemonRarity } from "../data/pokemonData"
 import { getPokemonSpriteSet, normalizeDisplayText, normalizeTypeText } from "../lib/utils"
 import { Swords, Target } from "lucide-react"
 import { motion } from "framer-motion"
@@ -22,6 +22,7 @@ interface BattleArenaProps {
   playerPokemon: Pokemon
   playerName: string
   battle: Battle
+  enemyRarity?: PokemonRarity
   environment?: "planicie" | "vulcanico" | "costeiro" | "floresta" | "caverna" | "alturas" | "ultrabeast_zone"
   className?: string
   attackAnimation?: AttackAnimationState | null
@@ -58,11 +59,10 @@ const getXpNeededForNextLevel = (level: number) => {
 }
 
 export const BattleArena = memo(
-  ({ playerPokemon, playerName, battle, environment = "planicie", className = "", attackAnimation = null }: BattleArenaProps) => {
+  ({ playerPokemon, playerName, battle, enemyRarity, environment = "planicie", className = "", attackAnimation = null }: BattleArenaProps) => {
   const visibleEnemyName = battle.enemyDisplayName || battle.enemyName
-  const enemyData = wildPokemon[visibleEnemyName] || wildPokemon[battle.enemyName]
   const normalizedPlayerType = normalizeTypeText(playerPokemon.type)
-  const normalizedEnemyType = normalizeTypeText(battle.enemyDisplayType || enemyData.type || battle.enemyType)
+  const normalizedEnemyType = normalizeTypeText(battle.enemyDisplayType || battle.enemyType)
   const playerTypeGradient = normalizedPlayerType
     ? typeColors[normalizedPlayerType.split("/")[0]]
     : "from-gray-400 to-gray-500"
@@ -70,11 +70,9 @@ export const BattleArena = memo(
   const playerBattleSprite = playerPokemon.isShiny
     ? getPokemonSpriteSet(playerName, playerPokemon.sprite, true).back
     : playerPokemon.spriteSet?.back || getPokemonSpriteSet(playerName, playerPokemon.sprite, false).back
-  const enemyBattleSprite = battle.enemyIsShiny
-    ? getPokemonSpriteSet(visibleEnemyName, enemyData.sprite, true).front
-    : enemyData.spriteSet?.front || getPokemonSpriteSet(visibleEnemyName, enemyData.sprite, false).front
+  const enemyBattleSprite = battle.enemySprite || getPokemonSpriteSet(visibleEnemyName, undefined, Boolean(battle.enemyIsShiny)).front
 
-  const rarity = POKEMON_RARITY_CONFIG[enemyData.rarity]
+  const rarity = POKEMON_RARITY_CONFIG[enemyRarity || "comum"]
   const animationType = attackAnimation ? normalizeTypeText(attackAnimation.attackType).split("/")[0] : "Normal"
   const attackGradient = typeColors[animationType] || "from-slate-400 to-slate-600"
   const playerIsAttacking = attackAnimation?.attacker === "player"

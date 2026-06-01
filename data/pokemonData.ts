@@ -19,20 +19,20 @@ export const POKEMON_RARITY_CONFIG = {
   comum: {
     chance: 0.75, // 75% chance
     color: "from-green-500 to-green-600",
-    emoji: "Ã¯Â¿Â½xRÃ¯Â¿Â½",
+    emoji: "🌿",
     text: "Comum",
   },
   raro: {
     chance: 0.2, // 20% chance
     color: "from-blue-500 to-purple-600",
-    emoji: "Ã¯Â¿Â½x}",
+    emoji: "💎",
     text: "Raro",
   },
   lendario: {
     chance: 0.05, // 5% chance
     color: "from-yellow-400 to-orange-500",
-    emoji: "Ã¯Â¿Â½xRx",
-    text: "LendÃ¯Â¿Â½rio",
+    emoji: "🌟",
+    text: "Lendário",
   },
 } as const
 
@@ -296,7 +296,8 @@ export const getPokemonDefenseDamageMultiplier = (ivs?: Partial<PokemonIVs> | nu
 }
 
 export const getCanonicalPokemonType = (pokemonName: string, fallbackType?: string): string => {
-  return (generatedWildTypes as Record<string, string>)[pokemonName] || fallbackType || "Normal"
+  const resolved = (generatedWildTypes as Record<string, string>)[pokemonName] || fallbackType || "Normal"
+  return normalizeTypeText(resolved) || "Normal"
 }
 
 export const starterPokemon: Record<string, Pokemon> = {
@@ -1859,12 +1860,9 @@ Object.keys(wildPokemon).forEach((name) => {
 Object.keys(wildPokemon).forEach((name) => {
   try {
     const typeOverride = (generatedWildTypes as Record<string, string>)[name]
-    if (typeOverride && wildPokemon[name].type !== typeOverride) {
-      // keep a console warning for developers so it's visible when running locally
-      // (harmless in production bundles but useful during debugging)
-      // eslint-disable-next-line no-console
-      console.warn(`[data/pokemonData] overriding type for ${name}: ${wildPokemon[name].type} -> ${typeOverride}`)
-      wildPokemon[name].type = typeOverride
+    const canonicalType = normalizeTypeText(typeOverride || wildPokemon[name].type)
+    if (canonicalType && wildPokemon[name].type !== canonicalType) {
+      wildPokemon[name].type = canonicalType
     }
 
     const allowedRarities: string[] = Object.keys(POKEMON_RARITY_CONFIG).filter(Boolean)
@@ -2247,7 +2245,7 @@ const ultraBeasts: Record<string, any> = {
   Xurkitree: { sprite: "https://play.pokemonshowdown.com/sprites/ani/xurkitree.gif", type: "Elétrico", baseHP: 83, attacks: { "Choque do Trovão": [28, 48], "Raio": [30, 52] }, rarity: "lendario", speed: 101 },
   Celesteela: { sprite: "https://play.pokemonshowdown.com/sprites/ani/celesteela.gif", type: "Aço/Voador", baseHP: 97, attacks: { "Lança Metálica": [26, 46], "Raio de Gelo": [20, 38] }, rarity: "lendario", speed: 55 },
   Kartana: { sprite: "https://play.pokemonshowdown.com/sprites/ani/kartana.gif", type: "Grama/Aço", baseHP: 59, attacks: { "Corte": [32, 54], "Golpe de Lâmina": [30, 52] }, rarity: "lendario", speed: 109 },
-  Guzzlord: { sprite: "https://play.pokemonshowdown.com/sprites/ani/guzzlord.gif", type: "Noturno/Dragão", baseHP: 120, attacks: { "Devoração": [36, 68], "Mordida": [26, 50] }, rarity: "lendario", speed: 38 },
+  Guzzlord: { sprite: "https://play.pokemonshowdown.com/sprites/ani/guzzlord.gif", type: "Sombrio/Dragão", baseHP: 120, attacks: { "Devoração": [36, 68], "Mordida": [26, 50] }, rarity: "lendario", speed: 38 },
   Poipole: { sprite: "https://play.pokemonshowdown.com/sprites/ani/poipole.gif", type: "Veneno", baseHP: 67, attacks: { "Agulha Venenosa": [20, 36], "Bomba Venenosa": [26, 46] }, rarity: "lendario", speed: 87 },
   Naganadel: { sprite: "https://play.pokemonshowdown.com/sprites/ani/naganadel.gif", type: "Veneno/Dragão", baseHP: 73, attacks: { "Lança Venenosa": [30, 56], "Dragão Pulsante": [28, 52] }, rarity: "lendario", speed: 117 },
   Stakataka: { sprite: "https://play.pokemonshowdown.com/sprites/ani/stakataka.gif", type: "Pedra/Aço", baseHP: 123, attacks: { "Arremesso de Pedras": [36, 68], "Escudo": [0, 0] }, rarity: "lendario", speed: 28 },

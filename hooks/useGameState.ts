@@ -50,6 +50,7 @@ export interface Pokemon {
 export interface Battle {
   enemyName: string
   enemyType: string
+  wave?: number
   enemyDisplayName?: string
   enemyIsBoss?: boolean
   enemyDisplayType?: string

@@ -45,6 +45,7 @@ import {
   scaleAttackSetForLevel,
   typeChart,
   typeColors,
+  POKEMON_RARITY_CONFIG,
 } from "../data/pokemonData"
 import { BattleArena } from "../components/BattleArena"
 import { PokemonCard } from "../components/PokemonCard"
@@ -166,7 +167,24 @@ const IMPOSTOR_CHANCE = 0.08
 const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
 const BOSS_WAVE_INTERVAL = 10
+const LEGENDARY_WAVE_INTERVAL = 100
 const BOSS_MULTIPLIER = 1.5
+
+const isLegendaryMilestoneWave = (wave: number) => wave > 0 && wave % LEGENDARY_WAVE_INTERVAL === 0
+
+const getDisplayedWave = (battles: number, hasActiveBattle: boolean) => Math.max(0, battles) + (hasActiveBattle ? 1 : 0)
+
+const getEnemyDisplayRarity = (
+  enemyName: string,
+  wave: number,
+  enemyIsBoss?: boolean,
+): "comum" | "raro" | "lendario" => {
+  if (isLegendaryMilestoneWave(wave) && enemyIsBoss) {
+    return "lendario"
+  }
+
+  return wildPokemon[enemyName]?.rarity || "comum"
+}
 // Lower base XP multiplier to reduce XP per battle significantly
 const XP_GAIN_MULTIPLIER = 0.6
 const BOSS_XP_MULTIPLIER = 1.25
@@ -611,10 +629,10 @@ const getEnvironmentWildPool = (environment: BattleEnvironment) => {
   })
 }
 
-const getTargetRarityForBattle = (battleCount: number) => {
+const getTargetRarityForBattle = (wave: number) => {
   const rarityRoll = Math.random()
 
-  if (battleCount > 0 && battleCount % 100 === 0) {
+  if (isLegendaryMilestoneWave(wave)) {
     return "lendario" as const
   }
 
@@ -2370,7 +2388,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       options?: { preferredTypeToken?: string | null; fixedEnemyLevel?: number },
     ): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
-      const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
+      const isLegendaryWave = isLegendaryMilestoneWave(nextWave)
+      const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0 || isLegendaryWave
       const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(gameState.battles, random)
       const preferredTypeToken = options?.preferredTypeToken || null
       const baseEnemyName = getRandomWildPokemonForEnvironmentWithType(
@@ -2859,14 +2878,26 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     handleGameOver()
   }
 
+  const completeCurrentWave = useCallback(() => {
+    setNextEncounterPreview(null)
+    setHiddenEncounterPreview(null)
+    setGameState((previous) => ({ ...previous, battles: previous.battles + 1 }))
+  }, [setGameState])
+
   const handleEnemyDefeat = (enemyName: string) => {
-    const rarity = wildPokemon[enemyName].rarity
+    const battleWave = gameState.currentBattle?.wave ?? gameState.battles + 1
+    const rarity = getEnemyDisplayRarity(enemyName, battleWave, gameState.currentBattle?.enemyIsBoss)
     const reward = rarity === "lendario" ? 100 : rarity === "raro" ? 50 : 15
 
     addLog(`🎉 ${enemyName} derrotado! +${reward} moedas`)
-    updateGameState({ money: gameState.money + reward })
-
-    levelUp()
+    setNextEncounterPreview(null)
+    setHiddenEncounterPreview(null)
+    setGameState((previous) => ({
+      ...previous,
+      money: previous.money + reward,
+      battles: previous.battles + 1,
+    }))
+    window.setTimeout(() => levelUp(), 0)
     setTimeout(() => endBattle(), 900)
   }
 
@@ -3206,7 +3237,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           <Badge className="pixel-badge bg-[linear-gradient(180deg,#fde047_0%,#fde047_50%,#eab308_50%,#eab308_100%)] px-3 py-1 text-slate-900">
             💰 {gameState.money}
           </Badge>
-          <Badge className="pixel-badge bg-[linear-gradient(180deg,#f87171_0%,#f87171_50%,#ef4444_50%,#ef4444_100%)] px-3 py-1 text-white">⚔️ {gameState.battles}</Badge>
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#f87171_0%,#f87171_50%,#ef4444_50%,#ef4444_100%)] px-3 py-1 text-white">⚔️ {getDisplayedWave(gameState.battles, Boolean(gameState.currentBattle))}</Badge>
           <Badge className="pixel-badge bg-[linear-gradient(180deg,#60a5fa_0%,#60a5fa_50%,#2563eb_50%,#2563eb_100%)] px-3 py-1 text-white">
             🎯 {activePokemonLabel}
           </Badge>
@@ -3370,12 +3401,12 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const loadedSpeciesName = loadedBattle.enemyName
       const visibleSpeciesName = loadedBattle.enemyDisplayName || loadedSpeciesName
       const loadedBattleRarity = wildPokemon[loadedSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
-      const loadedBattleWave = Math.max(0, gameState.battles)
-      const legendaryWave = loadedBattleWave > 0 && loadedBattleWave % 100 === 0
+      const loadedBattleWave = Math.max(1, loadedBattle.wave ?? gameState.battles + 1)
+      const legendaryWave = isLegendaryMilestoneWave(loadedBattleWave)
       const loadedBattleMinLevel = dataMinWildLevelBySpecies[loadedSpeciesName] || 1
       const loadedBattleIsValid =
-        (loadedBattleRarity === "lendario" && legendaryWave && Boolean(loadedBattle.enemyIsBoss)) ||
-        (loadedBattleRarity !== "lendario" && Math.max(0, loadedBattle.enemyLevel || 0) >= loadedBattleMinLevel)
+        (legendaryWave && Boolean(loadedBattle.enemyIsBoss)) ||
+        (!legendaryWave && Math.max(0, loadedBattle.enemyLevel || 0) >= loadedBattleMinLevel)
 
       if (loadedBattleIsValid) {
         setCurrentScreen("battle")
@@ -3397,6 +3428,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     }
 
     const nextWave = gameState.battles + 1
+    const isLegendaryWave = isLegendaryMilestoneWave(nextWave)
     const hasValidHiddenPreview =
       hiddenEncounterPreview &&
       hiddenEncounterPreview.forBattles === gameState.battles &&
@@ -3416,7 +3448,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const enemyName = encounterPreview.enemyName
     const enemyDisplayName = encounterPreview.enemyDisplayName
     const enemyLevel = encounterPreview.enemyLevel
-    const isBossWave = encounterPreview.isBoss
+    const isBossWave = encounterPreview.isBoss || isLegendaryWave
     const enemyIVs = encounterPreview.enemyIVs ?? createPokemonIVs()
 
     const enemyStats = wildPokemonStats[enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
@@ -3449,6 +3481,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const newBattle = {
       enemyName,
       enemyType: wildPokemon[enemyName].type,
+      wave: nextWave,
       enemyDisplayName,
       enemyIsBoss: isBossWave,
       enemyDisplayType: encounterPreview.enemyDisplayType,
@@ -3467,18 +3500,16 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     }
 
     updateGameState({
-      battles: gameState.battles + 1,
       currentBattle: newBattle,
     })
-    setNextEncounterPreview(null)
-    setHiddenEncounterPreview(null)
 
     setCurrentScreen("battle")
 
-    const rarity = wildPokemon[enemyName].rarity
-    const rarityEmoji = rarity === "lendario" ? "🌟" : rarity === "raro" ? "💎" : "🌿"
+    const rarity = getEnemyDisplayRarity(enemyName, nextWave, isBossWave)
+    const rarityLabel = POKEMON_RARITY_CONFIG[rarity].text
+    const rarityEmoji = POKEMON_RARITY_CONFIG[rarity].emoji
 
-    if (rarity === "lendario") {
+    if (isLegendaryWave) {
       showScreenNotice(`👑 O Chefe Lendário ${enemyName} apareceu na Onda ${nextWave}!`, 3800)
     } else if (isBossWave) {
       showScreenNotice(`👑 Boss de Onda ${nextWave}: ${enemyName} entrou em campo!`, 3200)
@@ -3486,7 +3517,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const bossTag = isBossWave ? " 👑BOSS" : ""
     const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
-    addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
+    addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarityLabel} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
   }, [
     gameState,
     updateGameState,
@@ -4377,7 +4408,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       newInventory[ballType] = Math.max(0, ownedBallCount - 1)
 
       const enemyData = wildPokemon[currentBattle.enemyName]
-      const rarity = enemyData.rarity
+      const battleWave = currentBattle.wave ?? getDisplayedWave(gameState.battles, true)
+      const rarity = getEnemyDisplayRarity(currentBattle.enemyName, battleWave, currentBattle.enemyIsBoss)
       const isLegendaryBoss = rarity === "lendario" && Boolean(currentBattle.enemyIsBoss)
       const isNonBossLegendary = rarity === "lendario" && !currentBattle.enemyIsBoss
       const belowHalfHP = currentBattle.enemyHP <= Math.floor(currentBattle.enemyMaxHP / 2)
@@ -5985,6 +6017,11 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           playerName={gameState.activePokemon}
           playerPokemon={gameState.playerTeam[gameState.activePokemon]}
           battle={gameState.currentBattle}
+          enemyRarity={getEnemyDisplayRarity(
+            gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
+            gameState.currentBattle.wave ?? getDisplayedWave(gameState.battles, true),
+            gameState.currentBattle.enemyIsBoss,
+          )}
           environment={(gameState.currentEnvironment as BattleEnvironment) || "planicie"}
           attackAnimation={attackAnimation}
           className="flex-1 min-h-0"
@@ -6095,7 +6132,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
               if (success) {
                 addLog(`✅ Fugiu da batalha com sucesso! (${Math.floor(fleeChance * 100)}% chance)`)
-                updateGameState({ battles: Math.max(0, gameState.battles - 1) })
                 // Não decrementar as durações de status quando o jogador foge
                 endBattle(false, { advanceStatus: false })
               } else {
@@ -6449,7 +6485,13 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                 🧭 Ir Por Outro Caminho
               </Button>
 
-              {nextEncounterPreview.isBoss && (
+              {isLegendaryMilestoneWave(gameState.battles + 1) && (
+                <div className="rounded-xl border border-amber-300/50 bg-amber-500/15 p-3 text-center text-sm text-amber-100">
+                  👑 O próximo encontro é um Chefe Lendário de onda (1.5x HP e 1.5x dano).
+                </div>
+              )}
+
+              {nextEncounterPreview.isBoss && !isLegendaryMilestoneWave(gameState.battles + 1) && (
                 <div className="rounded-xl border border-rose-300/50 bg-rose-500/15 p-3 text-center text-sm text-rose-100">
                   👑 O próximo encontro é um BOSS de onda (1.5x HP e 1.5x dano).
                 </div>
@@ -6533,7 +6575,11 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           const teamSize = Object.keys(gameState.playerTeam).length
           const teamIsFull = teamSize >= MAX_TEAM_SIZE
           const isLegendaryBoss = gameState.currentBattle
-            ? wildPokemon[gameState.currentBattle.enemyName]?.rarity === "lendario" && Boolean(gameState.currentBattle.enemyIsBoss)
+            ? getEnemyDisplayRarity(
+                gameState.currentBattle.enemyName,
+                gameState.currentBattle.wave ?? getDisplayedWave(gameState.battles, true),
+                gameState.currentBattle.enemyIsBoss,
+              ) === "lendario" && Boolean(gameState.currentBattle.enemyIsBoss)
             : false
           const legendaryCanCapture = gameState.currentBattle
             ? gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
@@ -6627,6 +6673,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                 onClick={() => {
                   setCaptureCelebration(null)
                   setShowModal(null)
+                  completeCurrentWave()
                   endBattle()
                 }}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-600"

@@ -65,8 +65,65 @@ export function normalizeDisplayText(value: string | undefined | null) {
   return normalized.replace(/�/g, "")
 }
 
+const canonicalTypeAliases: Record<string, string> = {
+  noturno: "Sombrio",
+  dark: "Sombrio",
+  steel: "Aço",
+  aco: "Aço",
+  electric: "Elétrico",
+  eletrico: "Elétrico",
+  psychic: "Psíquico",
+  psiquico: "Psíquico",
+  grass: "Grama",
+  grama: "Grama",
+  water: "Água",
+  agua: "Água",
+  fire: "Fogo",
+  fogo: "Fogo",
+  normal: "Normal",
+  flying: "Voador",
+  voador: "Voador",
+  poison: "Veneno",
+  veneno: "Veneno",
+  ground: "Terra",
+  terra: "Terra",
+  rock: "Pedra",
+  pedra: "Pedra",
+  bug: "Inseto",
+  inseto: "Inseto",
+  ghost: "Fantasma",
+  fantasma: "Fantasma",
+  dragon: "Dragão",
+  dragao: "Dragão",
+  fairy: "Fada",
+  fada: "Fada",
+  fighting: "Lutador",
+  lutador: "Lutador",
+  ice: "Gelo",
+  gelo: "Gelo",
+}
+
+const canonicalizeTypeToken = (token: string) => {
+  const normalized = normalizeDisplayText(token).trim()
+  if (!normalized) return normalized
+
+  const aliasKey = normalized
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+
+  return canonicalTypeAliases[aliasKey] || normalized
+}
+
 export function normalizeTypeText(value: string | undefined | null) {
-  return normalizeDisplayText(value)
+  const normalized = normalizeDisplayText(value)
+  if (!normalized) return ""
+
+  return normalized
+    .split("/")
+    .map((token) => canonicalizeTypeToken(token))
+    .filter(Boolean)
+    .join("/")
 }
 
 export function normalizeShowdownName(name: string | undefined | null) {

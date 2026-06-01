@@ -8,7 +8,7 @@ import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
 import { starterPokemon, wildPokemon, getCanonicalPokemonType, minWildLevelBySpecies } from "../data/pokemonData"
 import generatedWildTypes from "../data/pokedex/wild-types.generated.json"
-import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
+import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeTypeText } from "../lib/utils"
 
 const GAME_SAVE_KEY = "pokemon-adventure-saves"
 const ACCOUNT_SAVE_KEY_PREFIX = "pokemon-adventure-account-saves:"
@@ -51,27 +51,27 @@ function normalizeLoadedBattle(gameState: GameState, battle: GameState["currentB
     return null
   }
 
-  const battleWave = Math.max(0, gameState.battles)
+  const battleWave = Math.max(1, battle.wave ?? gameState.battles + 1)
   const battleSpeciesName = battle.enemyName
   const visibleSpeciesName = battle.enemyDisplayName || battle.enemyName
-  const battleRarity = wildPokemon[battleSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
   const isLegendaryWave = battleWave > 0 && battleWave % 100 === 0
   const battleMinLevel = minWildLevelBySpecies[battleSpeciesName] || 1
 
-  if (battleRarity === "lendario" && !isLegendaryWave) {
+  if (isLegendaryWave && !battle.enemyIsBoss) {
     return null
   }
 
-  if (battleRarity !== "lendario" && Math.max(0, battle.enemyLevel || 0) < battleMinLevel) {
+  if (!isLegendaryWave && Math.max(0, battle.enemyLevel || 0) < battleMinLevel) {
     return null
   }
 
   return {
     ...battle,
+    wave: battleWave,
     enemyDisplayName: visibleSpeciesName,
-    enemyType: getCanonicalPokemonType(battleSpeciesName, battle.enemyType),
-    enemyDisplayType: getCanonicalPokemonType(visibleSpeciesName, battle.enemyDisplayType || battle.enemyType),
-    enemyIsBoss: isLegendaryWave ? Boolean(battle.enemyIsBoss || battleRarity === "lendario") : Boolean(battle.enemyIsBoss),
+    enemyType: normalizeTypeText(getCanonicalPokemonType(battleSpeciesName, battle.enemyType)),
+    enemyDisplayType: normalizeTypeText(getCanonicalPokemonType(visibleSpeciesName, battle.enemyDisplayType || battle.enemyType)),
+    enemyIsBoss: isLegendaryWave ? true : Boolean(battle.enemyIsBoss),
   }
 }
 
