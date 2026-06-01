@@ -1,9 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Use a custom distDir only for local development on machines where
-// `.next` inside synced folders (OneDrive) causes instability.
-const isCI = !!process.env.CI || !!process.env.VERCEL
 const nextConfig = {
-  ...(isCI ? {} : { distDir: ".local/next" }),
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -13,7 +9,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  allowedDevOrigins: ["*"],
+  allowedDevOrigins: [
+    "*.replit.dev",
+    "*.repl.co",
+    "*.janeway.replit.dev",
+  ],
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
