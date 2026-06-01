@@ -2332,10 +2332,10 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     ): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
       const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
-      const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(gameState.battles, random)
+      const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(nextWave, random)
       const preferredTypeToken = options?.preferredTypeToken || null
       const baseEnemyName = getRandomWildPokemonForEnvironmentWithType(
-        gameState.battles,
+        nextWave,
         gameState.currentEnvironment,
         enemyLevel,
         preferredTypeToken,
@@ -6173,14 +6173,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
             return (
               <div className="text-center">
                 <p className="text-white">Sem Pokémon ativo para simular.</p>
-              </div>
-            )
-          }
-
-          if (gameState.currentBattle) {
-            return (
-              <div className="text-center">
-                <p className="text-white">O scanner só pode ser usado fora da batalha.</p>
               </div>
             )
           }
