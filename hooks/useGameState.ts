@@ -37,6 +37,7 @@ export interface Pokemon {
   sprite: string
   spriteSet?: PokemonSpriteSet
   type?: string
+  rarity?: string
   pendingAttacks?: Record<string, [number, number]>
   pendingMove?: PendingMove
   speed?: number

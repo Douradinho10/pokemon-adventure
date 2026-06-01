@@ -4207,6 +4207,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
             Boolean(gameState.currentBattle.enemyIsShiny),
           ),
           type: enemyData.type,
+          rarity,
           speed: capturedSpeed,
           attackPP: initializePP(capturedAttacks),
           isShiny: Boolean(gameState.currentBattle.enemyIsShiny),

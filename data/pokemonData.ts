@@ -316,6 +316,7 @@ export const starterPokemon: Record<string, Pokemon> = {
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/charmander.gif",
     type: "Fogo",
+    rarity: "raro",
     speed: 65,
   },
   Squirtle: {
@@ -325,7 +326,8 @@ export const starterPokemon: Record<string, Pokemon> = {
     level: 5,
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/squirtle.gif",
-    type: "ÃƒÂgua",
+    type: "ÃƒÂgua",
+    rarity: "raro",
     speed: 43,
   },
   Bulbasaur: {
@@ -336,6 +338,7 @@ export const starterPokemon: Record<string, Pokemon> = {
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/bulbasaur.gif",
     type: "Grama",
+    rarity: "raro",
     speed: 45,
   },
   Pidgey: {
@@ -346,10 +349,12 @@ export const starterPokemon: Record<string, Pokemon> = {
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/pidgey.gif",
     type: "Normal/Voador",
+    rarity: "comum",
     speed: 56,
   },
   Eevee: { HP: 40, maxHP: 40, attacks: { Investida: [8, 15], "Ataque RÃƒÂ¡pido": [12, 25] }, level: 5, xp: 0, sprite: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif",
     type: "Normal",
+    rarity: "raro",
     speed: 55,
   },
 }
@@ -2904,6 +2909,7 @@ export const typeColors: Record<string, string> = {
   "Dragão": "from-indigo-600 to-purple-700",
   "Aço": "from-gray-500 to-slate-600",
   Sombrio: "from-gray-800 to-black",
+  Noturno: "from-gray-900 to-indigo-900",
 }
 
 const attackTypeLookup: Record<string, string> = {
