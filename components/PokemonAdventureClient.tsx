@@ -18,6 +18,7 @@ import {
   calculateBattleSpeed,
   createBattleStatStages,
   createPokemonIVs,
+  createLegendaryPokemonIVs,
   applyBattleStatChanges,
   getBattleStatStageMultiplier,
   resolvePokemonIVs,
@@ -724,7 +725,20 @@ const getRandomWildPokemonForEnvironmentWithType = (
   const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
-  const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
+
+  let selectedPool: string[]
+  if (rarityPool.length > 0) {
+    selectedPool = rarityPool
+  } else if (targetRarity === "lendario") {
+    const allLegendaries = Object.keys(wildPokemon).filter(
+      (name) => wildPokemon[name].rarity === "lendario" && enemyLevel >= (minWildLevelBySpecies[name] || 1),
+    )
+    selectedPool = allLegendaries.length > 0
+      ? allLegendaries
+      : Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === "lendario")
+  } else {
+    selectedPool = levelFilteredPool
+  }
 
   const typeFilteredPool = preferredTypeToken
     ? selectedPool.filter((name) =>
@@ -2331,7 +2345,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
       const isShiny = Math.random() < SHINY_CHANCE
-      const enemyIVs = createPokemonIVs()
+      const enemyRarity = wildPokemon[baseEnemyName]?.rarity
+      const enemyIVs = enemyRarity === "lendario" ? createLegendaryPokemonIVs() : createPokemonIVs()
 
       const legalEnemyAttacks = getLegalBattleAttacksForPokemon(
         impostorName,
@@ -4551,9 +4566,15 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
             <div
               key={slot.id}
               onClick={() => {
+                const slotState = saveSlots[slot.id]?.gameState
                 loadSlotGame(slot.id)
-                setCurrentScreen("menu")
-                addLog("🎮 Jogo carregado! Bem-vindo de volta!")
+                if (slotState?.currentBattle) {
+                  setCurrentScreen("battle")
+                  addLog("🎮 Batalha restaurada! Continue lutando!")
+                } else {
+                  setCurrentScreen("menu")
+                  addLog("🎮 Jogo carregado! Bem-vindo de volta!")
+                }
                 setShowModal(null)
               }}
               className="cursor-pointer rounded-[16px] border-4 border-slate-800 bg-[linear-gradient(180deg,#f5f5f4_0%,#f5f5f4_55%,#e7e5e4_55%,#e7e5e4_100%)] p-4 text-slate-900 shadow-[5px_5px_0_rgba(15,23,42,0.3)] transition-all hover:-translate-x-[1px] hover:-translate-y-[1px]"

@@ -6,8 +6,8 @@ import { useGameState } from "./useGameState"
 import type { GameState } from "./useGameState"
 import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from "../lib/firebaseRtdbService"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
-import { starterPokemon, wildPokemon } from "../data/pokemonData"
-import { getPokemonSpriteSet, getPokemonSpriteUrl } from "../lib/utils"
+import { starterPokemon, wildPokemon, createPokemonIVs } from "../data/pokemonData"
+import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeTypeText } from "../lib/utils"
 
 const GAME_SAVE_KEY = "pokemon-adventure-saves"
 const ACCOUNT_SAVE_KEY_PREFIX = "pokemon-adventure-account-saves:"
@@ -49,12 +49,16 @@ function migrateGameStateSprites(gameState: GameState): GameState {
   const migratedTeam = Object.fromEntries(
     Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
       const datasetSprite = starterPokemon[name]?.sprite || wildPokemon[name]?.sprite
+      const datasetType = starterPokemon[name]?.type || wildPokemon[name]?.type
+      const normalizedType = normalizeTypeText(pokemon.type || datasetType || "")
       return [
         name,
         {
           ...pokemon,
           sprite: getPokemonSpriteUrl(name, datasetSprite || pokemon.sprite, "original", Boolean(pokemon.isShiny)),
           spriteSet: getPokemonSpriteSet(name, datasetSprite || pokemon.sprite, Boolean(pokemon.isShiny)),
+          type: normalizedType || pokemon.type,
+          ivs: pokemon.ivs ?? createPokemonIVs(),
         },
       ]
     }),
