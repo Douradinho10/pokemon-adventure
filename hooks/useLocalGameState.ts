@@ -46,13 +46,37 @@ function saveSlotsToAccountLocal(userId: string, slots: SaveSlot[]) {
   }
 }
 
+function normalizeLoadedBattle(gameState: GameState, battle: GameState["currentBattle"]): GameState["currentBattle"] {
+  if (!battle) {
+    return null
+  }
+
+  const battleWave = Math.max(0, gameState.battles)
+  const battleSpeciesName = battle.enemyName
+  const visibleSpeciesName = battle.enemyDisplayName || battle.enemyName
+  const battleRarity = wildPokemon[battleSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
+  const isLegendaryWave = battleWave > 0 && battleWave % 100 === 0
+
+  if (battleRarity === "lendario" && !isLegendaryWave) {
+    return null
+  }
+
+  return {
+    ...battle,
+    enemyDisplayName: visibleSpeciesName,
+    enemyType: getCanonicalPokemonType(battleSpeciesName, battle.enemyType),
+    enemyDisplayType: getCanonicalPokemonType(visibleSpeciesName, battle.enemyDisplayType || battle.enemyType),
+    enemyIsBoss: isLegendaryWave ? Boolean(battle.enemyIsBoss || battleRarity === "lendario") : Boolean(battle.enemyIsBoss),
+  }
+}
+
 function migrateGameStateSprites(gameState: GameState): GameState {
   const migratedTeam = Object.fromEntries(
     Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
       const datasetSprite = starterPokemon[name]?.sprite || wildPokemon[name]?.sprite
-      // Normalize stored type using canonical generated types to avoid stale save data
       const canonicalType = getCanonicalPokemonType(name, pokemon.type)
       const nextType = canonicalType || pokemon.type || starterPokemon[name]?.type || wildPokemon[name]?.type
+
       return [
         name,
         {
@@ -65,26 +89,21 @@ function migrateGameStateSprites(gameState: GameState): GameState {
     }),
   )
 
-  const migratedBattle = gameState.currentBattle
+  const normalizedBattle = normalizeLoadedBattle(gameState, gameState.currentBattle)
+  const migratedBattle = normalizedBattle
     ? {
-        ...gameState.currentBattle,
+        ...normalizedBattle,
         playerSprite: getPokemonSpriteUrl(
           gameState.activePokemon,
           migratedTeam[gameState.activePokemon ?? ""]?.sprite,
           "back",
           Boolean(migratedTeam[gameState.activePokemon ?? ""]?.isShiny),
         ),
-        enemyDisplayName: gameState.currentBattle.enemyDisplayName,
         enemySprite: getPokemonSpriteUrl(
-          gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
-          wildPokemon[gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName]?.sprite,
+          normalizedBattle.enemyDisplayName || normalizedBattle.enemyName,
+          wildPokemon[normalizedBattle.enemyDisplayName || normalizedBattle.enemyName]?.sprite,
           "front",
-          Boolean(gameState.currentBattle.enemyIsShiny),
-        ),
-        // Normalize enemy type from canonical mapping when present
-        enemyType: getCanonicalPokemonType(
-          gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
-          gameState.currentBattle.enemyType,
+          Boolean(normalizedBattle.enemyIsShiny),
         ),
       }
     : null
@@ -97,6 +116,8 @@ function migrateGameStateSprites(gameState: GameState): GameState {
 }
 
 function getAuthenticatedUserId(): string | null {
+
+
   const auth = getFirebaseAuth()
   return auth?.currentUser?.uid ?? null
 }
@@ -523,3 +544,4 @@ export const useLocalGameState = () => {
     GAME_SAVE_KEY,
   }
 }
+

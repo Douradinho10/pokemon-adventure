@@ -3364,9 +3364,22 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [chooseStarter, multiplayerRoom?.mode, multiplayerRoom?.starterMode, showModal])
 
   const startBattle = useCallback(() => {
-    if (gameState.currentBattle) {
-      setCurrentScreen("battle")
-      return
+    const loadedBattle = gameState.currentBattle
+    if (loadedBattle) {
+      const loadedSpeciesName = loadedBattle.enemyName
+      const visibleSpeciesName = loadedBattle.enemyDisplayName || loadedSpeciesName
+      const loadedBattleRarity = wildPokemon[loadedSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
+      const loadedBattleWave = Math.max(0, gameState.battles)
+      const legendaryWave = loadedBattleWave > 0 && loadedBattleWave % 100 === 0
+      const loadedBattleIsValid =
+        loadedBattleRarity !== "lendario" || (legendaryWave && Boolean(loadedBattle.enemyIsBoss))
+
+      if (loadedBattleIsValid) {
+        setCurrentScreen("battle")
+        return
+      }
+
+      updateGameState({ currentBattle: null })
     }
 
     if (!gameState.activePokemon) {
