@@ -1860,9 +1860,10 @@ Object.keys(wildPokemon).forEach((name) => {
 Object.keys(wildPokemon).forEach((name) => {
   try {
     const typeOverride = (generatedWildTypes as Record<string, string>)[name]
-    const canonicalType = normalizeTypeText(typeOverride || wildPokemon[name].type)
-    if (canonicalType && wildPokemon[name].type !== canonicalType) {
-      wildPokemon[name].type = canonicalType
+    if (typeOverride) {
+      wildPokemon[name].type = normalizeTypeText(typeOverride)
+    } else {
+      wildPokemon[name].type = normalizeTypeText(wildPokemon[name].type)
     }
 
     const allowedRarities: string[] = Object.keys(POKEMON_RARITY_CONFIG).filter(Boolean)
@@ -2635,7 +2636,7 @@ const manualEvolutionRules: Record<string, EvolutionRule> = {
   Spearow: { level: 20, evolvesTo: "Fearow" },
   Ekans: { level: 22, evolvesTo: "Arbok" },
   Sandshrew: { level: 22, evolvesTo: "Sandslash" },
-  Nidoran: { level: 16, evolvesTo: "Nidorino" },
+  Nidoran: { level: 16, evolvesTo: "Nidorina" },
   Zubat: { level: 22, evolvesTo: "Golbat" },
   Golbat: { level: 30, evolvesTo: "Crobat" },
   Oddish: { level: 21, evolvesTo: "Gloom" },

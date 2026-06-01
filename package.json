@@ -8,6 +8,7 @@
     "dev:web": "next dev -p 5000 -H 0.0.0.0",
     "dev:socket": "node server/socket-server.js",
     "dev:multiplayer": "node scripts/dev-multiplayer.js",
+    "sync:pokedex": "node scripts/generate-wild-types.js && node scripts/generate-evolution-rules.js",
     "lint": "eslint .",
     "start": "next start",
     "socket:server": "node server/socket-server.js"

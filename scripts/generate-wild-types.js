@@ -37,6 +37,48 @@ const typeLabels = {
   fairy: 'Fada',
 }
 
+// Default form slugs on PokeAPI (matches pokemon.com / official dex defaults).
+const apiSlugOverrides = {
+  Nidoran: 'nidoran-f',
+  Type_Null: 'type-null',
+  Deoxys: 'deoxys-normal',
+  Wormadam: 'wormadam-plant',
+  Giratina: 'giratina-altered',
+  Shaymin: 'shaymin-land',
+  Basculin: 'basculin-red-striped',
+  Darmanitan: 'darmanitan-standard',
+  Frillish: 'frillish-male',
+  Jellicent: 'jellicent-male',
+  Tornadus: 'tornadus-incarnate',
+  Thundurus: 'thundurus-incarnate',
+  Landorus: 'landorus-incarnate',
+  Keldeo: 'keldeo-ordinary',
+  Meloetta: 'meloetta-aria',
+  Pyroar: 'pyroar-male',
+  Meowstic: 'meowstic-male',
+  Aegislash: 'aegislash-shield',
+  Pumpkaboo: 'pumpkaboo-average',
+  Gourgeist: 'gourgeist-average',
+  Zygarde: 'zygarde-50',
+  Oricorio: 'oricorio-baile',
+  Lycanroc: 'lycanroc-midday',
+  Wishiwashi: 'wishiwashi-solo',
+  Minior: 'minior-red-meteor',
+  Mimikyu: 'mimikyu-disguised',
+  Toxtricity: 'toxtricity-amped',
+  Eiscue: 'eiscue-ice',
+  Indeedee: 'indeedee-male',
+  Morpeko: 'morpeko-full-belly',
+  Urshifu: 'urshifu-single-strike',
+  Oinkologne: 'oinkologne-male',
+  Maushold: 'maushold-family-of-four',
+  Squawkabilly: 'squawkabilly-green-plumage',
+  Palafin: 'palafin-zero',
+  Tatsugiri: 'tatsugiri-curly',
+  Dudunsparce: 'dudunsparce-two-segment',
+  Tinkatunk: 'tinkatuff',
+}
+
 const manualWildTypeOverrides = {
   Nidoran: 'Veneno',
   Deoxys: 'Psíquico',
@@ -109,7 +151,8 @@ async function main() {
     })
   }
 
-  const resolveApiName = (name) => apiNameByComparable.get(normalizeComparable(name)) || repoNameToSlug(name)
+  const resolveApiName = (name) =>
+    apiSlugOverrides[name] || apiNameByComparable.get(normalizeComparable(name)) || repoNameToSlug(name)
   const pokemonCache = new Map()
 
   const getPokemonData = async (name) => {
