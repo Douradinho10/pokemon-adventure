@@ -211,6 +211,20 @@ export const createPokemonIVs = (): PokemonIVs => ({
   speed: Math.floor(Math.random() * 32),
 })
 
+export const createLegendaryPokemonIVs = (): PokemonIVs => {
+  const result: PokemonIVs = {
+    hp: Math.floor(Math.random() * 32),
+    attack: Math.floor(Math.random() * 32),
+    defense: Math.floor(Math.random() * 32),
+    speed: Math.floor(Math.random() * 32),
+  }
+  const keys = (Object.keys(result) as (keyof PokemonIVs)[]).sort(() => Math.random() - 0.5)
+  for (let i = 0; i < 3; i++) {
+    result[keys[i]] = 31
+  }
+  return result
+}
+
 export const resolvePokemonIVs = (ivs?: Partial<PokemonIVs> | null): PokemonIVs => ({
   hp: clampValue(ivs?.hp ?? defaultPokemonIVs.hp, 0, 31),
   attack: clampValue(ivs?.attack ?? defaultPokemonIVs.attack, 0, 31),

@@ -1,6 +1,7 @@
 modules = ["nodejs-20", "web"]
 [agent]
 expertMode = true
+stack = "BEST_EFFORT_FALLBACK"
 
 [nix]
 channel = "stable-25_05"
@@ -32,6 +33,10 @@ waitForPort = 5000
 [[ports]]
 localPort = 3000
 externalPort = 3001
+
+[[ports]]
+localPort = 4001
+externalPort = 3000
 
 [[ports]]
 localPort = 5000
