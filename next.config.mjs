@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url"
 const isCI = !!process.env.CI || !!process.env.VERCEL
 const repoRoot = dirname(fileURLToPath(new URL(".", import.meta.url)))
 const nextConfig = {
-  ...(isCI ? {} : { distDir: ".local/next" }),
-  outputFileTracingRoot: repoRoot,
+  ...(isCI ? {} : { distDir: ".local/next", outputFileTracingRoot: repoRoot }),
   eslint: {
     ignoreDuringBuilds: true,
   },
