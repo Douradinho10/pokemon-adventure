@@ -3220,7 +3220,47 @@ export const buildMinWildLevelBySpecies = (): Record<string, number> => {
   return cache
 }
 
-export const minWildLevelBySpecies = buildMinWildLevelBySpecies()
+const minWildLevelOverrides: Record<string, number> = {
+  Raichu: 30,
+  Clefable: 30,
+  Wigglytuff: 30,
+  Vileplume: 36,
+  Victreebel: 36,
+  Poliwrath: 36,
+  Bellossom: 36,
+  Slowking: 37,
+  Steelix: 36,
+  Scizor: 30,
+  Kingdra: 45,
+}
+
+export const minWildLevelBySpecies = (() => {
+  const computed = buildMinWildLevelBySpecies()
+  Object.entries(minWildLevelOverrides).forEach(([species, minLevel]) => {
+    computed[species] = Math.max(computed[species] || 1, minLevel)
+  })
+  return computed
+})()
+
+export const getMaxWildLevelForSpecies = (speciesName: string): number => {
+  const rule = evolutionRules[speciesName]
+  if (rule?.level && rule.evolvesTo) {
+    return rule.level - 1
+  }
+  return Number.MAX_SAFE_INTEGER
+}
+
+/** True when this exact species (not an earlier/later stage) can appear in the wild at `level`. */
+export const isWildSpeciesValidAtLevel = (speciesName: string, level: number): boolean => {
+  const safeLevel = Math.max(1, Math.floor(level))
+  const minLevel = minWildLevelBySpecies[speciesName] || 1
+  const maxLevel = getMaxWildLevelForSpecies(speciesName)
+  return safeLevel >= minLevel && safeLevel <= maxLevel
+}
+
+export const getPokemonDisplayType = (pokemonName: string, fallbackType?: string): string => {
+  return getCanonicalPokemonType(pokemonName, fallbackType || wildPokemon[pokemonName]?.type || "Normal")
+}
 
 export const getSpeciesAtLevel = (speciesName: string, level: number): string => {
   if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
@@ -3268,8 +3308,9 @@ export const getRandomWildPokemon = (battleCount = 0) => {
     availablePokemon = Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === "comum")
   }
 
-  const pick = availablePokemon[Math.floor(Math.random() * availablePokemon.length)]
-  // default to base form appropriate for level 1 (fallback) to avoid evolved forms showing early
+  const levelOnePool = availablePokemon.filter((name) => isWildSpeciesValidAtLevel(name, 1))
+  const pickFrom = levelOnePool.length > 0 ? levelOnePool : availablePokemon
+  const pick = pickFrom[Math.floor(Math.random() * pickFrom.length)]
   return getSpeciesAtLevel(pick, 1)
 }
 

@@ -39,7 +39,10 @@ import {
   getMoveAccuracy,
   evolutionRules,
   getCanonicalPokemonType,
+  getPokemonDisplayType,
+  isWildSpeciesValidAtLevel,
   minWildLevelBySpecies as dataMinWildLevelBySpecies,
+  getSpeciesAtLevel,
   initializePP, // Import new helper
   MAX_TEAM_SIZE,
   scaleAttackSetForLevel,
@@ -594,7 +597,7 @@ const pickWeightedPokemon = (candidates: string[], environment: BattleEnvironmen
 
   const typeWeights = environmentTypeWeights[environment]
   const weighted = candidates.map((name) => {
-    const typeTokens = normalizeTypeText(wildPokemon[name].type)
+    const typeTokens = normalizeTypeText(getPokemonDisplayType(name))
       .split("/")
       .map(normalizeTypeToken)
       .filter(Boolean)
@@ -620,7 +623,7 @@ const getEnvironmentWildPool = (environment: BattleEnvironment) => {
   const preferredTypes = new Set(environmentPreferredTypes[environment])
 
   return Object.keys(wildPokemon).filter((name) => {
-    const typeTokens = normalizeTypeText(wildPokemon[name].type)
+    const typeTokens = normalizeTypeText(getPokemonDisplayType(name))
       .split("/")
       .map(normalizeTypeToken)
       .filter(Boolean)
@@ -643,117 +646,14 @@ const getTargetRarityForBattle = (wave: number) => {
   return "comum" as const
 }
 
-const buildMinWildLevelBySpecies = () => {
-  const speciesNames = Object.keys(wildPokemon)
-  const cache = new Map<string, number>()
-  const visiting = new Set<string>()
-
-  const resolveMinLevel = (species: string): number => {
-    const cached = cache.get(species)
-    if (cached !== undefined) {
-      return cached
-    }
-
-    if (visiting.has(species)) {
-      return 1
-    }
-
-    visiting.add(species)
-
-    const preEvolutionLevels = speciesNames
-      .map((candidate) => {
-        const candidateRule = getEvolutionForPokemon(candidate, 100)
-        if (!candidateRule || candidateRule.evolvesTo !== species) {
-          return null
-        }
-
-        const preMin = resolveMinLevel(candidate)
-        return Math.max(candidateRule.level, preMin)
-      })
-      .filter((value): value is number => value !== null)
-
-    visiting.delete(species)
-
-    const minLevel = preEvolutionLevels.length > 0 ? Math.max(...preEvolutionLevels) : 1
-    cache.set(species, minLevel)
-    return minLevel
-  }
-
-  const result: Record<string, number> = {}
-  speciesNames.forEach((species) => {
-    result[species] = resolveMinLevel(species)
-  })
-  return result
-}
-
-const minWildLevelOverrides: Record<string, number> = {
-  Raichu: 30,
-  Clefable: 30,
-  Wigglytuff: 30,
-  Vileplume: 36,
-  Victreebel: 36,
-  Poliwrath: 36,
-  Bellossom: 36,
-  Slowking: 37,
-  Steelix: 36,
-  Scizor: 30,
-  Kingdra: 45,
-}
-
-const minWildLevelBySpecies = (() => {
-  const computed = buildMinWildLevelBySpecies()
-
-  Object.entries(minWildLevelOverrides).forEach(([species, minLevel]) => {
-    computed[species] = Math.max(computed[species] || 1, minLevel)
-  })
-
-  return computed
-})()
-
-// Resolve a species to the appropriate form for the given level by walking
-// backwards through evolution rules so evolved forms don't appear earlier
-// than their pre-evolutions in wild/enemy encounters.
-const getSpeciesAtLevel = (speciesName: string, level: number): string => {
-  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
-
-  let current = speciesName
-  const maxIter = Object.keys(minWildLevelBySpecies).length + 5
-  let iter = 0
-
-  while (iter++ < maxIter) {
-    let found: string | null = null
-    for (const candidate of Object.keys(minWildLevelBySpecies)) {
-      const rule = (evolutionRules as Record<string, any>)[candidate]
-      if (rule && rule.evolvesTo === current) {
-        const candMin = minWildLevelBySpecies[candidate] || 1
-        if (candMin <= level) {
-          if (!found || (minWildLevelBySpecies[found] || 1) < candMin) {
-            found = candidate
-          }
-        }
-      }
-    }
-
-    if (!found) break
-    current = found
-    if ((minWildLevelBySpecies[current] || 1) <= level) return current
-  }
-
-  // Fallbacks
-  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
-  const entries = Object.entries(minWildLevelBySpecies)
-  entries.sort((a, b) => (a[1] || 1) - (b[1] || 1))
-  return entries.length > 0 ? entries[0][0] : speciesName
-}
+const matchesWildLevel = (speciesName: string, enemyLevel: number) => isWildSpeciesValidAtLevel(speciesName, enemyLevel)
 
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
   const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
   const levelFilteredPool = environmentPool.filter(
-    (name) =>
-      enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
-      (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+    (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
   )
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
@@ -761,23 +661,22 @@ const getRandomWildPokemonForEnvironment = (battleCount: number, environment: Ba
 
   if (selectedPool.length === 0) {
     const fallbackByLevel = Object.keys(wildPokemon).filter(
-      (name) =>
-        enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
-        (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+      (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
     )
     const fallbackPick = pickWeightedPokemon(fallbackByLevel, environment)
     if (fallbackPick) {
-      return getSpeciesAtLevel(fallbackPick, enemyLevel)
+      return fallbackPick
     }
   }
 
   const weightedPick = pickWeightedPokemon(selectedPool, environment)
 
   if (weightedPick) {
-    return getSpeciesAtLevel(weightedPick, enemyLevel)
+    return weightedPick
   }
 
-  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
+  const fallbackSpecies = environmentPool.find((name) => matchesWildLevel(name, enemyLevel))
+  return fallbackSpecies || getSpeciesAtLevel(getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 const getRandomWildPokemonForEnvironmentWithType = (
@@ -790,9 +689,7 @@ const getRandomWildPokemonForEnvironmentWithType = (
   const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
   const levelFilteredPool = environmentPool.filter(
-    (name) =>
-      enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
-      (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+    (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
   )
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
@@ -800,7 +697,7 @@ const getRandomWildPokemonForEnvironmentWithType = (
 
   const typeFilteredPool = preferredTypeToken
     ? selectedPool.filter((name) =>
-        normalizeTypeText(wildPokemon[name].type)
+        normalizeTypeText(getPokemonDisplayType(name))
           .split("/")
           .map(normalizeTypeToken)
           .includes(preferredTypeToken),
@@ -811,13 +708,11 @@ const getRandomWildPokemonForEnvironmentWithType = (
 
   if (finalPool.length === 0) {
     const fallbackByLevel = Object.keys(wildPokemon).filter(
-      (name) =>
-        enemyLevel >= (minWildLevelBySpecies[name] || 1) &&
-        (allowLegendary || wildPokemon[name].rarity !== "lendario"),
+      (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
     )
     const fallbackByType = preferredTypeToken
       ? fallbackByLevel.filter((name) =>
-          normalizeTypeText(wildPokemon[name].type)
+          normalizeTypeText(getPokemonDisplayType(name))
             .split("/")
             .map(normalizeTypeToken)
             .includes(preferredTypeToken),
@@ -827,17 +722,18 @@ const getRandomWildPokemonForEnvironmentWithType = (
 
     const fallbackPick = pickWeightedPokemon(fallbackPool, environment)
     if (fallbackPick) {
-      return getSpeciesAtLevel(fallbackPick, enemyLevel)
+      return fallbackPick
     }
   }
 
   const weightedPick = pickWeightedPokemon(finalPool, environment)
 
   if (weightedPick) {
-    return getSpeciesAtLevel(weightedPick, enemyLevel)
+    return weightedPick
   }
 
-  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
+  const fallbackSpecies = environmentPool.find((name) => matchesWildLevel(name, enemyLevel))
+  return fallbackSpecies || getSpeciesAtLevel(getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
@@ -2399,14 +2295,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         preferredTypeToken,
       )
 
-      let enemyName = baseEnemyName
-      for (let i = 0; i < 4; i++) {
-        const evolution = getEvolutionForPokemon(enemyName, enemyLevel - 1)
-        if (!evolution || !wildPokemon[evolution.evolvesTo]) {
-          break
-        }
-        enemyName = evolution.evolvesTo
-      }
+      const enemyName = getSpeciesAtLevel(baseEnemyName, enemyLevel)
 
       const canRollImpostor = enemyName !== "Ditto" && enemyName !== "Zoroark" && wildPokemon[enemyName]?.rarity !== "lendario"
       const impostorRoll = random(1, 1000) / 1000
@@ -2415,9 +2304,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const canUseZoroark = enemyLevel >= ZOROARK_MIN_LEVEL && Boolean(wildPokemon.Zoroark)
       let impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
 
-      // Safety: ensure the resolved species respects canonical wild minimums
-      // so evolved forms don't appear at levels below their pre-evolutions.
-      enemyName = getSpeciesAtLevel(enemyName, enemyLevel)
       impostorName = getSpeciesAtLevel(impostorName, enemyLevel)
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
       const isShiny = Math.random() < SHINY_CHANCE
@@ -2425,7 +2311,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
       const legalEnemyAttacks = getLegalBattleAttacksForPokemon(
         impostorName,
-        wildPokemon[impostorName].type,
+        getPokemonDisplayType(impostorName),
         enemyLevel,
       )
       const enemyAttacks = Object.fromEntries(
@@ -2439,8 +2325,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         enemyDisplayName: displayEnemyName,
         isBoss: isBossWave,
         enemyLevel,
-        enemyType: wildPokemon[impostorName].type,
-        enemyDisplayType: wildPokemon[displayEnemyName].type,
+        enemyType: getPokemonDisplayType(impostorName),
+        enemyDisplayType: getPokemonDisplayType(displayEnemyName),
         enemyAttacks,
         enemyIVs,
         isImpostor: shouldUseImpostor,
@@ -3480,11 +3366,11 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const newBattle = {
       enemyName,
-      enemyType: wildPokemon[enemyName].type,
+      enemyType: getPokemonDisplayType(enemyName, encounterPreview.enemyType),
       wave: nextWave,
       enemyDisplayName,
       enemyIsBoss: isBossWave,
-      enemyDisplayType: encounterPreview.enemyDisplayType,
+      enemyDisplayType: getPokemonDisplayType(enemyDisplayName, encounterPreview.enemyDisplayType),
       enemyIsDisguised: encounterPreview.isImpostor,
       enemyIsShiny: encounterPreview.isShiny,
       enemyIVs,
