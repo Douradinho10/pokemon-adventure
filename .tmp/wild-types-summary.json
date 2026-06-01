@@ -1,0 +1,15 @@
+{
+  "totalSpecies": 1000,
+  "generatedTypes": 1000,
+  "skippedCount": 2,
+  "skipped": [
+    {
+      "species": "Roaring_Steppe",
+      "reason": "Request failed 404 for https://pokeapi.co/api/v2/pokemon/roaring-steppe"
+    },
+    {
+      "species": "Great_Karina",
+      "reason": "Request failed 404 for https://pokeapi.co/api/v2/pokemon/great-karina"
+    }
+  ]
+}
