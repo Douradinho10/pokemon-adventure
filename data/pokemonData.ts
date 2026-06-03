@@ -1906,8 +1906,41 @@ const ensureSpeciesInWild = (name: string) => {
   // ✅ Verifica se o Pokémon já existe (com nome normalizado ou original)
   if ((wildPokemon as any)[name] || (wildPokemon as any)[normalizedName]) return;
 
-  // Lista de Pokémon lendários
-  const LEGENDARY_SPECIES = new Set<string>([]);
+  // Lista completa de Pokémon lendários e míticos (Gen 1–9)
+  const LEGENDARY_SPECIES = new Set<string>([
+    // Gen 1
+    "Articuno", "Zapdos", "Moltres", "Mewtwo", "Mew",
+    // Gen 2
+    "Raikou", "Entei", "Suicune", "Lugia", "Ho-Oh", "Celebi",
+    // Gen 3
+    "Regirock", "Regice", "Registeel", "Latias", "Latios",
+    "Kyogre", "Groudon", "Rayquaza", "Jirachi", "Deoxys",
+    // Gen 4
+    "Uxie", "Mesprit", "Azelf", "Dialga", "Palkia", "Heatran",
+    "Regigigas", "Giratina", "Cresselia", "Phione", "Manaphy",
+    "Darkrai", "Shaymin", "Arceus",
+    // Gen 5
+    "Victini", "Cobalion", "Terrakion", "Virizion", "Tornadus",
+    "Thundurus", "Reshiram", "Zekrom", "Landorus", "Kyurem",
+    "Keldeo", "Meloetta", "Genesect",
+    // Gen 6
+    "Xerneas", "Yveltal", "Zygarde", "Diancie", "Hoopa", "Volcanion",
+    // Gen 7 + Ultra Beasts
+    "Type: Null", "Silvally", "Tapu Koko", "Tapu Lele", "Tapu Bulu", "Tapu Fini",
+    "Cosmog", "Cosmoem", "Solgaleo", "Lunala", "Necrozma",
+    "Magearna", "Marshadow", "Zeraora",
+    "Nihilego", "Buzzwole", "Pheromosa", "Xurkitree", "Celesteela",
+    "Kartana", "Guzzlord", "Poipole", "Naganadel", "Stakataka", "Blacephalon",
+    // Gen 8
+    "Zacian", "Zamazenta", "Eternatus", "Kubfu", "Urshifu",
+    "Zarude", "Regieleki", "Regidrago", "Glastrier", "Spectrier", "Calyrex",
+    "Enamorus", "Meltan", "Melmetal",
+    // Gen 9
+    "Wo-Chien", "Chien-Pao", "Ting-Lu", "Chi-Yu",
+    "Koraidon", "Miraidon", "Ogerpon", "Terapagos", "Pecharunt",
+    "Walking Wake", "Iron Leaves", "Gouging Fire", "Raging Bolt",
+    "Iron Boulder", "Iron Crown",
+  ]);
 
   const defaultEntry = {
     sprite: `https://play.pokemonshowdown.com/sprites/ani/${normalizedName}.gif`,

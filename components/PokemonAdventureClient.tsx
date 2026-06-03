@@ -4286,12 +4286,12 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       const belowHalfHP = currentBattle.enemyHP <= Math.floor(currentBattle.enemyMaxHP / 2)
 
       if (isNonBossLegendary) {
-        showScreenNotice("👑 Lendários só podem ser capturados quando aparecem como boss na wave 100.")
+        showScreenNotice("👑 Lendários só aparecem nas waves 100, 200, 300... e só podem ser capturados como boss nessas waves.")
         return
       }
 
       if (isLegendaryBoss && !belowHalfHP) {
-        showScreenNotice("👑 Chefes lendários só podem ser capturados após ficarem com metade da vida.")
+        showScreenNotice("👑 Lendários só podem ser capturados após perderem pelo menos metade do HP!")
         return
       }
 
