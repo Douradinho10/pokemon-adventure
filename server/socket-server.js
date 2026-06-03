@@ -810,8 +810,20 @@ io.on("connection", (socket) => {
         return { ok: false, message: "Apenas o host pode iniciar" }
       }
 
+      // In casual mode, auto-ready the host when they call start so bots + host can begin
+      const roomForReadyCheck =
+        room.mode === "casual" && hostUserId && room.players?.[hostUserId]
+          ? {
+              ...room,
+              players: {
+                ...room.players,
+                [hostUserId]: { ...room.players[hostUserId], ready: true },
+              },
+            }
+          : room
+
       const minimumPlayers = room.mode === "competitive" ? room.maxPlayers : 2
-      if (playersCount < minimumPlayers || (requiresReadyCheck && !areAllPlayersReady(room))) {
+      if (playersCount < minimumPlayers || (requiresReadyCheck && !areAllPlayersReady(roomForReadyCheck))) {
         return {
           ok: false,
           message:

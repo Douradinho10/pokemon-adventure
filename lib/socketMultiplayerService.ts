@@ -111,9 +111,26 @@ function isLocalDevelopmentHost() {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.endsWith(".local")
 }
 
+function isReplitHost() {
+  if (typeof window === "undefined") return false
+  const hostname = window.location.hostname.toLowerCase()
+  return (
+    hostname.endsWith(".replit.dev") ||
+    hostname.endsWith(".repl.co") ||
+    hostname.endsWith(".replit.app") ||
+    hostname.includes(".janeway.replit.")
+  )
+}
+
 function resolveSocketServerUrl(preferRemote = false) {
   if (typeof window === "undefined") {
     return SOCKET_SERVER_URL
+  }
+
+  // On Replit the browser cannot reach 127.0.0.1:4001 directly.
+  // Next.js proxies /socket.io/* → localhost:4001, so we connect to the same origin.
+  if (isReplitHost()) {
+    return window.location.origin
   }
 
   if (!preferRemote && isLocalDevelopmentHost() && !HAS_EXPLICIT_SOCKET_URL) {

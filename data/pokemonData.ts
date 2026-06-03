@@ -2294,14 +2294,32 @@ try {
   Object.entries(enrichedMoves as Record<string, string[]>).forEach(([name, moves]) => {
     if (!(wildPokemon as any)[name]) return
     const existing = (wildPokemon as any)[name].attacks || {}
-    if (Object.keys(existing).length > 0) return
+    const existingKeys = Object.keys(existing)
+    // Skip only if the Pokemon already has real, varied moves (not just the default "Investida" fallback)
+    const isDefaultOnly = existingKeys.length === 0 || (existingKeys.length === 1 && "Investida" in existing)
+    if (!isDefaultOnly) return
 
+    const enriched = (moves || []).filter((m) => m && m !== "Investida").slice(0, 4)
+    if (enriched.length === 0) return
     ;(wildPokemon as any)[name].attacks = Object.fromEntries(
-      (moves || []).slice(0, 4).map((m) => [m, [12, 24]]),
+      enriched.map((m) => [m, [12, 24]]),
     )
   })
 } catch (e) {
   // ignore if enrichedMoves absent or malformed
+}
+
+// After enriched moves are merged, re-apply generatedWildTypes to fix any types still set to "Normal"
+// for entries created by ensureSpeciesInWild that weren't in the original wildPokemon batch
+try {
+  Object.keys(wildPokemon).forEach((name) => {
+    const typeOverride = (generatedWildTypes as Record<string, string>)[name]
+    if (typeOverride) {
+      wildPokemon[name].type = normalizeTypeText(typeOverride)
+    }
+  })
+} catch (e) {
+  // ignore
 }
 
 // Remove species that do not have an available Showdown sprite
