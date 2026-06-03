@@ -6,12 +6,8 @@ import { useGameState } from "./useGameState"
 import type { GameState } from "./useGameState"
 import { saveGameToFirebase, loadGameFromFirebase, deleteGameFromFirebase } from "../lib/firebaseRtdbService"
 import { getFirebaseAuth, initializeFirebase } from "../lib/firebase"
-<<<<<<< HEAD
-import { starterPokemon, wildPokemon, getCanonicalPokemonType, minWildLevelBySpecies } from "../data/pokemonData"
+import { starterPokemon, wildPokemon, getCanonicalPokemonType, minWildLevelBySpecies, createPokemonIVs } from "../data/pokemonData"
 import generatedWildTypes from "../data/pokedex/wild-types.generated.json"
-=======
-import { starterPokemon, wildPokemon, createPokemonIVs } from "../data/pokemonData"
->>>>>>> 9883fc10e705824f59221faae96322d35263043c
 import { getPokemonSpriteSet, getPokemonSpriteUrl, normalizeTypeText } from "../lib/utils"
 
 const GAME_SAVE_KEY = "pokemon-adventure-saves"
@@ -83,19 +79,14 @@ function migrateGameStateSprites(gameState: GameState): GameState {
   const migratedTeam = Object.fromEntries(
     Object.entries(gameState.playerTeam).map(([name, pokemon]) => {
       const datasetSprite = starterPokemon[name]?.sprite || wildPokemon[name]?.sprite
-<<<<<<< HEAD
       const canonicalType = getCanonicalPokemonType(name, pokemon.type)
-      const nextType = canonicalType || pokemon.type || starterPokemon[name]?.type || wildPokemon[name]?.type
-
-=======
       const datasetType = starterPokemon[name]?.type || wildPokemon[name]?.type
-      const normalizedType = normalizeTypeText(pokemon.type || datasetType || "")
->>>>>>> 9883fc10e705824f59221faae96322d35263043c
+      const nextType = canonicalType || pokemon.type || datasetType || ""
+      const normalizedType = normalizeTypeText(nextType)
       return [
         name,
         {
           ...pokemon,
-          type: nextType,
           sprite: getPokemonSpriteUrl(name, datasetSprite || pokemon.sprite, "original", Boolean(pokemon.isShiny)),
           spriteSet: getPokemonSpriteSet(name, datasetSprite || pokemon.sprite, Boolean(pokemon.isShiny)),
           type: normalizedType || pokemon.type,

@@ -219,6 +219,13 @@ export const createPokemonIVs = (): PokemonIVs => ({
   speed: Math.floor(Math.random() * 32),
 })
 
+export const createLegendaryPokemonIVs = (): PokemonIVs => ({
+  hp: 20 + Math.floor(Math.random() * 12),
+  attack: 20 + Math.floor(Math.random() * 12),
+  defense: 20 + Math.floor(Math.random() * 12),
+  speed: 20 + Math.floor(Math.random() * 12),
+})
+
 export const resolvePokemonIVs = (ivs?: Partial<PokemonIVs> | null): PokemonIVs => ({
   hp: clampValue(ivs?.hp ?? defaultPokemonIVs.hp, 0, 31),
   attack: clampValue(ivs?.attack ?? defaultPokemonIVs.attack, 0, 31),
@@ -1900,7 +1907,7 @@ const ensureSpeciesInWild = (name: string) => {
   if ((wildPokemon as any)[name] || (wildPokemon as any)[normalizedName]) return;
 
   // Lista de Pokémon lendários
-  const LEGENDARY_SPECIES = new Set([...]);
+  const LEGENDARY_SPECIES = new Set<string>([]);
 
   const defaultEntry = {
     sprite: `https://play.pokemonshowdown.com/sprites/ani/${normalizedName}.gif`,
