@@ -14,31 +14,39 @@ import gen9 from "./pokedex/gen9.json"
 import generatedEvolutionRules from "./pokedex/evolution-rules.generated.json"
 import generatedWildTypes from "./pokedex/wild-types.generated.json"
 
+// ✅ Adiciona esta função depois dos imports (ex: linha ~20)
+function normalizePokemonName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gi, "") // Remove caracteres especiais
+    .replace(" ", "_"); // Substitui espaços por _
+}
+
 // Rarity configuration - moved to top for better visibility
 export const POKEMON_RARITY_CONFIG = {
   comum: {
     chance: 0.75, // 75% chance
     color: "from-green-500 to-green-600",
-    emoji: "🌿",
+    emoji: "??",
     text: "Comum",
   },
   raro: {
     chance: 0.2, // 20% chance
     color: "from-blue-500 to-purple-600",
-    emoji: "💎",
+    emoji: "??",
     text: "Raro",
   },
   lendario: {
     chance: 0.05, // 5% chance
     color: "from-yellow-400 to-orange-500",
-    emoji: "🌟",
+    emoji: "??",
     text: "Lendário",
   },
 } as const
 
 export type PokemonRarity = keyof typeof POKEMON_RARITY_CONFIG
 
-// FunÃ¯Â¿Â½Ã¯Â¿Â½o para calcular HP baseado no nÃ¯Â¿Â½vel e tipo de PokÃƒÂ©mon
+// FunÃ¯Â¿Â½Ã¯Â¿Â½o para calcular HP baseado no nÃ¯Â¿Â½vel e tipo de PokÃÂ©mon
 export const calculateHP = (baseHP: number, level: number, pokemonName: string, ivs?: Partial<PokemonIVs> | null): number => {
   const hpMultipliers: Record<string, number> = {
     // Starters
@@ -48,7 +56,7 @@ export const calculateHP = (baseHP: number, level: number, pokemonName: string, 
     Pidgey: 0.8,
     Eevee: 0.9,
 
-    // PokÃƒÂ©mon Comuns
+    // PokÃÂ©mon Comuns
     Caterpie: 0.6,
     Weedle: 0.6,
     Kakuna: 0.7,
@@ -176,7 +184,7 @@ export const calculateHP = (baseHP: number, level: number, pokemonName: string, 
     Aerodactyl: 1.1,
     Snorlax: 2.2,
 
-    // LendÃƒÂ¡rios
+    // LendÃÂ¡rios
     Articuno: 1.3,
     Zapdos: 1.3,
     Moltres: 1.3,
@@ -210,20 +218,6 @@ export const createPokemonIVs = (): PokemonIVs => ({
   defense: Math.floor(Math.random() * 32),
   speed: Math.floor(Math.random() * 32),
 })
-
-export const createLegendaryPokemonIVs = (): PokemonIVs => {
-  const result: PokemonIVs = {
-    hp: Math.floor(Math.random() * 32),
-    attack: Math.floor(Math.random() * 32),
-    defense: Math.floor(Math.random() * 32),
-    speed: Math.floor(Math.random() * 32),
-  }
-  const keys = (Object.keys(result) as (keyof PokemonIVs)[]).sort(() => Math.random() - 0.5)
-  for (let i = 0; i < 3; i++) {
-    result[keys[i]] = 31
-  }
-  return result
-}
 
 export const resolvePokemonIVs = (ivs?: Partial<PokemonIVs> | null): PokemonIVs => ({
   hp: clampValue(ivs?.hp ?? defaultPokemonIVs.hp, 0, 31),
@@ -318,7 +312,7 @@ export const starterPokemon: Record<string, Pokemon> = {
   Charmander: {
     HP: 45,
     maxHP: 45,
-    attacks: { "Arranh�o": [10, 20], Brasa: [15, 30] },
+    attacks: { "Arranhão": [10, 20], Brasa: [15, 30] },
     level: 5,
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/charmander.gif",
@@ -328,11 +322,11 @@ export const starterPokemon: Record<string, Pokemon> = {
   Squirtle: {
     HP: 50,
     maxHP: 50,
-    attacks: { Investida: [10, 18], "Pistola d'�gua": [12, 25] },
+    attacks: { Investida: [10, 18], "Pistola d'Água": [12, 25] },
     level: 5,
     xp: 0,
     sprite: "https://play.pokemonshowdown.com/sprites/ani/squirtle.gif",
-    type: "�gua",
+    type: "Água",
     speed: 43,
   },
   Bulbasaur: {
@@ -355,7 +349,7 @@ export const starterPokemon: Record<string, Pokemon> = {
     type: "Normal/Voador",
     speed: 56,
   },
-  Eevee: { HP: 40, maxHP: 40, attacks: { Investida: [8, 15], "Ataque RÃƒÂ¡pido": [12, 25] }, level: 5, xp: 0, sprite: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif",
+  Eevee: { HP: 40, maxHP: 40, attacks: { Investida: [8, 15], "Ataque Rápido": [12, 25] }, level: 5, xp: 0, sprite: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif",
     type: "Normal",
     speed: 55,
   },
@@ -417,15 +411,15 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/ekans.gif",
     type: "Veneno",
     baseHP: 32,
-    attacks: { Picada: [10, 18], "Ýcido": [12, 20] },
+    attacks: { Picada: [10, 18], "Ácido": [12, 20] },
     rarity: "comum",
     speed: 55,
   },
   Pikachu: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/pikachu.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 30,
-    attacks: { "Choque do Trov�o": [12, 22], "Ataque RÃƒÂ¡pido": [10, 18] },
+    attacks: { "Choque do Trovão": [12, 22], "Ataque Rápido": [10, 18] },
     rarity: "raro",
     speed: 90,
   },
@@ -433,7 +427,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/sandshrew.gif",
     type: "Terra",
     baseHP: 40,
-    attacks: { "Arranh�o": [8, 15], "Bola de Lama": [12, 20] },
+    attacks: { "Arranhão": [8, 15], "Bola de Lama": [12, 20] },
     rarity: "comum",
     speed: 40,
   },
@@ -449,7 +443,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/clefairy.gif",
     type: "Fada",
     baseHP: 50,
-    attacks: { Tapa: [8, 15], "Metr�nomo": [10, 25] },
+    attacks: { Tapa: [8, 15], "Metronôme": [10, 25] },
     rarity: "raro",
     speed: 35,
   },
@@ -473,7 +467,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/zubat.gif",
     type: "Veneno/Voador",
     baseHP: 30,
-    attacks: { Mordida: [10, 18], "Supersônico": [8, 15] },
+    attacks: { Mordida: [10, 18], "Supersónico": [8, 15] },
     rarity: "comum",
     speed: 55,
   },
@@ -481,7 +475,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/oddish.gif",
     type: "Grama/Veneno",
     baseHP: 38,
-    attacks: { Absorver: [10, 18], "PÃƒÂ³ Venenoso": [8, 15] },
+    attacks: { Absorver: [10, 18], "Pó Venenoso": [8, 15] },
     rarity: "comum",
     speed: 30,
   },
@@ -489,7 +483,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/paras.gif",
     type: "Inseto/Grama",
     baseHP: 32,
-    attacks: { "Arranh�o": [8, 15], Drenar: [10, 18] },
+    attacks: { "Arranhão": [8, 15], Drenar: [10, 18] },
     rarity: "comum",
     speed: 25,
   },
@@ -497,7 +491,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/venonat.gif",
     type: "Inseto/Veneno",
     baseHP: 45,
-    attacks: { Investida: [8, 15], "Confus�o": [12, 22] },
+    attacks: { Investida: [8, 15], "Confusão": [12, 22] },
     rarity: "comum",
     speed: 45,
   },
@@ -505,7 +499,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/diglett.gif",
     type: "Terra",
     baseHP: 20,
-    attacks: { "Arranh�o": [8, 15], "Bola de Lama": [10, 18] },
+    attacks: { "Arranhão": [8, 15], "Bola de Lama": [10, 18] },
     rarity: "comum",
     speed: 95,
   },
@@ -513,15 +507,15 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/meowth.gif",
     type: "Normal",
     baseHP: 35,
-    attacks: { "Arranh�o": [10, 18], Mordida: [12, 22] },
+    attacks: { "Arranhão": [10, 18], Mordida: [12, 22] },
     rarity: "comum",
     speed: 90,
   },
   Psyduck: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/psyduck.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 42,
-    attacks: { "Arranh�o": [8, 15], "Pistola d'�gua": [12, 22] },
+    attacks: { "Arranhão": [8, 15], "Pistola d'Água": [12, 22] },
     rarity: "comum",
     speed: 55,
   },
@@ -529,7 +523,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mankey.gif",
     type: "Lutador",
     baseHP: 35,
-    attacks: { "Arranh�o": [10, 18], "Soco Karatê": [15, 28] },
+    attacks: { "Arranhão": [10, 18], "Soco Karatê": [15, 28] },
     rarity: "comum",
     speed: 70,
   },
@@ -543,18 +537,25 @@ export const wildPokemon: Record<
   },
   Poliwag: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/poliwag.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 35,
-    attacks: { "Pistola d'�gua": [10, 18], Hipnose: [0, 0] },
+    attacks: { "Pistola d'Água": [10, 18], Hipnose: [0, 0] },
     rarity: "comum",
     speed: 90,
   },
-  Abra: { sprite: "https://play.pokemonshowdown.com/sprites/ani/abra.gif", type: "Ps�quico", baseHP: 20, attacks: { Teletransporte: [0, 0] }, rarity: "raro", speed: 90 },
+  Abra: {
+    sprite: "https://play.pokemonshowdown.com/sprites/ani/abra.gif", 
+    type: "Psíquico", 
+    baseHP: 20, 
+    attacks: { Teletransporte: [0, 0] }, 
+    rarity: "raro", 
+    speed: 90 
+  },
   Machop: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/machop.gif",
     type: "Lutador",
     baseHP: 50,
-    attacks: { "Soco Karatê": [15, 28], "Golpe Baixo": [12, 22] },
+    attacks: { "Soco Karaté": [15, 28], "Golpe Baixo": [12, 22] },
     rarity: "comum",
     speed: 35,
   },
@@ -562,15 +563,15 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/bellsprout.gif",
     type: "Grama/Veneno",
     baseHP: 40,
-    attacks: { "Chicote de Vinha": [12, 22], "Ýcido": [10, 18] },
+    attacks: { "Chicote de Vinha": [12, 22], "Ácido": [10, 18] },
     rarity: "comum",
     speed: 40,
   },
   Tentacool: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/tentacool.gif",
-    type: "�gua/Veneno",
+    type: "Água/Veneno",
     baseHP: 35,
-    attacks: { Picada: [10, 18], "Pistola d'�gua": [12, 22] },
+    attacks: { Picada: [10, 18], "Pistola d'Água": [12, 22] },
     rarity: "comum",
     speed: 70,
   },
@@ -592,17 +593,17 @@ export const wildPokemon: Record<
   },
   Slowpoke: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/slowpoke.gif",
-    type: "�gua/Ps�quico",
+    type: "Água/Psíquico",
     baseHP: 70,
-    attacks: { "Pistola d'�gua": [10, 18], "Confus�o": [12, 22] },
+    attacks: { "Pistola d'Água": [10, 18], "Confusão": [12, 22] },
     rarity: "comum",
     speed: 15,
   },
   Magnemite: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/magnemite.gif",
-    type: "El�trico/Aço",
+    type: "Elétrico/Aço",
     baseHP: 28,
-    attacks: { "Choque do Trov�o": [12, 22], "Supersônico": [8, 15] },
+    attacks: { "Choque do Trovão": [12, 22], "Supersónico": [8, 15] },
     rarity: "raro",
     speed: 45,
   },
@@ -616,9 +617,9 @@ export const wildPokemon: Record<
   },
   Seel: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/seel.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 50,
-    attacks: { "Pistola d'�gua": [12, 22], Chifrada: [15, 28] },
+    attacks: { "Pistola d'Água": [12, 22], Chifrada: [15, 28] },
     rarity: "comum",
     speed: 45,
   },
@@ -626,15 +627,15 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/grimer.gif",
     type: "Veneno",
     baseHP: 55,
-    attacks: { "Bola de Lama": [12, 22], "Ýcido": [15, 28] },
+    attacks: { "Bola de Lama": [12, 22], "Ácido": [15, 28] },
     rarity: "comum",
     speed: 25,
   },
   Shellder: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/shellder.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 28,
-    attacks: { "Pistola d'�gua": [10, 18], "Raio de Gelo": [15, 28] },
+    attacks: { "Pistola d'Água": [10, 18], "Raio de Gelo": [15, 28] },
     rarity: "comum",
     speed: 40,
   },
@@ -656,33 +657,33 @@ export const wildPokemon: Record<
   },
   Drowzee: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/drowzee.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 45,
-    attacks: { "Confus�o": [12, 22], Hipnose: [0, 0] },
+    attacks: { "Confusão": [12, 22], Hipnose: [0, 0] },
     rarity: "comum",
     speed: 42,
   },
   Krabby: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/krabby.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 28,
-    attacks: { "Pistola d'�gua": [10, 18], "Garra de Metal": [15, 28] },
+    attacks: { "Pistola d'Água": [10, 18], "Garra de Metal": [15, 28] },
     rarity: "comum",
     speed: 50,
   },
   Voltorb: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/voltorb.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 35,
-    attacks: { "Choque do Trov�o": [12, 22], "Autodestruição": [40, 60] },
+    attacks: { "Choque do Trovão": [12, 22], "Autodestruio": [40, 60] },
     rarity: "comum",
     speed: 100,
   },
   Exeggcute: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/exeggcute.gif",
-    type: "Grama/Ps�quico",
+    type: "Grama/Psíquico",
     baseHP: 45,
-    attacks: { "Confus�o": [12, 22], "Bomba de Semente": [18, 35] },
+    attacks: { "Confusão": [12, 22], "Bomba de Semente": [18, 35] },
     rarity: "raro",
     speed: 40,
   },
@@ -698,7 +699,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/hitmonlee.gif",
     type: "Lutador",
     baseHP: 42,
-    attacks: { "Chute Alto": [20, 38], "Chute Giratório": [25, 45] },
+    attacks: { "Chute Alto": [20, 38], "Chute Giratrio": [25, 45] },
     rarity: "raro",
     speed: 87,
   },
@@ -722,7 +723,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/koffing.gif",
     type: "Veneno",
     baseHP: 35,
-    attacks: { "Bola de Lama": [12, 22], "Autodestruição": [40, 60] },
+    attacks: { "Bola de Lama": [12, 22], "Autodestruio": [40, 60] },
     rarity: "comum",
     speed: 35,
   },
@@ -746,7 +747,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/tangela.gif",
     type: "Grama",
     baseHP: 50,
-    attacks: { "Chicote de Vinha": [15, 28], "Constri��o": [18, 35] },
+    attacks: { "Chicote de Vinha": [15, 28], "Constrição": [18, 35] },
     rarity: "comum",
     speed: 60,
   },
@@ -760,33 +761,33 @@ export const wildPokemon: Record<
   },
   Horsea: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/horsea.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 28,
-    attacks: { "Pistola d'�gua": [12, 22], "Raio de Bolhas": [15, 28] },
+    attacks: { "Pistola d'Água": [12, 22], "Raio de Bolhas": [15, 28] },
     rarity: "comum",
     speed: 60,
   },
   Goldeen: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/goldeen.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 38,
-    attacks: { Bicada: [12, 22], "Pistola d'�gua": [15, 28] },
+    attacks: { Bicada: [12, 22], "Pistola d'Água": [15, 28] },
     rarity: "comum",
     speed: 63,
   },
   Staryu: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/staryu.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 28,
-    attacks: { "Pistola d'�gua": [12, 22], "Raio de Bolhas": [15, 28] },
+    attacks: { "Pistola d'Água": [12, 22], "Raio de Bolhas": [15, 28] },
     rarity: "comum",
     speed: 85,
   },
   Mr_Mime: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mrmime.gif",
-    type: "Ps�quico/Fada",
+    type: "Psíquico/Fada",
     baseHP: 35,
-    attacks: { "Confus�o": [15, 28], Barreira: [0, 0] },
+    attacks: { "Confusão": [15, 28], Barreira: [0, 0] },
     rarity: "raro",
     speed: 90,
   },
@@ -800,17 +801,17 @@ export const wildPokemon: Record<
   },
   Jynx: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/jynx.gif",
-    type: "Gelo/Ps�quico",
+    type: "Gelo/Psíquico",
     baseHP: 50,
-    attacks: { "Soco de Gelo": [20, 38], "Confus�o": [15, 28] },
+    attacks: { "Soco de Gelo": [20, 38], "Confusão": [15, 28] },
     rarity: "raro",
     speed: 95,
   },
   Electabuzz: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/electabuzz.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 50,
-    attacks: { "Soco Trov�o": [20, 38], "Choque do Trov�o": [25, 45] },
+    attacks: { "Soco Trovão": [20, 38], "Choque do Trovão": [25, 45] },
     rarity: "raro",
     speed: 105,
   },
@@ -818,7 +819,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/magmar.gif",
     type: "Fogo",
     baseHP: 50,
-    attacks: { "Soco de Fogo": [20, 38], "Lan�a_Chamas": [25, 45] },
+    attacks: { "Soco de Fogo": [20, 38], "Lança_Chamas": [25, 45] },
     rarity: "raro",
     speed: 93,
   },
@@ -840,7 +841,7 @@ export const wildPokemon: Record<
   },
   Magikarp: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/magikarp.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 15,
     attacks: { Splash: [0, 0] },
     rarity: "comum",
@@ -848,7 +849,7 @@ export const wildPokemon: Record<
   },
   Gyarados: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/gyarados.gif",
-    type: "�gua/Voador",
+    type: "Água/Voador",
     baseHP: 95,
     attacks: { "Hidro Bomba": [35, 60], Mordida: [25, 45] },
     rarity: "raro",
@@ -856,7 +857,7 @@ export const wildPokemon: Record<
   },
   Lapras: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/lapras.gif",
-    type: "�gua/Gelo",
+    type: "Água/Gelo",
     baseHP: 100,
     attacks: { "Raio de Gelo": [25, 45], "Hidro Bomba": [30, 55] },
     rarity: "raro",
@@ -866,7 +867,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/ditto.gif",
     type: "Normal",
     baseHP: 40,
-    attacks: { "Transforma��o": [0, 0] },
+    attacks: { "Transformao": [0, 0] },
     rarity: "raro",
     speed: 48,
   },
@@ -882,23 +883,23 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif",
     type: "Normal",
     baseHP: 40,
-    attacks: { Investida: [12, 22], "Ataque R�pido": [15, 28] },
+    attacks: { Investida: [12, 22], "Ataque Rápido": [15, 28] },
     rarity: "raro",
     speed: 55,
   },
   Vaporeon: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/vaporeon.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 80,
-    attacks: { "Pistola d'�gua": [18, 32], "Raio de Gelo": [22, 38] },
+    attacks: { "Pistola d'Água": [18, 32], "Raio de Gelo": [22, 38] },
     rarity: "raro",
     speed: 65,
   },
   Jolteon: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/jolteon.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 45,
-    attacks: { "Choque do Trov�o": [18, 32], "Ataque R�pido": [20, 35] },
+    attacks: { "Choque do Trovão": [18, 32], "Ataque Rápido": [20, 35] },
     rarity: "raro",
     speed: 130,
   },
@@ -906,7 +907,7 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/flareon.gif",
     type: "Fogo",
     baseHP: 45,
-    attacks: { Brasa: [18, 32], "Lan�a_Chamas": [22, 38] },
+    attacks: { Brasa: [18, 32], "Lança_Chamas": [22, 38] },
     rarity: "raro",
     speed: 65,
   },
@@ -914,39 +915,39 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/porygon.gif",
     type: "Normal",
     baseHP: 40,
-    attacks: { Investida: [15, 28], "Raio Ps�quico": [20, 38] },
+    attacks: { Investida: [15, 28], "Raio Psíquico": [20, 38] },
     rarity: "raro",
     speed: 40,
   },
   Omanyte: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/omanyte.gif",
-    type: "Pedra/�gua",
+    type: "Pedra/Água",
     baseHP: 35,
-    attacks: { "Pistola d'�gua": [12, 22], "Arremesso de Pedras": [15, 28] },
+    attacks: { "Pistola d'Água": [12, 22], "Arremesso de Pedras": [15, 28] },
     rarity: "raro",
     speed: 35,
   },
   Omastar: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/omastar.gif",
-    type: "Pedra/�gua",
+    type: "Pedra/Água",
     baseHP: 55,
-    attacks: { "Pistola d'�gua": [18, 32], "Arremesso de Pedras": [20, 38] },
+    attacks: { "Pistola d'Água": [18, 32], "Arremesso de Pedras": [20, 38] },
     rarity: "raro",
     speed: 55,
   },
   Kabuto: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/kabuto.gif",
-    type: "Pedra/�gua",
+    type: "Pedra/Água",
     baseHP: 30,
-    attacks: { "Arranh�o": [12, 22], "Arremesso de Pedras": [15, 28] },
+    attacks: { "Arranhão": [12, 22], "Arremesso de Pedras": [15, 28] },
     rarity: "raro",
     speed: 55,
   },
   Kabutops: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/kabutops.gif",
-    type: "Pedra/�gua",
+    type: "Pedra/Água",
     baseHP: 60,
-    attacks: { "Arranh�o": [20, 35], "Arremesso de Pedras": [22, 40] },
+    attacks: { "Arranhão": [20, 35], "Arremesso de Pedras": [22, 40] },
     rarity: "raro",
     speed: 80,
   },
@@ -976,9 +977,9 @@ export const wildPokemon: Record<
   },
   Zapdos: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/zapdos.gif",
-    type: "El�trico/Voador",
+    type: "Elétrico/Voador",
     baseHP: 80,
-    attacks: { "Choque do Trov�o": [30, 55], "Trov�o": [40, 70] },
+    attacks: { "Choque do Trovão": [30, 55], "Trovão": [40, 70] },
     rarity: "lendario",
     speed: 100,
   },
@@ -986,47 +987,47 @@ export const wildPokemon: Record<
     sprite: "https://play.pokemonshowdown.com/sprites/ani/moltres.gif",
     type: "Fogo/Voador",
     baseHP: 80,
-    attacks: { "Lan�a_Chamas": [30, 55], "Tempestade de Fogo": [40, 70] },
+    attacks: { "Lança_Chamas": [30, 55], "Tempestade de Fogo": [40, 70] },
     rarity: "lendario",
     speed: 90,
   },
   Dratini: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/dratini.gif",
-    type: "Drag�o",
+    type: "Dragão",
     baseHP: 35,
-    attacks: { Investida: [15, 28], "F�ria do Drag�o": [20, 38] },
+    attacks: { Investida: [15, 28], "Fúria do Dragão": [20, 38] },
     rarity: "raro",
     speed: 50,
   },
   Dragonair: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/dragonair.gif",
-    type: "Drag�o",
+    type: "Dragão",
     baseHP: 55,
-    attacks: { Investida: [20, 38], "F�ria do Drag�o": [25, 45] },
+    attacks: { Investida: [20, 38], "Fúria do Dragão": [25, 45] },
     rarity: "raro",
     speed: 70,
   },
   Dragonite: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/dragonite.gif",
-    type: "Drag�o/Voador",
+    type: "Dragão/Voador",
     baseHP: 80,
-    attacks: { "F�ria do Drag�o": [35, 60], Hiper_Raio: [45, 80] },
+    attacks: { "Fúria do Dragão": [35, 60], Hiper_Raio: [45, 80] },
     rarity: "muito raro",
     speed: 80,
   },
   Mewtwo: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 100,
-    attacks: { "Ps�quico": [40, 70], "Bola Sombria": [45, 80] },
+    attacks: { "Psíquico": [40, 70], "Bola Sombria": [45, 80] },
     rarity: "lendario",
     speed: 130,
   },
   Mew: {
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mew.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 90,
-    attacks: { "Ps�quico": [35, 60], "Metr�nomo": [30, 55] },
+    attacks: { "Psíquico": [35, 60], "Metronôme": [30, 55] },
     rarity: "lendario",
     speed: 100,
   },
@@ -1059,7 +1060,7 @@ export const wildPokemon: Record<
   Chinchou: {
     attacks: { "Thunder Wave": [10, 18], "Water Gun": [8, 15] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/chinchou.gif",
-    type: "�gua/El�trico",
+    type: "Água/Elétrico",
     baseHP: 35,
     rarity: "comum",
     speed: 30,
@@ -1067,7 +1068,7 @@ export const wildPokemon: Record<
   Pichu: {
     attacks: { "Thunder Shock": [8, 15], "Sweet Kiss": [5, 10] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/pichu.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 25,
     rarity: "comum",
     speed: 60,
@@ -1099,7 +1100,7 @@ export const wildPokemon: Record<
   Natu: {
     attacks: { Bicada: [8, 15], "Night Shade": [10, 18] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/natu.gif",
-    type: "Ps�quico/Voador",
+    type: "Psíquico/Voador",
     baseHP: 30,
     rarity: "comum",
     speed: 70,
@@ -1107,7 +1108,7 @@ export const wildPokemon: Record<
   Mareep: {
     attacks: { "Thunder Shock": [10, 18], Investida: [8, 15] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mareep.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 35,
     rarity: "comum",
     speed: 35,
@@ -1115,7 +1116,7 @@ export const wildPokemon: Record<
   Marill: {
     attacks: { "Water Gun": [10, 18], Investida: [8, 15] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/marill.gif",
-    type: "�gua/Fada",
+    type: "Água/Fada",
     baseHP: 40,
     rarity: "comum",
     speed: 40,
@@ -1137,7 +1138,7 @@ export const wildPokemon: Record<
     speed: 60,
   },
   Aipom: {
-    attacks: { "Arranh�o": [12, 22], Swift: [15, 25] },
+    attacks: { "Arranhão": [12, 22], Swift: [15, 25] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/aipom.gif",
     type: "Normal",
     baseHP: 30,
@@ -1163,7 +1164,7 @@ export const wildPokemon: Record<
   Wooper: {
     attacks: { "Water Gun": [8, 15], "Mud Shot": [10, 18] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/wooper.gif",
-    type: "�gua/Terra",
+    type: "Água/Terra",
     baseHP: 35,
     rarity: "comum",
     speed: 20,
@@ -1187,13 +1188,13 @@ export const wildPokemon: Record<
   Unown: {
     attacks: { "Hidden Power": [20, 35] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/unown.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 24,
     rarity: "comum",
     speed: 48,
   },
   Pineco: {
-    attacks: { Investida: [8, 15], "Self-Destruct": [40, 70] },
+    attacks: { Investida: [8, 15], "Autodestruio": [40, 70] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/pineco.gif",
     type: "Inseto",
     baseHP: 30,
@@ -1227,7 +1228,7 @@ export const wildPokemon: Record<
   Qwilfish: {
     attacks: { "Poison Sting": [15, 25], "Water Gun": [12, 22] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/qwilfish.gif",
-    type: "�gua/Veneno",
+    type: "Água/Veneno",
     baseHP: 38,
     rarity: "comum",
     speed: 85,
@@ -1249,7 +1250,7 @@ export const wildPokemon: Record<
     speed: 115,
   },
   Teddiursa: {
-    attacks: { "Arranh�o": [12, 22], "Sweet Scent": [8, 15] },
+    attacks: { "Arranhão": [12, 22], "Sweet Scent": [8, 15] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/teddiursa.gif",
     type: "Normal",
     baseHP: 35,
@@ -1275,7 +1276,7 @@ export const wildPokemon: Record<
   Corsola: {
     attacks: { "Water Gun": [12, 22], "Ancient Power": [15, 25] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/corsola.gif",
-    type: "�gua/Pedra",
+    type: "Água/Pedra",
     baseHP: 35,
     rarity: "comum",
     speed: 30,
@@ -1283,7 +1284,7 @@ export const wildPokemon: Record<
   Remoraid: {
     attacks: { "Water Gun": [10, 18], "Aurora Beam": [12, 22] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/remoraid.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 25,
     rarity: "comum",
     speed: 65,
@@ -1339,7 +1340,7 @@ export const wildPokemon: Record<
   Smoochum: {
     attacks: { "Sweet Kiss": [8, 15], "Powder Snow": [10, 18] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/smoochum.gif",
-    type: "Gelo/Ps�quico",
+    type: "Gelo/Psíquico",
     baseHP: 30,
     rarity: "comum",
     speed: 45,
@@ -1347,7 +1348,7 @@ export const wildPokemon: Record<
   Elekid: {
     attacks: { "Thunder Punch": [15, 25], Swift: [12, 22] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/elekid.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 30,
     rarity: "comum",
     speed: 95,
@@ -1361,7 +1362,7 @@ export const wildPokemon: Record<
     speed: 83,
   },
 
-  // PokÃƒÂ©mon de Johto - Raros
+  // PokÃÂ©mon de Johto - Raros
   Crobat: {
     attacks: { "Air Slash": [30, 50], "Cross Poison": [25, 40] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/crobat.gif",
@@ -1373,7 +1374,7 @@ export const wildPokemon: Record<
   Lanturn: {
     attacks: { Thunderbolt: [35, 60], Surf: [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/lanturn.gif",
-    type: "�gua/El�trico",
+    type: "Água/Elétrico",
     baseHP: 63,
     rarity: "raro",
     speed: 65,
@@ -1389,7 +1390,7 @@ export const wildPokemon: Record<
   Xatu: {
     attacks: { Psychic: [35, 60], "Air Slash": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/xatu.gif",
-    type: "Ps�quico/Voador",
+    type: "Psíquico/Voador",
     baseHP: 38,
     rarity: "raro",
     speed: 95,
@@ -1397,7 +1398,7 @@ export const wildPokemon: Record<
   Flaaffy: {
     attacks: { "Thunder Punch": [20, 35], "Fire Punch": [18, 30] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/flaaffy.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 40,
     rarity: "raro",
     speed: 45,
@@ -1405,7 +1406,7 @@ export const wildPokemon: Record<
   Ampharos: {
     attacks: { Thunder: [40, 70], "Fire Punch": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/ampharos.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 45,
     rarity: "raro",
     speed: 55,
@@ -1421,7 +1422,7 @@ export const wildPokemon: Record<
   Azumarill: {
     attacks: { "Hydro Pump": [35, 60], "Play Rough": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/azumarill.gif",
-    type: "�gua/Fada",
+    type: "Água/Fada",
     baseHP: 50,
     rarity: "raro",
     speed: 50,
@@ -1437,7 +1438,7 @@ export const wildPokemon: Record<
   Politoed: {
     attacks: { "Hydro Pump": [40, 70], Hypnosis: [15, 25] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/politoed.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 45,
     rarity: "raro",
     speed: 70,
@@ -1461,7 +1462,7 @@ export const wildPokemon: Record<
   Quagsire: {
     attacks: { Earthquake: [35, 60], Surf: [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/quagsire.gif",
-    type: "�gua/Terra",
+    type: "Água/Terra",
     baseHP: 54,
     rarity: "raro",
     speed: 35,
@@ -1469,7 +1470,7 @@ export const wildPokemon: Record<
   Espeon: {
     attacks: { Psychic: [40, 70], "Morning Sun": [20, 35] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/espeon.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 38,
     rarity: "raro",
     speed: 110,
@@ -1485,7 +1486,7 @@ export const wildPokemon: Record<
   Slowking: {
     attacks: { Psychic: [35, 60], "Water Pulse": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/slowking.gif",
-    type: "�gua/Ps�quico",
+    type: "Água/Psíquico",
     baseHP: 54,
     rarity: "raro",
     speed: 30,
@@ -1493,7 +1494,7 @@ export const wildPokemon: Record<
   Wobbuffet: {
     attacks: { Counter: [30, 50], "Mirror Coat": [25, 40] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/wobbuffet.gif",
-    type: "Ps�quico",
+    type: "Psíquico",
     baseHP: 95,
     rarity: "raro",
     speed: 33,
@@ -1501,7 +1502,7 @@ export const wildPokemon: Record<
   Girafarig: {
     attacks: { Psychic: [30, 50], Stomp: [25, 40] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/girafarig.gif",
-    type: "Normal/Ps�quico",
+    type: "Normal/Psíquico",
     baseHP: 40,
     rarity: "raro",
     speed: 85,
@@ -1509,7 +1510,7 @@ export const wildPokemon: Record<
   Forretress: {
     attacks: { "Gyro Ball": [30, 50], Explosion: [50, 90] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/forretress.gif",
-    type: "Inseto/AÃƒÂ§o",
+    type: "Inseto/Aço",
     baseHP: 40,
     rarity: "raro",
     speed: 40,
@@ -1517,7 +1518,7 @@ export const wildPokemon: Record<
   Steelix: {
     attacks: { "Iron Tail": [40, 70], Earthquake: [45, 80] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/steelix.gif",
-    type: "AÃƒÂ§o/Terra",
+    type: "Aço/Terra",
     baseHP: 40,
     rarity: "raro",
     speed: 30,
@@ -1533,7 +1534,7 @@ export const wildPokemon: Record<
   Scizor: {
     attacks: { "Bullet Punch": [35, 60], "U-turn": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/scizor.gif",
-    type: "Inseto/AÃƒÂ§o",
+    type: "Inseto/Aço",
     baseHP: 40,
     rarity: "raro",
     speed: 65,
@@ -1573,7 +1574,7 @@ export const wildPokemon: Record<
   Octillery: {
     attacks: { Octazooka: [35, 60], "Ice Beam": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/octillery.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 40,
     rarity: "raro",
     speed: 45,
@@ -1581,7 +1582,7 @@ export const wildPokemon: Record<
   Mantine: {
     attacks: { "Water Pulse": [30, 50], "Air Slash": [25, 40] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mantine.gif",
-    type: "�gua/Voador",
+    type: "Água/Voador",
     baseHP: 38,
     rarity: "raro",
     speed: 70,
@@ -1589,7 +1590,7 @@ export const wildPokemon: Record<
   Skarmory: {
     attacks: { "Steel Wing": [35, 60], "Air Slash": [30, 50] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/skarmory.gif",
-    type: "AÃƒÂ§o/Voador",
+    type: "Aço/Voador",
     baseHP: 38,
     rarity: "raro",
     speed: 70,
@@ -1605,7 +1606,7 @@ export const wildPokemon: Record<
   Kingdra: {
     attacks: { "Hydro Pump": [40, 70], "Dragon Pulse": [35, 60] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/kingdra.gif",
-    type: "�gua/DragÃƒÂ£o",
+    type: "Água/Dragão",
     baseHP: 40,
     rarity: "raro",
     speed: 85,
@@ -1651,11 +1652,11 @@ export const wildPokemon: Record<
     speed: 55,
   },
 
-  // Johto - LendÃƒÂ¡rios
+  // Johto - LendÃÂ¡rios
   Raikou: {
     attacks: { Thunder: [70, 120], "Thunder Fang": [60, 100] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/raikou.gif",
-    type: "El�trico",
+    type: "Elétrico",
     baseHP: 45,
     rarity: "lendario",
     speed: 115,
@@ -1671,7 +1672,7 @@ export const wildPokemon: Record<
   Suicune: {
     attacks: { "Hydro Pump": [70, 120], "Aurora Beam": [60, 100] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/suicune.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 50,
     rarity: "lendario",
     speed: 85,
@@ -1703,7 +1704,7 @@ export const wildPokemon: Record<
   Lugia: {
     attacks: { Aeroblast: [80, 140], Psychic: [70, 120] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/lugia.gif",
-    type: "Ps�quico/Voador",
+    type: "Psíquico/Voador",
     baseHP: 63,
     rarity: "lendario",
     speed: 90,
@@ -1719,7 +1720,7 @@ export const wildPokemon: Record<
   Celebi: {
     attacks: { "Leaf Storm": [70, 120], Psychic: [60, 100] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/celebi.gif",
-    type: "Ps�quico/Grama",
+    type: "Psíquico/Grama",
     baseHP: 50,
     rarity: "lendario",
     speed: 100,
@@ -1745,7 +1746,7 @@ export const wildPokemon: Record<
   Mudkip: {
     attacks: { "Water Gun": [12, 22], Tackle: [10, 18] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/mudkip.gif",
-    type: "�gua",
+    type: "Água",
     baseHP: 42,
     rarity: "comum",
     speed: 40,
@@ -1753,7 +1754,7 @@ export const wildPokemon: Record<
   Ralts: {
     attacks: { Confusion: [10, 18], "Disarming Voice": [12, 22] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/ralts.gif",
-    type: "Ps�quico/Fada",
+    type: "Psíquico/Fada",
     baseHP: 28,
     rarity: "comum",
     speed: 40,
@@ -1763,7 +1764,7 @@ export const wildPokemon: Record<
   Beldum: {
     attacks: { "Take Down": [14, 24], "Iron Head": [16, 28] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/beldum.gif",
-    type: "AÃƒÂ§o/Ps�quico",
+    type: "Aço/Psíquico",
     baseHP: 40,
     rarity: "raro",
     speed: 30,
@@ -1787,7 +1788,7 @@ export const wildPokemon: Record<
   Marshtomp: {
     attacks: { "Mud Shot": [25, 40], "Water Pulse": [28, 45] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/marshtomp.gif",
-    type: "�gua/Terra",
+    type: "Água/Terra",
     baseHP: 55,
     rarity: "raro",
     speed: 50,
@@ -1795,7 +1796,7 @@ export const wildPokemon: Record<
   Kirlia: {
     attacks: { Psybeam: [25, 40], "Draining Kiss": [22, 36] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/kirlia.gif",
-    type: "Ps�quico/Fada",
+    type: "Psíquico/Fada",
     baseHP: 38,
     rarity: "raro",
     speed: 50,
@@ -1803,13 +1804,13 @@ export const wildPokemon: Record<
   Metang: {
     attacks: { "Metal Claw": [28, 45], Psychic: [25, 40] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/metang.gif",
-    type: "AÃƒÂ§o/Ps�quico",
+    type: "Aço/Psíquico",
     baseHP: 60,
     rarity: "raro",
     speed: 50,
   },
 
-  // Hoenn - LendÃƒÂ¡rios
+  // Hoenn - LendÃÂ¡rios
   Sceptile: {
     attacks: { "Leaf Storm": [70, 120], "Dragon Claw": [60, 100] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/sceptile.gif",
@@ -1829,7 +1830,7 @@ export const wildPokemon: Record<
   Swampert: {
     attacks: { Earthquake: [75, 130], "Hydro Pump": [70, 120] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/swampert.gif",
-    type: "�gua/Terra",
+    type: "Água/Terra",
     baseHP: 62,
     rarity: "lendario",
     speed: 60,
@@ -1837,7 +1838,7 @@ export const wildPokemon: Record<
   Gardevoir: {
     attacks: { Psychic: [70, 120], "Moonblast": [65, 110] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/gardevoir.gif",
-    type: "Ps�quico/Fada",
+    type: "Psíquico/Fada",
     baseHP: 55,
     rarity: "lendario",
     speed: 80,
@@ -1845,7 +1846,7 @@ export const wildPokemon: Record<
   Metagross: {
     attacks: { "Meteor Mash": [80, 140], ZenHeadbutt: [65, 110] },
     sprite: "https://play.pokemonshowdown.com/sprites/ani/metagross.gif",
-    type: "AÃƒÂ§o/Ps�quico",
+    type: "Aço/Psíquico",
     baseHP: 70,
     rarity: "lendario",
     speed: 70,
@@ -1892,37 +1893,37 @@ Object.keys(wildPokemon).forEach((name) => {
 })
 
 const ensureSpeciesInWild = (name: string) => {
-  if ((wildPokemon as any)[name]) return
-  // Known legendary species list (covers across gens 1-9)
-  const LEGENDARY_SPECIES = new Set([
-    "Articuno","Zapdos","Moltres","Mewtwo","Mew","Lugia","HoOh","Raikou","Entei","Suicune","Celebi",
-    "Regirock","Regice","Registeel","Latias","Latios","Kyogre","Groudon","Rayquaza","Jirachi","Deoxys",
-    "Uxie","Mesprit","Azelf","Dialga","Palkia","Giratina","Heatran","Regigigas","Cresselia","Phione","Manaphy","Darkrai","Shaymin","Arceus",
-    "Victini","Cobalion","Terrakion","Virizion","Tornadus","Thundurus","Landorus","Reshiram","Zekrom","Kyurem","Keldeo","Meloetta","Genesect",
-    "Xerneas","Yveltal","Zygarde","Diancie","Hoopa","Volcanion","Type_Null","Silvally","Tapu_Koko","Tapu_Lele","Tapu_Bulu","Tapu_Fini",
-    "Cosmog","Cosmoem","Solgaleo","Lunala","Necrozma","Magearna","Marshadow","Zacian","Zamazenta","Eternatus","Kubfu","Urshifu","Zarude",
-    "Regieleki","Regidrago","Glastrier","Spectrier","Calyrex","Koraidon","Miraidon","Wo_Chien","Chien_Pao","Ting_Lu","Chi_Yu","Roaring_Steppe","Great_Karina",
-    "Terapagos","Ogerpon","Okidogi","Munkidori","Fezandipiti","Pecharunt",
-  ])
+  // ✅ Normaliza o nome do Pokémon
+  const normalizedName = normalizePokemonName(name);
+
+  // ✅ Verifica se o Pokémon já existe (com nome normalizado ou original)
+  if ((wildPokemon as any)[name] || (wildPokemon as any)[normalizedName]) return;
+
+  // Lista de Pokémon lendários
+  const LEGENDARY_SPECIES = new Set([...]);
 
   const defaultEntry = {
-    sprite: `https://play.pokemonshowdown.com/sprites/ani/${name.toLowerCase().replace(/[^a-z0-9]/gi, "")}.gif`,
+    sprite: `https://play.pokemonshowdown.com/sprites/ani/${normalizedName}.gif`,
     type: getCanonicalPokemonType(name, "Normal"),
     baseHP: 40,
     attacks: { Investida: [8, 15] },
     rarity: (LEGENDARY_SPECIES.has(name) ? "lendario" : "comum") as PokemonRarity,
     speed: 50,
-  }
+  };
 
-  ;(wildPokemon as any)[name] = defaultEntry
+  // ✅ Apenas aplica defaultEntry se não existir e loga um aviso
+  console.warn(`Pokémon ${name} não encontrado em wildPokemon! Adicionando default entry.`);
+  (wildPokemon as any)[name] = defaultEntry;
 
   try {
-    const spriteSet = getPokemonSpriteSet(name, defaultEntry.sprite)
-    pokemonSpriteCatalog[name] = spriteSet
-    ;(wildPokemon as any)[name].sprite = spriteSet.original
-    ;(wildPokemon as any)[name].spriteSet = spriteSet
-  } catch {}
-}
+    const spriteSet = getPokemonSpriteSet(name, defaultEntry.sprite);
+    pokemonSpriteCatalog[name] = spriteSet;
+    (wildPokemon as any)[name].sprite = spriteSet.original;
+    (wildPokemon as any)[name].spriteSet = spriteSet;
+  } catch (error) {
+    console.error(`Erro ao carregar sprite para ${name}:`, error);
+  }
+};
 
 // Add species from every generation list once wildPokemon exists.
 const allGenLists: string[][] = [
@@ -2062,7 +2063,7 @@ export const wildPokemonStats: Record<string, { baseHP: number; hpMultiplier: nu
   Aerodactyl: { baseHP: 49, hpMultiplier: 1.1 },
   Snorlax: { baseHP: 99, hpMultiplier: 2.2 },
 
-  // LendÃƒÂ¡rios
+  // LendÃÂ¡rios
   Articuno: { baseHP: 58, hpMultiplier: 1.3 },
   Zapdos: { baseHP: 58, hpMultiplier: 1.3 },
   Moltres: { baseHP: 58, hpMultiplier: 1.3 },
@@ -2153,7 +2154,7 @@ export const wildPokemonStats: Record<string, { baseHP: number; hpMultiplier: nu
   Miltank: { baseHP: 54, hpMultiplier: 1.2 },
   Blissey: { baseHP: 112, hpMultiplier: 2.5 },
 
-  // Johto - LendÃƒÂ¡rios
+  // Johto - LendÃÂ¡rios
   Raikou: { baseHP: 45, hpMultiplier: 1.0 },
   Entei: { baseHP: 63, hpMultiplier: 1.4 },
   Suicune: { baseHP: 50, hpMultiplier: 1.1 },
@@ -2184,9 +2185,9 @@ export const wildPokemonStats: Record<string, { baseHP: number; hpMultiplier: nu
 
 export const MOVE_PP: Record<string, number> = {
   // Basic moves - 25-35 PP
-  "Arranh�o": 35,
+  "Arranhão": 35,
   Investida: 35,
-  "Ataque RÃƒÂ¡pido": 30,
+  "Ataque Rápido": 30,
   Rajada: 35,
   Bicada: 35,
   Tapa: 35,
@@ -2195,7 +2196,7 @@ export const MOVE_PP: Record<string, number> = {
 
   // Elemental basic moves - 25 PP
   Brasa: 25,
-  "Pistola d'�gua": 25,
+  "Pistola d'Água": 25,
   "Chicote de Vinha": 25,
   "Thunder Shock": 30,
   Absorver: 25,
@@ -2256,13 +2257,13 @@ export const MOVE_PP: Record<string, number> = {
 const ultraBeasts: Record<string, any> = {
   Nihilego: { sprite: "https://play.pokemonshowdown.com/sprites/ani/nihilego.gif", type: "Pedra/Veneno", baseHP: 45, attacks: { "Bola Sombria": [18, 30], "Anomalia": [14, 26] }, rarity: "lendario", speed: 70 },
   Buzzwole: { sprite: "https://play.pokemonshowdown.com/sprites/ani/buzzwole.gif", type: "Inseto/Lutador", baseHP: 95, attacks: { "Soco Pesado": [30, 50], "Garra de Metal": [20, 36] }, rarity: "lendario", speed: 45 },
-  Pheromosa: { sprite: "https://play.pokemonshowdown.com/sprites/ani/pheromosa.gif", type: "Inseto/Lutador", baseHP: 71, attacks: { "Chute Veloz": [28, 48], "Ataque R�pido": [18, 34] }, rarity: "lendario", speed: 137 },
-  Xurkitree: { sprite: "https://play.pokemonshowdown.com/sprites/ani/xurkitree.gif", type: "El�trico", baseHP: 83, attacks: { "Choque do Trov�o": [28, 48], "Raio": [30, 52] }, rarity: "lendario", speed: 101 },
-  Celesteela: { sprite: "https://play.pokemonshowdown.com/sprites/ani/celesteela.gif", type: "Aço/Voador", baseHP: 97, attacks: { "Lan�a Metálica": [26, 46], "Raio de Gelo": [20, 38] }, rarity: "lendario", speed: 55 },
+  Pheromosa: { sprite: "https://play.pokemonshowdown.com/sprites/ani/pheromosa.gif", type: "Inseto/Lutador", baseHP: 71, attacks: { "Chute Veloz": [28, 48], "Ataque Rápido": [18, 34] }, rarity: "lendario", speed: 137 },
+  Xurkitree: { sprite: "https://play.pokemonshowdown.com/sprites/ani/xurkitree.gif", type: "Elétrico", baseHP: 83, attacks: { "Choque do Trovão": [28, 48], "Raio": [30, 52] }, rarity: "lendario", speed: 101 },
+  Celesteela: { sprite: "https://play.pokemonshowdown.com/sprites/ani/celesteela.gif", type: "Aço/Voador", baseHP: 97, attacks: { "Lança Metálica": [26, 46], "Raio de Gelo": [20, 38] }, rarity: "lendario", speed: 55 },
   Kartana: { sprite: "https://play.pokemonshowdown.com/sprites/ani/kartana.gif", type: "Grama/Aço", baseHP: 59, attacks: { "Corte": [32, 54], "Golpe de Lâmina": [30, 52] }, rarity: "lendario", speed: 109 },
-  Guzzlord: { sprite: "https://play.pokemonshowdown.com/sprites/ani/guzzlord.gif", type: "Sombrio/Drag�o", baseHP: 120, attacks: { "Devoração": [36, 68], "Mordida": [26, 50] }, rarity: "lendario", speed: 38 },
+  Guzzlord: { sprite: "https://play.pokemonshowdown.com/sprites/ani/guzzlord.gif", type: "Sombrio/Dragão", baseHP: 120, attacks: { "Devoração": [36, 68], "Mordida": [26, 50] }, rarity: "lendario", speed: 38 },
   Poipole: { sprite: "https://play.pokemonshowdown.com/sprites/ani/poipole.gif", type: "Veneno", baseHP: 67, attacks: { "Agulha Venenosa": [20, 36], "Bomba Venenosa": [26, 46] }, rarity: "lendario", speed: 87 },
-  Naganadel: { sprite: "https://play.pokemonshowdown.com/sprites/ani/naganadel.gif", type: "Veneno/Drag�o", baseHP: 73, attacks: { "Lan�a Venenosa": [30, 56], "Drag�o Pulsante": [28, 52] }, rarity: "lendario", speed: 117 },
+  Naganadel: { sprite: "https://play.pokemonshowdown.com/sprites/ani/naganadel.gif", type: "Veneno/Dragão", baseHP: 73, attacks: { "Lança Venenosa": [30, 56], "Dragão Pulsante": [28, 52] }, rarity: "lendario", speed: 117 },
   Stakataka: { sprite: "https://play.pokemonshowdown.com/sprites/ani/stakataka.gif", type: "Pedra/Aço", baseHP: 123, attacks: { "Arremesso de Pedras": [36, 68], "Escudo": [0, 0] }, rarity: "lendario", speed: 28 },
   Blacephalon: { sprite: "https://play.pokemonshowdown.com/sprites/ani/blacephalon.gif", type: "Fogo/Fantasma", baseHP: 73, attacks: { "Explosão de Cabeça": [36, 70], "Bola Sombria": [26, 50] }, rarity: "lendario", speed: 97 },
 }
@@ -2323,11 +2324,11 @@ const moveAccuracyLookup: Record<string, number> = {
   thunder: 70,
   thunderbolt: 100,
   "thunder wave": 90,
-  "choque do Trov�o": 100,
+  "choque do Trovão": 100,
   "thunder shock": 100,
   "fire blast": 85,
   flamethrower: 100,
-  "Lan�a chamas": 100,
+  "Lança chamas": 100,
   "hydro pump": 80,
   surf: 100,
   "water pulse": 100,
@@ -2335,7 +2336,7 @@ const moveAccuracyLookup: Record<string, number> = {
   psychic: 100,
   psybeam: 100,
   confusion: 100,
-  "Confus�o": 100,
+  "Confusão": 100,
   "ice beam": 100,
   nevasca: 70,
   blizzard: 70,
@@ -2344,7 +2345,7 @@ const moveAccuracyLookup: Record<string, number> = {
   "gunk shot": 80,
   "cross poison": 100,
   "sweet kiss": 75,
-  supersônico: 55,
+  Supersónico: 55,
   supersonic: 55,
   "string shot": 95,
   tackle: 95,
@@ -2354,7 +2355,7 @@ const moveAccuracyLookup: Record<string, number> = {
   "ataque de asa": 100,
   "wing attack": 100,
   "quick attack": 100,
-  "ataque R�pido": 100,
+  "ataque Rápido": 100,
   "raio de gelo": 100,
   brasa: 100,
   "giro de fogo": 85,
@@ -2397,7 +2398,7 @@ const movePriorityLookup: Record<string, number> = {
   // +1 priority
   "quick attack": 1,
   "ataque rapido": 1,
-  "ataque R�pido": 1,
+  "ataque Rápido": 1,
   "extreme speed": 1,
   "extremespeed": 1,
   "extrema velocidade": 1,
@@ -2405,7 +2406,7 @@ const movePriorityLookup: Record<string, number> = {
   "aqua jet": 1,
   "jato dagua": 1,
   "jato d'agua": 1,
-  "jato d �gua": 1,
+  "jato d Água": 1,
   "mach punch": 1,
   "vacuum wave": 1,
   "onda vacuo": 1,
@@ -2485,18 +2486,18 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
   Charmander: [
     { level: 9, name: "Brasa", power: [14, 24] },
     { level: 15, name: "Giro de Fogo", power: [16, 28] },
-    { level: 30, name: "Lan�a Chamas", power: [28, 46] },
+    { level: 30, name: "Lança Chamas", power: [28, 46] },
   ],
   Charmeleon: [
     { level: 24, name: "Giro de Fogo", power: [18, 30] },
-    { level: 38, name: "Lan�a Chamas", power: [30, 48] },
+    { level: 38, name: "Lança Chamas", power: [30, 48] },
   ],
   Charizard: [
     { level: 36, name: "Ataque de Asa", power: [24, 40] },
-    { level: 46, name: "Lan�a Chamas", power: [34, 54] },
+    { level: 46, name: "Lança Chamas", power: [34, 54] },
   ],
   Squirtle: [
-    { level: 8, name: "Pistola d'�gua", power: [14, 24] },
+    { level: 8, name: "Pistola d'Água", power: [14, 24] },
     { level: 15, name: "Mordida", power: [14, 24] },
     { level: 24, name: "Raio de Bolhas", power: [18, 30] },
     { level: 31, name: "Hidro Bomba", power: [34, 54] },
@@ -2524,7 +2525,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 53, name: "Solar Beam", power: [40, 64] },
   ],
   Pidgey: [
-    { level: 9, name: "Ataque R�pido", power: [14, 24] },
+    { level: 9, name: "Ataque Rápido", power: [14, 24] },
     { level: 12, name: "Agility", power: [0, 0] },
     { level: 18, name: "Ataque de Asa", power: [22, 36] },
     { level: 30, name: "Air Slash", power: [30, 48] },
@@ -2533,7 +2534,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 1, name: "Brasa", power: [12, 22] },
     { level: 1, name: "Mordida", power: [15, 28] },
     { level: 12, name: "Howl", power: [0, 0] },
-    { level: 24, name: "Lan�a Chamas", power: [28, 46] },
+    { level: 24, name: "Lança Chamas", power: [28, 46] },
   ],
   Pidgeotto: [
     { level: 19, name: "Ataque de Asa", power: [24, 38] },
@@ -2541,7 +2542,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 38, name: "Sky Attack", power: [38, 60] },
   ],
   Zubat: [
-    { level: 9, name: "Supersônico", power: [0, 0] },
+    { level: 9, name: "Supersónico", power: [0, 0] },
     { level: 12, name: "Screech", power: [0, 0] },
     { level: 18, name: "Ataque de Asa", power: [22, 36] },
     { level: 28, name: "Air Slash", power: [30, 48] },
@@ -2585,7 +2586,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 34, name: "Dark Pulse", power: [34, 56] },
   ],
   Ralts: [
-    { level: 6, name: "Confus�o", power: [14, 24] },
+    { level: 6, name: "Confusão", power: [14, 24] },
     { level: 12, name: "Psybeam", power: [20, 34] },
     { level: 20, name: "Psychic", power: [32, 52] },
   ],
@@ -2602,7 +2603,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 36, name: "Meteor Mash", power: [36, 58] },
   ],
   Treecko: [
-    { level: 7, name: "Ataque R�pido", power: [14, 24] },
+    { level: 7, name: "Ataque Rápido", power: [14, 24] },
     { level: 16, name: "Leaf Blade", power: [26, 42] },
     { level: 24, name: "Energy Ball", power: [30, 48] },
   ],
@@ -2612,7 +2613,7 @@ const speciesLevelUpMoves: Record<string, LevelUpMove[]> = {
     { level: 36, name: "X-Scissor", power: [34, 56] },
   ],
   Torchic: [
-    { level: 7, name: "Ataque R�pido", power: [14, 24] },
+    { level: 7, name: "Ataque Rápido", power: [14, 24] },
     { level: 16, name: "Flame Charge", power: [22, 36] },
     { level: 24, name: "Blaze Kick", power: [30, 48] },
   ],
@@ -2736,7 +2737,7 @@ const moveStatusEffects: Record<string, MoveStatusEffect> = {
   "gunk shot": { status: "poisoned", chance: 0.3 },
   "thunder wave": { status: "paralyzed", chance: 1 },
   "thunder shock": { status: "paralyzed", chance: 0.2 },
-  "choque do Trov�o": { status: "paralyzed", chance: 0.2 },
+  "choque do Trovão": { status: "paralyzed", chance: 0.2 },
   thunderbolt: { status: "paralyzed", chance: 0.2 },
   thunder: { status: "paralyzed", chance: 0.3 },
   "thunder punch": { status: "paralyzed", chance: 0.15 },
@@ -2748,7 +2749,7 @@ const moveStatusEffects: Record<string, MoveStatusEffect> = {
   brasa: { status: "burned", chance: 0.2 },
   "giro de fogo": { status: "burned", chance: 0.2 },
   "flame charge": { status: "burned", chance: 0.15 },
-  "Lan�a chamas": { status: "burned", chance: 0.2 },
+  "Lança chamas": { status: "burned", chance: 0.2 },
   flamethrower: { status: "burned", chance: 0.2 },
   "fire blast": { status: "burned", chance: 0.25 },
   "tempestade de fogo": { status: "burned", chance: 0.25 },
@@ -2764,10 +2765,10 @@ const moveStatusEffects: Record<string, MoveStatusEffect> = {
   "sweet kiss": { status: "confused", chance: 1, turns: [2, 4] },
   confuse: { status: "confused", chance: 1, turns: [2, 4] },
   confusion: { status: "confused", chance: 0.2, turns: [2, 3] },
-  "Confus�o": { status: "confused", chance: 0.2, turns: [2, 3] },
+  "Confusão": { status: "confused", chance: 0.2, turns: [2, 3] },
   psybeam: { status: "confused", chance: 0.25, turns: [2, 3] },
   "water pulse": { status: "confused", chance: 0.2, turns: [2, 3] },
-  supersônico: { status: "confused", chance: 1, turns: [2, 4] },
+  Supersónico: { status: "confused", chance: 1, turns: [2, 4] },
 }
 
 const moveBattleEffects: Record<string, MoveBattleEffect> = {
@@ -2786,7 +2787,7 @@ const moveBattleEffects: Record<string, MoveBattleEffect> = {
   "swords dance": { target: "self", statChanges: { attack: 2 } },
   "double team": { target: "self", statChanges: { evasion: 1 } },
   minimize: { target: "self", statChanges: { evasion: 2 } },
-  "self-destruct": { target: "opponent", selfDestruct: true },
+  "Autodestruio": { target: "opponent", selfDestruct: true },
   explosion: { target: "opponent", selfDestruct: true },
   transform: { target: "self", transform: true },
   transformacao: { target: "self", transform: true },
@@ -2950,7 +2951,7 @@ export const MAX_TEAM_SIZE = 6
 
 export const typeColors: Record<string, string> = {
   Fogo: "from-red-500 to-orange-500",
-  "�gua": "from-blue-500 to-cyan-500",
+  "Água": "from-blue-500 to-cyan-500",
   Grama: "from-green-500 to-emerald-500",
   Normal: "from-gray-400 to-gray-500",
   Voador: "from-sky-400 to-blue-400",
@@ -2959,12 +2960,12 @@ export const typeColors: Record<string, string> = {
   Terra: "from-yellow-600 to-orange-600",
   Lutador: "from-red-600 to-rose-600",
   Fantasma: "from-indigo-500 to-purple-600",
-  "El�trico": "from-yellow-400 to-yellow-600",
+  "Elétrico": "from-yellow-400 to-yellow-600",
   Inseto: "from-green-600 to-lime-600",
   Fada: "from-pink-400 to-rose-500",
-  "Ps�quico": "from-purple-400 to-pink-500",
+  "Psíquico": "from-purple-400 to-pink-500",
   Gelo: "from-cyan-400 to-blue-500",
-  "Drag�o": "from-indigo-600 to-purple-700",
+  "Dragão": "from-indigo-600 to-purple-700",
   "Aço": "from-gray-500 to-slate-600",
   Sombrio: "from-gray-800 to-black",
 }
@@ -2976,14 +2977,14 @@ const attackTypeLookup: Record<string, string> = {
   aeroblast: "Voador",
   "air slash": "Voador",
   "ancient power": "Pedra",
-  "Arranh�o": "Normal",
+  "Arranhão": "Normal",
   "arremesso de osso": "Terra",
   "arremesso de pedras": "Pedra",
   "ataque de asa": "Voador",
-  "ataque R�pido": "Normal",
+  "ataque Rápido": "Normal",
   "aurora beam": "Gelo",
-  "autodestruição": "Normal",
-  barreira: "Ps�quico",
+  "Autodestruio": "Normal",
+  barreira: "Psíquico",
   bicada: "Voador",
   bite: "Sombrio",
   "blaze kick": "Fogo",
@@ -2991,7 +2992,7 @@ const attackTypeLookup: Record<string, string> = {
   "bola de lama": "Terra",
   "bola sombria": "Fantasma",
   "bomba de semente": "Grama",
-  bolha: "�gua",
+  bolha: "Água",
   brasa: "Fogo",
   "bug bite": "Inseto",
   "bullet punch": "Aço",
@@ -3000,15 +3001,15 @@ const attackTypeLookup: Record<string, string> = {
   cantar: "Normal",
   "chicote de vinha": "Grama",
   chifrada: "Normal",
-  "choque do Trov�o": "El�trico",
+  "choque do Trovão": "Elétrico",
   "chute alto": "Lutador",
   "chute giratório": "Lutador",
   "close combat": "Lutador",
   "comet punch": "Normal",
-  "Confus�o": "Ps�quico",
-  confuse: "Ps�quico",
-  confusion: "Ps�quico",
-  Constri��o: "Normal",
+  "Confusão": "Psíquico",
+  confuse: "Psíquico",
+  confusion: "Psíquico",
+  Constrição: "Normal",
   corte: "Normal",
   counter: "Lutador",
   "cross poison": "Veneno",
@@ -3016,8 +3017,8 @@ const attackTypeLookup: Record<string, string> = {
   "dark pulse": "Sombrio",
   "disarming voice": "Fada",
   "double kick": "Lutador",
-  "dragon claw": "Drag�o",
-  "dragon pulse": "Drag�o",
+  "dragon claw": "Dragão",
+  "dragon pulse": "Dragão",
   "draining kiss": "Fada",
   drenar: "Grama",
   earthquake: "Terra",
@@ -3027,7 +3028,7 @@ const attackTypeLookup: Record<string, string> = {
   "fire blast": "Fogo",
   "fire punch": "Fogo",
   "flame charge": "Fogo",
-  "F�ria do Drag�o": "Drag�o",
+  "Fúria do Dragão": "Dragão",
   "garra de metal": "Aço",
   "giro de fogo": "Fogo",
   "golpe baixo": "Sombrio",
@@ -3038,10 +3039,10 @@ const attackTypeLookup: Record<string, string> = {
   "hammer arm": "Lutador",
   headbutt: "Normal",
   "hidden power": "Normal",
-  "hidro bomba": "�gua",
-  hipnose: "Ps�quico",
-  "hydro pump": "�gua",
-  hypnosis: "Ps�quico",
+  "hidro bomba": "Água",
+  hipnose: "Psíquico",
+  "hydro pump": "Água",
+  hypnosis: "Psíquico",
   "ice beam": "Gelo",
   "ice fang": "Gelo",
   "ice shard": "Gelo",
@@ -3049,7 +3050,7 @@ const attackTypeLookup: Record<string, string> = {
   "iron head": "Aço",
   "iron tail": "Aço",
   lambida: "Fantasma",
-  "Lan�a chamas": "Fogo",
+  "Lança chamas": "Fogo",
   "lava plume": "Fogo",
   "leaf blade": "Grama",
   "leaf storm": "Grama",
@@ -3060,7 +3061,7 @@ const attackTypeLookup: Record<string, string> = {
   metronome: "Normal",
   "métrônomo": "Normal",
   "milk drink": "Normal",
-  "mirror coat": "Ps�quico",
+  "mirror coat": "Psíquico",
   moonblast: "Fada",
   moonlight: "Fada",
   mordida: "Sombrio",
@@ -3069,26 +3070,26 @@ const attackTypeLookup: Record<string, string> = {
   nevasca: "Gelo",
   "night shade": "Fantasma",
   "night slash": "Sombrio",
-  octazooka: "�gua",
+  octazooka: "Água",
   "ovo bomba": "Normal",
   "pó venenoso": "Veneno",
   peck: "Voador",
   "petal dance": "Grama",
   picada: "Inseto",
-  "pistola d'�gua": "�gua",
+  "pistola d'Água": "Água",
   "play rough": "Fada",
   "poison sting": "Veneno",
   "powder snow": "Gelo",
   present: "Normal",
-  Ps�quico: "Ps�quico",
-  psybeam: "Ps�quico",
-  psychic: "Ps�quico",
+  Psíquico: "Psíquico",
+  psybeam: "Psíquico",
+  psychic: "Psíquico",
   "quick attack": "Normal",
   rajada: "Voador",
-  "raio de bolhas": "�gua",
+  "raio de bolhas": "Água",
   "raio de gelo": "Gelo",
-  "raio Ps�quico": "Ps�quico",
-  raio: "El�trico",
+  "raio Psíquico": "Psíquico",
+  raio: "Elétrico",
   "razor leaf": "Grama",
   "rock slide": "Pedra",
   "rock throw": "Pedra",
@@ -3096,7 +3097,7 @@ const attackTypeLookup: Record<string, string> = {
   rollout: "Pedra",
   "sacred fire": "Fogo",
   "seismic toss": "Lutador",
-  "self-destruct": "Normal",
+  "Autodestruio": "Normal",
   "shadow ball": "Fantasma",
   sketch: "Normal",
   "sky attack": "Voador",
@@ -3107,41 +3108,41 @@ const attackTypeLookup: Record<string, string> = {
   "soco de fogo": "Fogo",
   "soco de gelo": "Gelo",
   "soco karatê": "Lutador",
-  "soco Trov�o": "El�trico",
+  "soco Trovão": "Elétrico",
   "soft-boiled": "Normal",
   "solar beam": "Grama",
-  splash: "�gua",
+  splash: "Água",
   "steel wing": "Aço",
   stomp: "Normal",
   "stone edge": "Pedra",
   "string shot": "Inseto",
-  supersônico: "Normal",
-  surf: "�gua",
+  Supersónico: "Normal",
+  surf: "Água",
   "sweet kiss": "Fada",
   "sweet scent": "Normal",
   swift: "Normal",
   tackle: "Normal",
   "take down": "Normal",
   tapa: "Normal",
-  teletransporte: "Ps�quico",
+  teletransporte: "Psíquico",
   "tempestade de fogo": "Fogo",
   thrash: "Normal",
-  thunder: "El�trico",
-  "thunder fang": "El�trico",
-  "thunder punch": "El�trico",
-  "thunder shock": "El�trico",
-  "thunder wave": "El�trico",
-  thunderbolt: "El�trico",
+  thunder: "Elétrico",
+  "thunder fang": "Elétrico",
+  "thunder punch": "Elétrico",
+  "thunder shock": "Elétrico",
+  "thunder wave": "Elétrico",
+  thunderbolt: "Elétrico",
   transformação: "Normal",
   "tri attack": "Normal",
   "triple kick": "Lutador",
-  Trov�o: "El�trico",
+  Trovão: "Elétrico",
   "u-turn": "Inseto",
-  "water gun": "�gua",
-  "water pulse": "�gua",
+  "water gun": "Água",
+  "water pulse": "Água",
   "wing attack": "Voador",
   "wood hammer": "Grama",
-  zenheadbutt: "Ps�quico",
+  zenheadbutt: "Psíquico",
 }
 
 export const normalizeMoveLookupKey = (moveName: string) =>
@@ -3162,27 +3163,27 @@ export const typeChart: Record<string, Record<string, number>> = {
     Inseto: 0.5,
     Fantasma: 0,
     "Aço": 2,
-    "Ps�quico": 0.5,
+    "Psíquico": 0.5,
     Gelo: 2,
     Sombrio: 2,
     Fada: 0.5,
   },
-  Voador: { Lutador: 2, Pedra: 0.5, Inseto: 2, "Aço": 0.5, Grama: 2, "El�trico": 0.5 },
+  Voador: { Lutador: 2, Pedra: 0.5, Inseto: 2, "Aço": 0.5, Grama: 2, "Elétrico": 0.5 },
   Veneno: { Veneno: 0.5, Terra: 0.5, Pedra: 0.5, Fantasma: 0.5, "Aço": 0, Grama: 2, Fada: 2 },
-  Terra: { Voador: 0, Veneno: 2, Pedra: 2, Inseto: 0.5, "Aço": 2, Fogo: 2, Grama: 0.5, "El�trico": 2 },
+  Terra: { Voador: 0, Veneno: 2, Pedra: 2, Inseto: 0.5, "Aço": 2, Fogo: 2, Grama: 0.5, "Elétrico": 2 },
   Pedra: { Lutador: 0.5, Voador: 2, Terra: 0.5, Inseto: 2, "Aço": 0.5, Fogo: 2, Gelo: 2 },
-  Inseto: { Lutador: 0.5, Voador: 0.5, Veneno: 0.5, Fantasma: 0.5, "Aço": 0.5, Fogo: 0.5, Grama: 2, "Ps�quico": 2, Sombrio: 2, Fada: 0.5 },
-  Fantasma: { Normal: 0, Fantasma: 2, "Ps�quico": 2, Sombrio: 0.5 },
-  "Aço": { Pedra: 2, "Aço": 0.5, Fogo: 0.5, �gua: 0.5, "El�trico": 0.5, Gelo: 2, Fada: 2 },
-  Fogo: { Pedra: 0.5, Inseto: 2, "Aço": 2, Fogo: 0.5, �gua: 0.5, Grama: 2, Gelo: 2, Drag�o: 0.5 },
-  �gua: { Terra: 2, Pedra: 2, Fogo: 2, �gua: 0.5, Grama: 0.5, Drag�o: 0.5 },
-  Grama: { Voador: 0.5, Veneno: 0.5, Terra: 2, Pedra: 2, Inseto: 0.5, "Aço": 0.5, Fogo: 0.5, �gua: 2, Grama: 0.5, Drag�o: 0.5 },
-  "El�trico": { Voador: 2, Terra: 0, �gua: 2, Grama: 0.5, "El�trico": 0.5, Drag�o: 0.5 },
-  "Ps�quico": { Lutador: 2, Veneno: 2, "Aço": 0.5, "Ps�quico": 0.5, Sombrio: 0 },
-  Gelo: { Voador: 2, Terra: 2, "Aço": 0.5, Fogo: 0.5, �gua: 0.5, Grama: 2, Gelo: 0.5, Drag�o: 2 },
-  Drag�o: { "Aço": 0.5, Drag�o: 2, Fada: 0 },
-  Sombrio: { Lutador: 0.5, Fantasma: 2, "Ps�quico": 2, Sombrio: 0.5, Fada: 0.5 },
-  Fada: { Lutador: 2, Veneno: 0.5, "Aço": 0.5, Fogo: 0.5, Drag�o: 2, Sombrio: 2 },
+  Inseto: { Lutador: 0.5, Voador: 0.5, Veneno: 0.5, Fantasma: 0.5, "Aço": 0.5, Fogo: 0.5, Grama: 2, "Psíquico": 2, Sombrio: 2, Fada: 0.5 },
+  Fantasma: { Normal: 0, Fantasma: 2, "Psíquico": 2, Sombrio: 0.5 },
+  "Aço": { Pedra: 2, "Aço": 0.5, Fogo: 0.5, Água: 0.5, "Elétrico": 0.5, Gelo: 2, Fada: 2 },
+  Fogo: { Pedra: 0.5, Inseto: 2, "Aço": 2, Fogo: 0.5, Água: 0.5, Grama: 2, Gelo: 2, Dragão: 0.5 },
+  Água: { Terra: 2, Pedra: 2, Fogo: 2, Água: 0.5, Grama: 0.5, Dragão: 0.5 },
+  Grama: { Voador: 0.5, Veneno: 0.5, Terra: 2, Pedra: 2, Inseto: 0.5, "Aço": 0.5, Fogo: 0.5, Água: 2, Grama: 0.5, Dragão: 0.5 },
+  "Elétrico": { Voador: 2, Terra: 0, Água: 2, Grama: 0.5, "Elétrico": 0.5, Dragão: 0.5 },
+  "Psíquico": { Lutador: 2, Veneno: 2, "Aço": 0.5, "Psíquico": 0.5, Sombrio: 0 },
+  Gelo: { Voador: 2, Terra: 2, "Aço": 0.5, Fogo: 0.5, Água: 0.5, Grama: 2, Gelo: 0.5, Dragão: 2 },
+  Dragão: { "Aço": 0.5, Dragão: 2, Fada: 0 },
+  Sombrio: { Lutador: 0.5, Fantasma: 2, "Psíquico": 2, Sombrio: 0.5, Fada: 0.5 },
+  Fada: { Lutador: 2, Veneno: 0.5, "Aço": 0.5, Fogo: 0.5, Dragão: 2, Sombrio: 2 },
 }
 
 export const typeAdvantages: Record<string, string[]> = Object.fromEntries(
@@ -3310,7 +3311,7 @@ export const getSpeciesAtLevel = (speciesName: string, level: number): string =>
   return entries.length > 0 ? entries[0][0] : speciesName
 }
 
-// FunÃ¯Â¿Â½Ã¯Â¿Â½o para selecionar PokÃƒÂ©mon selvagem baseado na raridade e progresso do jogo
+// FunÃ¯Â¿Â½Ã¯Â¿Â½o para selecionar PokÃÂ©mon selvagem baseado na raridade e progresso do jogo
 export const getRandomWildPokemon = (battleCount = 0) => {
   const rand = Math.random()
   let availablePokemon: string[]
@@ -3328,6 +3329,3 @@ export const getRandomWildPokemon = (battleCount = 0) => {
   const pick = pickFrom[Math.floor(Math.random() * pickFrom.length)]
   return getSpeciesAtLevel(pick, 1)
 }
-
-
-

@@ -318,35 +318,41 @@ function normalizeRoomVisibility(visibility?: MultiplayerRoomVisibility): Multip
 }
 
 export async function createMultiplayerRoom(params: {
-  hostUserId: string
-  hostDisplayName: string
-  maxPlayers: 2 | 3
-  mode: MultiplayerRoomMode
-  visibility?: MultiplayerRoomVisibility
+  hostUserId: string;
+  hostDisplayName: string;
+  maxPlayers: 2 | 3;
+  mode: MultiplayerRoomMode;
+  visibility?: MultiplayerRoomVisibility;
 }): Promise<MultiplayerRoom> {
-  return await runRoomOperation({
+  const room = await runRoomOperation({
     socketOperation: async () => {
       const response = normalizeRoomResponse(
-        await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>("multiplayer:room:create", {
-          hostUserId: params.hostUserId,
-          hostDisplayName: params.hostDisplayName,
-          maxPlayers: params.maxPlayers,
-          mode: params.mode,
-          visibility: normalizeRoomVisibility(params.visibility),
-        }),
-      )
-
+        await emitWithAck<{ ok: boolean; room?: MultiplayerRoom; message?: string }>(
+          "multiplayer:room:create",
+          {
+            hostUserId: params.hostUserId,
+            hostDisplayName: params.hostDisplayName,
+            maxPlayers: params.maxPlayers,
+            mode: params.mode,
+            visibility: normalizeRoomVisibility(params.visibility),
+          }
+        )
+      );
       if (!response.ok || !response.room) {
-        throw new Error(response.message || "Nao foi possivel criar a sala")
+        throw new Error(response.message || "Nao foi possivel criar a sala");
       }
-
-      return response.room
+      // ✅ ADICIONA ESTAS LINHAS:
+      if (typeof window !== "undefined") {
+        window.location.href = `/multiplayer?roomId=${response.room.id}`;
+      }
+      return response.room;
     },
     legacyOperation: async () => {
-      return await withTimeout(createLegacyMultiplayerRoom(params))
+      return await withTimeout(createLegacyMultiplayerRoom(params));
     },
     rememberFromResult: (room) => room.id,
-  })
+  });
+  return room; // ✅ Adiciona esta linha para retornar a sala
 }
 
 export async function joinMultiplayerRoom(params: {
