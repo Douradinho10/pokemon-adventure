@@ -24,6 +24,8 @@ const nextConfig = {
     "*.replit.dev",
     "*.repl.co",
     "*.janeway.replit.dev",
+    "*.riker.replit.dev",
+    "*.id.repl.co",
   ],
   // Proxy socket.io and multiplayer REST through Next.js so the browser
   // can reach the local socket server from Replit (or any proxied environment)
