@@ -358,10 +358,6 @@ export async function createMultiplayerRoom(params: {
       if (!response.ok || !response.room) {
         throw new Error(response.message || "Nao foi possivel criar a sala");
       }
-      // ✅ ADICIONA ESTAS LINHAS:
-      if (typeof window !== "undefined") {
-        window.location.href = `/multiplayer?roomId=${response.room.id}`;
-      }
       return response.room;
     },
     legacyOperation: async () => {

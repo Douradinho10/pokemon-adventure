@@ -1040,17 +1040,38 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         });
 
         if (!result.ok || !result.room) {
-          setMultiplayerError(result.message || "Não foi possível entrar no grupo.");
-          return false;
+          if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts) {
+            pendingInviteRetryCountRef.current += 1
+            pendingInviteRetryTimeoutRef.current = window.setTimeout(() => {
+              void joinMultiplayerRoomByCode(normalizedRoomCode, { autoRetry: true })
+            }, 2000)
+            setMultiplayerBusy(false)
+            return false
+          }
+
+          setMultiplayerError(result.message || "Não foi possível entrar no grupo.")
+          setMultiplayerBusy(false)
+          return false
         }
-        // ... (resto do código da função)
+
+        clearPendingInviteJoin()
+
+        const room = result.room
+        setMultiplayerJoinedRoomId(room.id)
+        setMultiplayerRoom(room)
+        setMultiplayerRoomCodeInput(room.id)
+        setMultiplayerMode(false)
+        setMultiplayerIsCasual(room.mode === "casual")
+        setCasualLobbyVisibility((room.visibility as MultiplayerRoomVisibility) ?? "private")
+        setMultiplayerBusy(false)
+        return true
       } catch (error) {
-        setMultiplayerError("Ocorreu um erro ao entrar no grupo.");
-        setMultiplayerBusy(false);
-        return false;
+        setMultiplayerError(getMultiplayerErrorMessage(error, "Ocorreu um erro ao entrar no grupo."))
+        setMultiplayerBusy(false)
+        return false
       }
     },
-    [accountUserId, accountName, leaveCurrentMultiplayerRoomIfNeeded, /* ... outras dependências ... */]
+    [accountUserId, accountName, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded]
   );
 
   const handleShareMultiplayerInvite = useCallback(async () => {
