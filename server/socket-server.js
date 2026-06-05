@@ -189,7 +189,8 @@ function scheduleBotSimulation(roomId, botId) {
   }
 
   const targetWave = randomInt(10, 15)
-  const waveStepDelayMs = randomInt(450, 900)
+  // Each wave takes 20-40 seconds to simulate, matching real player pace
+  const waveStepDelayMs = randomInt(20000, 40000)
 
   const advanceWave = (wave) => {
     const entry2 = getRoomEntry(roomId)
@@ -233,7 +234,8 @@ function scheduleBotSimulation(roomId, botId) {
     setTimeout(() => advanceWave(wave + 1), waveStepDelayMs)
   }
 
-  setTimeout(() => advanceWave(1), randomInt(700, 1200))
+  // Wait 10-20s before starting so the human player has time to begin their run
+  setTimeout(() => advanceWave(1), randomInt(10000, 20000))
 }
 
 function generateRoomId(length = ROOM_ID_LENGTH) {

@@ -3337,36 +3337,20 @@ export const getPokemonDisplayType = (pokemonName: string, fallbackType?: string
 }
 
 export const getSpeciesAtLevel = (speciesName: string, level: number): string => {
-  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
-
   let current = speciesName
-  const maxIter = Object.keys(minWildLevelBySpecies).length + 5
-  let iter = 0
-
-  while (iter++ < maxIter) {
-    let found: string | null = null
-    for (const candidate of Object.keys(minWildLevelBySpecies)) {
-      const rule = (generatedEvolutionRules as Record<string, any>)[candidate]
-      if (rule && rule.evolvesTo === current) {
-        const candMin = minWildLevelBySpecies[candidate] || 1
-        if (candMin <= level) {
-          if (!found || (minWildLevelBySpecies[found] || 1) < candMin) {
-            found = candidate
-          }
-        }
-      }
+  // Walk forward through the evolution chain: advance whenever the level is
+  // high enough for the next stage. This ensures e.g. "Pidgey" at lv 30
+  // returns "Pidgeotto" (evolves at 18) instead of staying as "Pidgey".
+  for (let i = 0; i < 10; i++) {
+    const rule = evolutionRules[current]
+    if (!rule?.level || !rule.evolvesTo) break
+    if (level >= rule.level) {
+      current = rule.evolvesTo
+    } else {
+      break
     }
-
-    if (!found) break
-    current = found
-    if ((minWildLevelBySpecies[current] || 1) <= level) return current
   }
-
-  // Fallbacks
-  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
-  const entries = Object.entries(minWildLevelBySpecies)
-  entries.sort((a, b) => (a[1] || 1) - (b[1] || 1))
-  return entries.length > 0 ? entries[0][0] : speciesName
+  return current
 }
 
 // FunÃ¯Â¿Â½Ã¯Â¿Â½o para selecionar PokÃÂ©mon selvagem baseado na raridade e progresso do jogo

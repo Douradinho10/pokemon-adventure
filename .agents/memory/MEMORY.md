@@ -1,0 +1,2 @@
+- [getSpeciesAtLevel bug](getspeciesatlevel.md) — original walked backwards only; fixed to walk forward through evolution chain so Pidgey@lv30 → Pidgeotto, not Pidgey.
+- [Bot simulation timing](bot-timing.md) — bots used 450-900ms per wave (finished in ~5s); fixed to 20-40s per wave + 10-20s initial delay to match real player pace.

@@ -4475,18 +4475,13 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return
     }
 
-    const learnableMoves = getLearnableMovesForPokemon(
-      moveVendorOffer.pokemonName,
-      pokemon.type,
-      pokemon.level,
-      Object.keys(pokemon.attacks),
+    // Validate the offered move: just check it's not already known and level is valid
+    const offeredMoveKey = normalizeMoveNameKey(moveVendorOffer.moveName)
+    const alreadyKnown = Object.keys(pokemon.attacks).some(
+      (attackName) => normalizeMoveNameKey(attackName) === offeredMoveKey,
     )
-    const offeredMoveStillValid = learnableMoves.some(
-      (move) => normalizeMoveNameKey(move.name) === normalizeMoveNameKey(moveVendorOffer.moveName),
-    )
-
-    if (!offeredMoveStillValid) {
-      addLog("⚠️ Oferta expirada. Esse Pokémon já não pode aprender este golpe agora.")
+    if (alreadyKnown) {
+      addLog("⚠️ Esse Pokémon já sabe este golpe.")
       setMoveVendorOffer(null)
       setMoveVendorReplaceAttack(null)
       setShowModal(null)
