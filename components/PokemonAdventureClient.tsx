@@ -1014,7 +1014,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       let roomCode = rawRoomCode;
       if (!roomCode) {
         const urlParams = new URLSearchParams(window.location.search);
-        roomCode = urlParams.get("roomId") || "";
+        roomCode = urlParams.get("room") || "";
       }
 
       const normalizedRoomCode = normalizeMultiplayerRoomCode(roomCode);
