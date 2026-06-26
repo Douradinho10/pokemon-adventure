@@ -2055,30 +2055,32 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
 
   const handleAddBot = useCallback(async () => {
-  // 1. Validação inicial de segurança
-  if (!multiplayerJoinedRoomId || !accountUserId || !multiplayerRoom) return
+  if (!multiplayerJoinedRoomId || !accountUserId) return
   
   setMultiplayerBusy(true)
+  setMultiplayerError(null) // Limpa erros anteriores ao tentar novamente
   
   try {
-    // Cenário: Sala Local (Fallback offline)
+    // === CASO 1: SALA LOCAL (OFFLINE FALLBACK) ===
     if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
-      const currentPlayers = multiplayerRoom.players || {}
-      const playerCount = Object.keys(currentPlayers).length
-
-      // Validação de sala cheia feita FORA do setMultiplayerRoom
-      if (playerCount >= multiplayerRoom.maxPlayers) {
-        setMultiplayerError("Sala cheia")
-        return
-      }
+      let salaCheia = false
 
       setMultiplayerRoom((prev) => {
         if (!prev) return prev
+        
+        const currentPlayers = prev.players || {}
+        const playerCount = Object.keys(currentPlayers).length
+        
+        if (playerCount >= prev.maxPlayers) {
+          salaCheia = true // Sinaliza para fora do setMultiplayerRoom
+          return prev
+        }
+        
         const botId = `BOT_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`
         return {
           ...prev,
           players: {
-            ...prev.players,
+            ...currentPlayers,
             [botId]: {
               userId: botId,
               displayName: "Bot",
@@ -2089,10 +2091,15 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           },
         }
       })
+
+      // Se a sala estava cheia, aplicamos o erro fora do fluxo de renderização pura
+      if (salaCheia) {
+        setMultiplayerError("Sala cheia")
+      }
       return
     }
 
-    // Cenário: Sala Online (via API/Socket)
+    // === CASO 2: SALA ONLINE (SOCKET/SERVER) ===
     const res = await addBotToRoom({ 
       roomId: multiplayerJoinedRoomId, 
       hostUserId: accountUserId, 
@@ -2100,15 +2107,16 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     })
     
     if (!res.ok) {
-      setMultiplayerError(res.message || "Não foi possível adicionar bot")
+      setMultiplayerError(res.message || "Nao foi possivel adicionar bot")
     }
   } catch (err) {
     setMultiplayerError("Erro ao adicionar bot")
   } finally {
     setMultiplayerBusy(false)
   }
-  // Adicionado 'multiplayerRoom' e 'addBotToRoom' (se aplicável) nas dependências
-}, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, addBotToRoom])
+  // 💡 REMOVIDO 'multiplayerRoom' daqui. 
+  // Agora a função é estável e não se recria quando a sala atualiza dados dinâmicos.
+}, [accountUserId, multiplayerJoinedRoomId])
 
   const handleKickPlayer = useCallback(async (targetUserId: string) => {
     if (!multiplayerJoinedRoomId || !accountUserId) return
