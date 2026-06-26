@@ -18,7 +18,6 @@ import {
   calculateBattleSpeed,
   createBattleStatStages,
   createPokemonIVs,
-  createLegendaryPokemonIVs,
   applyBattleStatChanges,
   getBattleStatStageMultiplier,
   resolvePokemonIVs,
@@ -29,7 +28,6 @@ import {
   getLegalBattleAttacksForPokemon,
   getMoveStatusEffect,
   getMoveBattleEffect,
-  normalizeMoveLookupKey,
   getMoveHitChance,
   getPokemonDefenseDamageMultiplier,
   wildPokemonStats,
@@ -38,18 +36,11 @@ import {
   getAttackType,
   getMovePriority,
   getMoveAccuracy,
-  evolutionRules,
-  getCanonicalPokemonType,
-  getPokemonDisplayType,
-  isWildSpeciesValidAtLevel,
-  minWildLevelBySpecies as dataMinWildLevelBySpecies,
-  getSpeciesAtLevel,
   initializePP, // Import new helper
   MAX_TEAM_SIZE,
   scaleAttackSetForLevel,
   typeChart,
   typeColors,
-  POKEMON_RARITY_CONFIG,
 } from "../data/pokemonData"
 import { BattleArena } from "../components/BattleArena"
 import { PokemonCard } from "../components/PokemonCard"
@@ -171,24 +162,7 @@ const IMPOSTOR_CHANCE = 0.08
 const ZOROARK_MIN_LEVEL = 28
 const SHINY_CHANCE = 1 / 256
 const BOSS_WAVE_INTERVAL = 10
-const LEGENDARY_WAVE_INTERVAL = 100
 const BOSS_MULTIPLIER = 1.5
-
-const isLegendaryMilestoneWave = (wave: number) => wave > 0 && wave % LEGENDARY_WAVE_INTERVAL === 0
-
-const getDisplayedWave = (battles: number, hasActiveBattle: boolean) => Math.max(0, battles) + (hasActiveBattle ? 1 : 0)
-
-const getEnemyDisplayRarity = (
-  enemyName: string,
-  wave: number,
-  enemyIsBoss?: boolean,
-): "comum" | "raro" | "lendario" => {
-  if (isLegendaryMilestoneWave(wave) && enemyIsBoss) {
-    return "lendario"
-  }
-
-  return wildPokemon[enemyName]?.rarity || "comum"
-}
 // Lower base XP multiplier to reduce XP per battle significantly
 const XP_GAIN_MULTIPLIER = 0.6
 const BOSS_XP_MULTIPLIER = 1.25
@@ -598,7 +572,7 @@ const pickWeightedPokemon = (candidates: string[], environment: BattleEnvironmen
 
   const typeWeights = environmentTypeWeights[environment]
   const weighted = candidates.map((name) => {
-    const typeTokens = normalizeTypeText(getPokemonDisplayType(name))
+    const typeTokens = normalizeTypeText(wildPokemon[name].type)
       .split("/")
       .map(normalizeTypeToken)
       .filter(Boolean)
@@ -624,7 +598,7 @@ const getEnvironmentWildPool = (environment: BattleEnvironment) => {
   const preferredTypes = new Set(environmentPreferredTypes[environment])
 
   return Object.keys(wildPokemon).filter((name) => {
-    const typeTokens = normalizeTypeText(getPokemonDisplayType(name))
+    const typeTokens = normalizeTypeText(wildPokemon[name].type)
       .split("/")
       .map(normalizeTypeToken)
       .filter(Boolean)
@@ -633,10 +607,10 @@ const getEnvironmentWildPool = (environment: BattleEnvironment) => {
   })
 }
 
-const getTargetRarityForBattle = (wave: number) => {
+const getTargetRarityForBattle = (battleCount: number) => {
   const rarityRoll = Math.random()
 
-  if (isLegendaryMilestoneWave(wave)) {
+  if (battleCount > 0 && battleCount % 100 === 0) {
     return "lendario" as const
   }
 
@@ -647,37 +621,132 @@ const getTargetRarityForBattle = (wave: number) => {
   return "comum" as const
 }
 
-const matchesWildLevel = (speciesName: string, enemyLevel: number) => isWildSpeciesValidAtLevel(speciesName, enemyLevel)
+const buildMinWildLevelBySpecies = () => {
+  const speciesNames = Object.keys(wildPokemon)
+  const cache = new Map<string, number>()
+  const visiting = new Set<string>()
+
+  const resolveMinLevel = (species: string): number => {
+    const cached = cache.get(species)
+    if (cached !== undefined) {
+      return cached
+    }
+
+    if (visiting.has(species)) {
+      return 1
+    }
+
+    visiting.add(species)
+
+    const preEvolutionLevels = speciesNames
+      .map((candidate) => {
+        const candidateRule = getEvolutionForPokemon(candidate, 100)
+        if (!candidateRule || candidateRule.evolvesTo !== species) {
+          return null
+        }
+
+        const preMin = resolveMinLevel(candidate)
+        return Math.max(candidateRule.level, preMin)
+      })
+      .filter((value): value is number => value !== null)
+
+    visiting.delete(species)
+
+    const minLevel = preEvolutionLevels.length > 0 ? Math.max(...preEvolutionLevels) : 1
+    cache.set(species, minLevel)
+    return minLevel
+  }
+
+  const result: Record<string, number> = {}
+  speciesNames.forEach((species) => {
+    result[species] = resolveMinLevel(species)
+  })
+  return result
+}
+
+const minWildLevelOverrides: Record<string, number> = {
+  Raichu: 30,
+  Clefable: 30,
+  Wigglytuff: 30,
+  Vileplume: 36,
+  Victreebel: 36,
+  Poliwrath: 36,
+  Bellossom: 36,
+  Slowking: 37,
+  Steelix: 36,
+  Scizor: 30,
+  Kingdra: 45,
+}
+
+const minWildLevelBySpecies = (() => {
+  const computed = buildMinWildLevelBySpecies()
+
+  Object.entries(minWildLevelOverrides).forEach(([species, minLevel]) => {
+    computed[species] = Math.max(computed[species] || 1, minLevel)
+  })
+
+  return computed
+})()
+
+// Resolve a species to the appropriate form for the given level by walking
+// backwards through evolution rules so evolved forms don't appear earlier
+// than their pre-evolutions in wild/enemy encounters.
+const getSpeciesAtLevel = (speciesName: string, level: number): string => {
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+
+  let current = speciesName
+  const maxIter = Object.keys(minWildLevelBySpecies).length + 5
+  let iter = 0
+
+  while (iter++ < maxIter) {
+    let found: string | null = null
+    for (const candidate of Object.keys(minWildLevelBySpecies)) {
+      const rule = (evolutionRules as Record<string, any>)[candidate]
+      if (rule && rule.evolvesTo === current) {
+        const candMin = minWildLevelBySpecies[candidate] || 1
+        if (candMin <= level) {
+          if (!found || (minWildLevelBySpecies[found] || 1) < candMin) {
+            found = candidate
+          }
+        }
+      }
+    }
+
+    if (!found) break
+    current = found
+    if ((minWildLevelBySpecies[current] || 1) <= level) return current
+  }
+
+  // Fallbacks
+  if ((minWildLevelBySpecies[speciesName] || 1) <= level) return speciesName
+  const entries = Object.entries(minWildLevelBySpecies)
+  entries.sort((a, b) => (a[1] || 1) - (b[1] || 1))
+  return entries.length > 0 ? entries[0][0] : speciesName
+}
 
 const getRandomWildPokemonForEnvironment = (battleCount: number, environment: BattleEnvironment, enemyLevel: number) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
-  const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
-  const levelFilteredPool = environmentPool.filter(
-    (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
-  )
+  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
   const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
 
   if (selectedPool.length === 0) {
-    const fallbackByLevel = Object.keys(wildPokemon).filter(
-      (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
-    )
+    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
     const fallbackPick = pickWeightedPokemon(fallbackByLevel, environment)
     if (fallbackPick) {
-      return fallbackPick
+      return getSpeciesAtLevel(fallbackPick, enemyLevel)
     }
   }
 
   const weightedPick = pickWeightedPokemon(selectedPool, environment)
 
   if (weightedPick) {
-    return weightedPick
+    return getSpeciesAtLevel(weightedPick, enemyLevel)
   }
 
-  const fallbackSpecies = environmentPool.find((name) => matchesWildLevel(name, enemyLevel))
-  return fallbackSpecies || getSpeciesAtLevel(getRandomWildPokemon(battleCount), enemyLevel)
+  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 const getRandomWildPokemonForEnvironmentWithType = (
@@ -687,31 +756,15 @@ const getRandomWildPokemonForEnvironmentWithType = (
   preferredTypeToken: string | null,
 ) => {
   const targetRarity = getTargetRarityForBattle(battleCount)
-  const allowLegendary = targetRarity === "lendario"
   const environmentPool = getEnvironmentWildPool(environment)
-  const levelFilteredPool = environmentPool.filter(
-    (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
-  )
+  const levelFilteredPool = environmentPool.filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
 
   const rarityPool = levelFilteredPool.filter((name) => wildPokemon[name].rarity === targetRarity)
-
-  let selectedPool: string[]
-  if (rarityPool.length > 0) {
-    selectedPool = rarityPool
-  } else if (targetRarity === "lendario") {
-    const allLegendaries = Object.keys(wildPokemon).filter(
-      (name) => wildPokemon[name].rarity === "lendario" && enemyLevel >= (minWildLevelBySpecies[name] || 1),
-    )
-    selectedPool = allLegendaries.length > 0
-      ? allLegendaries
-      : Object.keys(wildPokemon).filter((name) => wildPokemon[name].rarity === "lendario")
-  } else {
-    selectedPool = levelFilteredPool
-  }
+  const selectedPool = rarityPool.length > 0 ? rarityPool : levelFilteredPool
 
   const typeFilteredPool = preferredTypeToken
     ? selectedPool.filter((name) =>
-        normalizeTypeText(getPokemonDisplayType(name))
+        normalizeTypeText(wildPokemon[name].type)
           .split("/")
           .map(normalizeTypeToken)
           .includes(preferredTypeToken),
@@ -721,12 +774,10 @@ const getRandomWildPokemonForEnvironmentWithType = (
   const finalPool = typeFilteredPool.length > 0 ? typeFilteredPool : selectedPool
 
   if (finalPool.length === 0) {
-    const fallbackByLevel = Object.keys(wildPokemon).filter(
-      (name) => matchesWildLevel(name, enemyLevel) && (allowLegendary || wildPokemon[name].rarity !== "lendario"),
-    )
+    const fallbackByLevel = Object.keys(wildPokemon).filter((name) => enemyLevel >= (minWildLevelBySpecies[name] || 1))
     const fallbackByType = preferredTypeToken
       ? fallbackByLevel.filter((name) =>
-          normalizeTypeText(getPokemonDisplayType(name))
+          normalizeTypeText(wildPokemon[name].type)
             .split("/")
             .map(normalizeTypeToken)
             .includes(preferredTypeToken),
@@ -736,18 +787,17 @@ const getRandomWildPokemonForEnvironmentWithType = (
 
     const fallbackPick = pickWeightedPokemon(fallbackPool, environment)
     if (fallbackPick) {
-      return fallbackPick
+      return getSpeciesAtLevel(fallbackPick, enemyLevel)
     }
   }
 
   const weightedPick = pickWeightedPokemon(finalPool, environment)
 
   if (weightedPick) {
-    return weightedPick
+    return getSpeciesAtLevel(weightedPick, enemyLevel)
   }
 
-  const fallbackSpecies = environmentPool.find((name) => matchesWildLevel(name, enemyLevel))
-  return fallbackSpecies || getSpeciesAtLevel(getRandomWildPokemon(battleCount), enemyLevel)
+  return getSpeciesAtLevel(environmentPool[0] || getRandomWildPokemon(battleCount), enemyLevel)
 }
 
 function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: Screen }) {
@@ -1004,75 +1054,84 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [])
 
   const joinMultiplayerRoomByCode = useCallback(
-    async (rawRoomCode?: string, options?: { autoRetry?: boolean }) => { // ✅ rawRoomCode é opcional
+    async (rawRoomCode: string, options?: { autoRetry?: boolean }) => {
       if (!accountUserId) {
-        setMultiplayerError("Faz login para entrar num grupo multiplayer.");
-        return false;
+        setMultiplayerError("Faz login para entrar num grupo multiplayer.")
+        return false
       }
 
-      // ✅ Ler o roomId da URL se não for fornecido
-      let roomCode = rawRoomCode;
+      const roomCode = normalizeMultiplayerRoomCode(rawRoomCode)
       if (!roomCode) {
-        const urlParams = new URLSearchParams(window.location.search);
-        roomCode = urlParams.get("roomId") || "";
+        setMultiplayerError("Indica um codigo ou link de grupo.")
+        return false
       }
 
-      const normalizedRoomCode = normalizeMultiplayerRoomCode(roomCode);
-      if (!normalizedRoomCode) {
-        setMultiplayerError("Indica um codigo ou link de grupo.");
-        return false;
-      }
+      const isInviteAutoJoin = options?.autoRetry === true && pendingInviteRoomIdRef.current === roomCode
+      const maxInviteAttempts = 6
 
-      const isInviteAutoJoin = options?.autoRetry === true && pendingInviteRoomIdRef.current === normalizedRoomCode;
-      const maxInviteAttempts = 6;
+      await leaveCurrentMultiplayerRoomIfNeeded(roomCode)
+      multiplayerResultSubmittedRef.current = null
 
-      await leaveCurrentMultiplayerRoomIfNeeded(normalizedRoomCode);
-      multiplayerResultSubmittedRef.current = null;
-
-      setMultiplayerBusy(true);
-      setMultiplayerError(null);
+      setMultiplayerBusy(true)
+      setMultiplayerError(null)
 
       try {
         const result = await joinMultiplayerRoom({
-          roomId: normalizedRoomCode, // ✅ Usa o roomId normalizado
+          roomId: roomCode,
           userId: accountUserId,
           displayName: accountName,
-        });
+        })
 
-        if (!result.ok || !result.room) {
-          if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts) {
+        if (!result.ok) {
+          if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts - 1) {
             pendingInviteRetryCountRef.current += 1
+
+            if (pendingInviteRetryTimeoutRef.current !== null) {
+              window.clearTimeout(pendingInviteRetryTimeoutRef.current)
+            }
+
             pendingInviteRetryTimeoutRef.current = window.setTimeout(() => {
-              void joinMultiplayerRoomByCode(normalizedRoomCode, { autoRetry: true })
-            }, 2000)
-            setMultiplayerBusy(false)
+              pendingInviteRetryTimeoutRef.current = null
+              void joinMultiplayerRoomByCode(roomCode, { autoRetry: true })
+            }, 700)
+
             return false
           }
 
-          setMultiplayerError(result.message || "Não foi possível entrar no grupo.")
-          setMultiplayerBusy(false)
+          if (isInviteAutoJoin) {
+            pendingInviteRoomIdRef.current = null
+            pendingInviteRetryCountRef.current = 0
+          }
+
+          setMultiplayerError(result.message || "Nao foi possivel entrar no grupo.")
           return false
         }
 
-        clearPendingInviteJoin()
+        if (isInviteAutoJoin) {
+          clearPendingInviteJoin()
+        }
 
-        const room = result.room
-        setMultiplayerJoinedRoomId(room.id)
-        setMultiplayerRoom(room)
-        setMultiplayerRoomCodeInput(room.id)
+        setMultiplayerJoinedRoomId(roomCode)
+        if (result.room) {
+          setMultiplayerRoom(result.room)
+          const isCasualRoom = result.room.mode === "casual"
+          setMultiplayerIsCasual(isCasualRoom)
+          setMultiplayerSection(isCasualRoom ? "casual" : "competitive")
+        }
         setMultiplayerMode(false)
-        setMultiplayerIsCasual(room.mode === "casual")
-        setCasualLobbyVisibility((room.visibility as MultiplayerRoomVisibility) ?? "private")
-        setMultiplayerBusy(false)
+        setCasualLobbyVisibility("private")
+        setMultiplayerRoomCodeInput(roomCode)
+        showScreenNotice("Entraste no grupo por codigo!")
         return true
       } catch (error) {
-        setMultiplayerError(getMultiplayerErrorMessage(error, "Ocorreu um erro ao entrar no grupo."))
-        setMultiplayerBusy(false)
+        setMultiplayerError(getMultiplayerErrorMessage(error, "Erro ao entrar no grupo."))
         return false
+      } finally {
+        setMultiplayerBusy(false)
       }
     },
-    [accountUserId, accountName, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded]
-  );
+    [accountName, accountUserId, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded, showScreenNotice],
+  )
 
   const handleShareMultiplayerInvite = useCallback(async () => {
     if (!multiplayerRoom) {
@@ -1117,8 +1176,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     if (!auth) {
       hasAutoRoutedAfterAuthRef.current = false
-      setAccountUserId("guest")
-      setAccountEmail("guest@local")
+      setAccountUserId(null)
+      setAccountEmail(null)
       setAccountName("Treinador")
       setIsAuthChecking(false)
       return
@@ -1127,8 +1186,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         hasAutoRoutedAfterAuthRef.current = false
-        setAccountUserId("guest")
-        setAccountEmail("guest@local")
+        setAccountUserId(null)
+        setAccountEmail(null)
         setAccountName("Treinador")
         setIsAuthChecking(false)
         return
@@ -1221,14 +1280,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const hasSavedRun = saveSlots.some((slot) => slot.gameState?.activePokemon)
 
     if (gameState.activePokemon) {
-      if (gameState.currentBattle) {
-        hasAutoRoutedAfterAuthRef.current = true
-        if (currentScreen !== "battle") {
-          setCurrentScreen("battle")
-        }
-        return
-      }
-
       hasAutoRoutedAfterAuthRef.current = true
       if (
         currentScreen !== "menu" &&
@@ -1256,7 +1307,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     if (currentScreen === "select-slot" || currentScreen === "select-continue" || currentScreen === "game") {
       setCurrentScreen("main-menu")
     }
-  }, [accountEmail, currentScreen, gameState.activePokemon, gameState.currentBattle, isAuthChecking, isLoading, saveSlots])
+  }, [accountEmail, currentScreen, gameState.activePokemon, isAuthChecking, isLoading, saveSlots])
 
   useEffect(() => {
     if (forceMainMenuAfterPerfilRef.current) {
@@ -1315,10 +1366,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       }
     }
   }, [])
-
-  useEffect(() => {
-    console.log("[MP] multiplayerJoinedRoomId changed →", multiplayerJoinedRoomId)
-  }, [multiplayerJoinedRoomId])
 
   useEffect(() => {
     if (!multiplayerJoinedRoomId) {
@@ -1509,7 +1556,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
   const handleCreateMultiplayerRoom = useCallback(
     async (maxPlayers: 2 | 3, visibility: MultiplayerRoomVisibility = "private") => {
-      console.log("[MP] handleCreateMultiplayerRoom", { maxPlayers, visibility, accountUserId })
       if (!accountUserId) {
         setMultiplayerError("Faz login para criar um grupo multiplayer.")
         return
@@ -1524,7 +1570,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       setMultiplayerError(null)
 
       try {
-        console.log("[MP] calling createMultiplayerRoom…")
         const room = await createMultiplayerRoom({
           hostUserId: accountUserId,
           hostDisplayName: accountName,
@@ -1533,7 +1578,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           visibility,
         })
 
-        console.log("[MP] room created ok:", room.id)
         setMultiplayerJoinedRoomId(room.id)
         setMultiplayerRoom(room)
         setMultiplayerRoomCodeInput(room.id)
@@ -1542,7 +1586,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         setCasualLobbyVisibility(visibility)
         showScreenNotice(`Grupo criado! Codigo: ${room.id}`)
       } catch (error) {
-        console.error("[MP] createMultiplayerRoom failed:", error)
         if (visibility === "public") {
           setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel criar o grupo agora. Verifica o Firebase e tenta novamente."))
           return
@@ -1551,7 +1594,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         const localCode = `${LOCAL_ROOM_PREFIX}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
         const createdAt = Date.now()
 
-        console.log("[MP] falling back to local room:", localCode)
         setMultiplayerJoinedRoomId(localCode)
         setMultiplayerRoom({
           id: localCode,
@@ -2058,36 +2100,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     if (!multiplayerJoinedRoomId || !accountUserId) return
     setMultiplayerBusy(true)
     try {
-      // Local rooms (created as fallback when socket/Firebase is unavailable) exist
-      // only in component state — the socket server has no knowledge of them.
-      // Add the bot directly to the local room state instead of emitting to the server.
-      if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
-        setMultiplayerRoom((prev) => {
-          if (!prev) return prev
-          const currentPlayers = prev.players || {}
-          const playerCount = Object.keys(currentPlayers).length
-          if (playerCount >= prev.maxPlayers) {
-            setMultiplayerError("Sala cheia")
-            return prev
-          }
-          const botId = `BOT_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`
-          return {
-            ...prev,
-            players: {
-              ...currentPlayers,
-              [botId]: {
-                userId: botId,
-                displayName: "Bot",
-                joinedAt: Date.now(),
-                bestWave: 0,
-                ready: true,
-              },
-            },
-          }
-        })
-        return
-      }
-
       const res = await addBotToRoom({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId, displayName: `Bot` })
       if (!res.ok) {
         setMultiplayerError(res.message || "Nao foi possivel adicionar bot")
@@ -2097,7 +2109,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     } finally {
       setMultiplayerBusy(false)
     }
-  }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom])
+  }, [accountUserId, multiplayerJoinedRoomId])
 
   const handleKickPlayer = useCallback(async (targetUserId: string) => {
     if (!multiplayerJoinedRoomId || !accountUserId) return
@@ -2328,8 +2340,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       options?: { preferredTypeToken?: string | null; fixedEnemyLevel?: number },
     ): NextEncounterPreview => {
       const nextWave = gameState.battles + 1
-      const isLegendaryWave = isLegendaryMilestoneWave(nextWave)
-      const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0 || isLegendaryWave
+      const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0
       const enemyLevel = options?.fixedEnemyLevel ?? getScaledEnemyLevel(gameState.battles, random)
       const preferredTypeToken = options?.preferredTypeToken || null
       const baseEnemyName = getRandomWildPokemonForEnvironmentWithType(
@@ -2339,24 +2350,28 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         preferredTypeToken,
       )
 
-      const enemyName = getSpeciesAtLevel(baseEnemyName, enemyLevel)
+      let enemyName = baseEnemyName
+      for (let i = 0; i < 4; i++) {
+        const evolution = getEvolutionForPokemon(enemyName, enemyLevel - 1)
+        if (!evolution || !wildPokemon[evolution.evolvesTo]) {
+          break
+        }
+        enemyName = evolution.evolvesTo
+      }
 
       const canRollImpostor = enemyName !== "Ditto" && enemyName !== "Zoroark" && wildPokemon[enemyName]?.rarity !== "lendario"
       const impostorRoll = random(1, 1000) / 1000
       const shouldUseImpostor = canRollImpostor && impostorRoll < IMPOSTOR_CHANCE
 
       const canUseZoroark = enemyLevel >= ZOROARK_MIN_LEVEL && Boolean(wildPokemon.Zoroark)
-      let impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
-
-      impostorName = getSpeciesAtLevel(impostorName, enemyLevel)
+      const impostorName = shouldUseImpostor ? (canUseZoroark && random(0, 1) === 1 ? "Zoroark" : "Ditto") : enemyName
       const displayEnemyName = shouldUseImpostor ? enemyName : impostorName
       const isShiny = Math.random() < SHINY_CHANCE
-      const enemyRarity = wildPokemon[baseEnemyName]?.rarity
-      const enemyIVs = enemyRarity === "lendario" ? createLegendaryPokemonIVs() : createPokemonIVs()
+      const enemyIVs = createPokemonIVs()
 
       const legalEnemyAttacks = getLegalBattleAttacksForPokemon(
         impostorName,
-        getPokemonDisplayType(impostorName),
+        wildPokemon[impostorName].type,
         enemyLevel,
       )
       const enemyAttacks = Object.fromEntries(
@@ -2370,8 +2385,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         enemyDisplayName: displayEnemyName,
         isBoss: isBossWave,
         enemyLevel,
-        enemyType: getPokemonDisplayType(impostorName),
-        enemyDisplayType: getPokemonDisplayType(displayEnemyName),
+        enemyType: wildPokemon[impostorName].type,
+        enemyDisplayType: wildPokemon[displayEnemyName].type,
         enemyAttacks,
         enemyIVs,
         isImpostor: shouldUseImpostor,
@@ -2809,26 +2824,14 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     handleGameOver()
   }
 
-  const completeCurrentWave = useCallback(() => {
-    setNextEncounterPreview(null)
-    setHiddenEncounterPreview(null)
-    setGameState((previous) => ({ ...previous, battles: previous.battles + 1 }))
-  }, [setGameState])
-
   const handleEnemyDefeat = (enemyName: string) => {
-    const battleWave = gameState.currentBattle?.wave ?? gameState.battles + 1
-    const rarity = getEnemyDisplayRarity(enemyName, battleWave, gameState.currentBattle?.enemyIsBoss)
+    const rarity = wildPokemon[enemyName].rarity
     const reward = rarity === "lendario" ? 100 : rarity === "raro" ? 50 : 15
 
     addLog(`🎉 ${enemyName} derrotado! +${reward} moedas`)
-    setNextEncounterPreview(null)
-    setHiddenEncounterPreview(null)
-    setGameState((previous) => ({
-      ...previous,
-      money: previous.money + reward,
-      battles: previous.battles + 1,
-    }))
-    window.setTimeout(() => levelUp(), 0)
+    updateGameState({ money: gameState.money + reward })
+
+    levelUp()
     setTimeout(() => endBattle(), 900)
   }
 
@@ -2868,66 +2871,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const currentBattle = latestGameStateRef.current.currentBattle
     if (!effect || !currentBattle) {
       return { selfDestruct: false }
-    }
-
-    // Handle transformation (e.g., Ditto/Transform) specially: copy target's
-    // visible template (attacks, type, sprite) but preserve IVs of the
-    // attacker. Player transformations update the playerTeam entry; enemy
-    // transformations update the battle enemy fields.
-    if ((effect as any).transform) {
-      try {
-        if (attacker === "player") {
-          const activeName = latestGameStateRef.current.activePokemon
-          if (activeName) {
-            const enemyDisplay = currentBattle.enemyDisplayName || currentBattle.enemyName
-            const template = getPokemonBattleTemplate(enemyDisplay)
-            if (template) {
-              const newAttacks = template.attacks
-              const newType = template.type
-              const sprite = getPokemonSpriteUrl(enemyDisplay, template.sprite || wildPokemon[enemyDisplay]?.sprite, "back", Boolean(currentBattle.enemyIsShiny))
-              const spriteSet = getPokemonSpriteSet(enemyDisplay, template.sprite || wildPokemon[enemyDisplay]?.sprite, Boolean(currentBattle.enemyIsShiny))
-
-              // Preserve IVs; reset PP for new moves
-              const newPP = initializePP(newAttacks)
-
-              updatePokemon(activeName, {
-                attacks: newAttacks,
-                type: newType,
-                sprite,
-                spriteSet,
-                attackPP: newPP,
-              })
-
-              updateBattle({ playerSprite: getPokemonSpriteUrl(activeName, sprite, "back", Boolean(gameState.playerTeam[activeName]?.isShiny)) })
-              addLog(`✨ ${activeName} transformou-se em ${enemyDisplay}!`)
-            }
-          }
-        } else {
-          // Enemy transforms into the player's active Pokémon
-          const playerActive = gameState.activePokemon
-          if (playerActive) {
-            const template = getPokemonBattleTemplate(playerActive)
-            if (template) {
-              const newAttacks = template.attacks
-              const newType = template.type
-              const enemySprite = getPokemonSpriteUrl(playerActive, template.sprite || wildPokemon[playerActive]?.sprite, "front", Boolean(gameState.playerTeam[playerActive]?.isShiny))
-
-              updateBattle({
-                enemyAttacks: newAttacks,
-                enemyType: newType || "Normal",
-                enemySprite,
-                enemyDisplayName: playerActive,
-                enemyIsDisguised: true,
-              })
-
-              addLog(`✨ ${currentBattle.enemyName} transformou-se em ${playerActive}!`)
-            }
-          }
-        }
-      } catch (e) {
-        // swallow transform errors to avoid breaking the battle loop
-        console.error("Transform effect failed:", e)
-      }
     }
 
     if (effect.statChanges) {
@@ -3168,7 +3111,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           <Badge className="pixel-badge bg-[linear-gradient(180deg,#fde047_0%,#fde047_50%,#eab308_50%,#eab308_100%)] px-3 py-1 text-slate-900">
             💰 {gameState.money}
           </Badge>
-          <Badge className="pixel-badge bg-[linear-gradient(180deg,#f87171_0%,#f87171_50%,#ef4444_50%,#ef4444_100%)] px-3 py-1 text-white">⚔️ {getDisplayedWave(gameState.battles, Boolean(gameState.currentBattle))}</Badge>
+          <Badge className="pixel-badge bg-[linear-gradient(180deg,#f87171_0%,#f87171_50%,#ef4444_50%,#ef4444_100%)] px-3 py-1 text-white">⚔️ {gameState.battles}</Badge>
           <Badge className="pixel-badge bg-[linear-gradient(180deg,#60a5fa_0%,#60a5fa_50%,#2563eb_50%,#2563eb_100%)] px-3 py-1 text-white">
             🎯 {activePokemonLabel}
           </Badge>
@@ -3327,26 +3270,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [chooseStarter, multiplayerRoom?.mode, multiplayerRoom?.starterMode, showModal])
 
   const startBattle = useCallback(() => {
-    const loadedBattle = gameState.currentBattle
-    if (loadedBattle) {
-      const loadedSpeciesName = loadedBattle.enemyName
-      const visibleSpeciesName = loadedBattle.enemyDisplayName || loadedSpeciesName
-      const loadedBattleRarity = wildPokemon[loadedSpeciesName]?.rarity || wildPokemon[visibleSpeciesName]?.rarity || "comum"
-      const loadedBattleWave = Math.max(1, loadedBattle.wave ?? gameState.battles + 1)
-      const legendaryWave = isLegendaryMilestoneWave(loadedBattleWave)
-      const loadedBattleMinLevel = dataMinWildLevelBySpecies[loadedSpeciesName] || 1
-      const loadedBattleIsValid =
-        (legendaryWave && Boolean(loadedBattle.enemyIsBoss)) ||
-        (!legendaryWave && Math.max(0, loadedBattle.enemyLevel || 0) >= loadedBattleMinLevel)
-
-      if (loadedBattleIsValid) {
-        setCurrentScreen("battle")
-        return
-      }
-
-      updateGameState({ currentBattle: null })
-    }
-
     if (!gameState.activePokemon) {
       addLog("⚠️ Erro: Nenhum Pokémon ativo!")
       return
@@ -3359,7 +3282,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     }
 
     const nextWave = gameState.battles + 1
-    const isLegendaryWave = isLegendaryMilestoneWave(nextWave)
     const hasValidHiddenPreview =
       hiddenEncounterPreview &&
       hiddenEncounterPreview.forBattles === gameState.battles &&
@@ -3379,7 +3301,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const enemyName = encounterPreview.enemyName
     const enemyDisplayName = encounterPreview.enemyDisplayName
     const enemyLevel = encounterPreview.enemyLevel
-    const isBossWave = encounterPreview.isBoss || isLegendaryWave
+    const isBossWave = encounterPreview.isBoss
     const enemyIVs = encounterPreview.enemyIVs ?? createPokemonIVs()
 
     const enemyStats = wildPokemonStats[enemyName] || { baseHP: 40, hpMultiplier: 1.0 }
@@ -3411,11 +3333,10 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const newBattle = {
       enemyName,
-      enemyType: getPokemonDisplayType(enemyName, encounterPreview.enemyType),
-      wave: nextWave,
+      enemyType: wildPokemon[enemyName].type,
       enemyDisplayName,
       enemyIsBoss: isBossWave,
-      enemyDisplayType: getPokemonDisplayType(enemyDisplayName, encounterPreview.enemyDisplayType),
+      enemyDisplayType: encounterPreview.enemyDisplayType,
       enemyIsDisguised: encounterPreview.isImpostor,
       enemyIsShiny: encounterPreview.isShiny,
       enemyIVs,
@@ -3431,16 +3352,18 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     }
 
     updateGameState({
+      battles: gameState.battles + 1,
       currentBattle: newBattle,
     })
+    setNextEncounterPreview(null)
+    setHiddenEncounterPreview(null)
 
     setCurrentScreen("battle")
 
-    const rarity = getEnemyDisplayRarity(enemyName, nextWave, isBossWave)
-    const rarityLabel = POKEMON_RARITY_CONFIG[rarity].text
-    const rarityEmoji = POKEMON_RARITY_CONFIG[rarity].emoji
+    const rarity = wildPokemon[enemyName].rarity
+    const rarityEmoji = rarity === "lendario" ? "🌟" : rarity === "raro" ? "💎" : "🌿"
 
-    if (isLegendaryWave) {
+    if (rarity === "lendario") {
       showScreenNotice(`👑 O Chefe Lendário ${enemyName} apareceu na Onda ${nextWave}!`, 3800)
     } else if (isBossWave) {
       showScreenNotice(`👑 Boss de Onda ${nextWave}: ${enemyName} entrou em campo!`, 3200)
@@ -3448,16 +3371,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const bossTag = isBossWave ? " 👑BOSS" : ""
     const shinyTag = encounterPreview.isShiny ? " ✨SHINY✨" : ""
-    addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarityLabel} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
-  }, [
-    gameState,
-    updateGameState,
-    addLog,
-    showScreenNotice,
-    nextEncounterPreview,
-    hiddenEncounterPreview,
-    buildNextEncounterPreview,
-  ])
+    addLog(`${rarityEmoji}${bossTag}${shinyTag} ${enemyName} ${rarity} apareceu! (Nv.${enemyLevel}, ${enemyMaxHP}HP)`)
+  }, [gameState, updateGameState, addLog, showScreenNotice, nextEncounterPreview, hiddenEncounterPreview, buildNextEncounterPreview])
 
   const handleAttack = useCallback(
     async (attackName: string) => {
@@ -3517,54 +3432,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           return { shouldEnemyAttack: true, enemyDefeated: false }
         }
 
-        // Special-case: Counter / Mirror Coat reflect the most recent damage
-        const normalizedMove = normalizeMoveLookupKey(attackName)
-        if (normalizedMove === "counter" || normalizedMove === "mirrorcoat") {
-          const lastPlayerDamage = (currentBattle as any).playerLastDamageTaken ?? 0
-          if (!lastPlayerDamage || lastPlayerDamage <= 0) {
-            await playAttackAnimation({
-              id: attackAnimationCounter + 1,
-              attacker: "player",
-              target: "enemy",
-              moveName: attackName,
-              attackType,
-            })
-            setAttackAnimationCounter((current) => current + 1)
-            addLog(`⚠️ ${normalizeDisplayText(attackName)} falhou (sem dano recebido recentemente)!`)
-            // consume PP already done above; enemy still gets to attack
-            return { shouldEnemyAttack: true, enemyDefeated: false }
-          }
-
-          const reflected = Math.max(1, Math.floor(lastPlayerDamage * 2))
-
-          await playAttackAnimation({
-            id: attackAnimationCounter + 1,
-            attacker: "player",
-            target: "enemy",
-            moveName: attackName,
-            attackType,
-          })
-          setAttackAnimationCounter((current) => current + 1)
-
-          const latestEnemyHP = latestGameStateRef.current.currentBattle?.enemyHP ?? currentBattle.enemyHP
-          const newEnemyHP = Math.max(0, latestEnemyHP - reflected)
-          updateBattle({ enemyHP: newEnemyHP, enemyLastDamageTaken: reflected, enemyLastDamageMove: attackName })
-          // clear the stored player last-damage so it can't be reused
-          updateBattle({ playerLastDamageTaken: 0, playerLastDamageMove: undefined })
-
-          addLog(`🪞 ${normalizeDisplayText(attackName)} refletiu ${reflected} de dano!`)
-
-          applyStatusEffect(attackName, "enemy")
-          applyBattleMoveEffect(attackName, "player")
-
-          if (newEnemyHP <= 0) {
-            handleEnemyDefeat(currentBattle.enemyName)
-            return { shouldEnemyAttack: false, enemyDefeated: true }
-          }
-
-          return { shouldEnemyAttack: true, enemyDefeated: false }
-        }
-
         const finalDamage = Math.max(
           0,
           Math.floor(
@@ -3590,7 +3457,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
         const latestEnemyHP = latestGameStateRef.current.currentBattle?.enemyHP ?? currentBattle.enemyHP
         const newEnemyHP = Math.max(0, latestEnemyHP - finalDamage)
-        updateBattle({ enemyHP: newEnemyHP, enemyLastDamageTaken: finalDamage, enemyLastDamageMove: attackName })
+        updateBattle({ enemyHP: newEnemyHP })
 
         const damageTags = []
         if (stabMultiplier > 1) damageTags.push("STAB")
@@ -3813,11 +3680,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return { playerFainted: false, enemyFainted: false }
     }
 
-    const currentBattle = gameState.currentBattle
-    if (!currentBattle) {
-      return { playerFainted: false, enemyFainted: false }
-    }
-
     const enemyTurnState = processStatusAtTurnStart("enemy")
     if (!enemyTurnState.canAct) {
       return { playerFainted: false, enemyFainted: enemyTurnState.fainted }
@@ -3946,50 +3808,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return { playerFainted: false, enemyFainted: false }
     }
 
-    // Special-case: Counter / Mirror Coat used by enemy reflect the most recent damage
-    const normalizedMove = normalizeMoveLookupKey(attackName)
-    if (normalizedMove === "counter" || normalizedMove === "mirrorcoat") {
-      const lastEnemyDamage = (currentBattle as any).enemyLastDamageTaken ?? 0
-      if (!lastEnemyDamage || lastEnemyDamage <= 0) {
-        await playAttackAnimation({
-          id: attackAnimationCounter + 1,
-          attacker: "enemy",
-          target: "player",
-          moveName: attackName,
-          attackType: getAttackType(attackName),
-        })
-        setAttackAnimationCounter((current) => current + 1)
-        addLog(`⚠️ ${currentBattle.enemyDisplayName || currentBattle.enemyName} tentou ${normalizeDisplayText(attackName)} mas falhou!`)
-        return { playerFainted: false, enemyFainted: false }
-      }
-
-      const reflected = Math.max(1, Math.floor(lastEnemyDamage * 2))
-      await playAttackAnimation({
-        id: attackAnimationCounter + 1,
-        attacker: "enemy",
-        target: "player",
-        moveName: attackName,
-        attackType: getAttackType(attackName),
-      })
-      setAttackAnimationCounter((current) => current + 1)
-
-      const newHP = Math.max(0, playerPokemon.HP - reflected)
-      updatePokemon(gameState.activePokemon, { HP: newHP })
-      updateBattle({ playerLastDamageTaken: reflected, playerLastDamageMove: attackName, enemyLastDamageTaken: 0, enemyLastDamageMove: undefined })
-      addLog(`🪞 ${currentBattle.enemyDisplayName || currentBattle.enemyName} refletiu ${reflected} de dano em você!`)
-
-      applyStatusEffect(attackName, "player")
-      applyBattleMoveEffect(attackName, "enemy")
-
-      if (newHP <= 0) {
-        addLog(`😵 ${gameState.activePokemon} desmaiou!`)
-        handlePlayerKnockout(gameState.activePokemon, newHP)
-        return { playerFainted: true, enemyFainted: false }
-      }
-
-      return { playerFainted: false, enemyFainted: false }
-    }
-
     const [minDamage, maxDamage] = gameState.currentBattle.enemyAttacks[attackName]
     const baseDamage = random(minDamage, maxDamage)
 
@@ -4028,7 +3846,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     const newHP = Math.max(0, playerPokemon.HP - damage)
     updatePokemon(gameState.activePokemon, { HP: newHP })
-    updateBattle({ playerLastDamageTaken: damage, playerLastDamageMove: attackName })
 
     const enemyDamageTags = []
     if (stabMultiplier > 1) enemyDamageTags.push("STAB")
@@ -4235,7 +4052,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         attackPP: syncAttackPP(pokemon.attackPP, evolvedAttacks),
         sprite: evolutionTemplate?.sprite || getPokemonSpriteUrl(evolvedName, undefined, "front", Boolean(pokemon.isShiny)),
         spriteSet: getPokemonSpriteSet(evolvedName, evolutionTemplate?.sprite, Boolean(pokemon.isShiny)),
-        type: evolutionTemplate?.type ?? getCanonicalPokemonType(evolvedName, pokemon.type),
+        type: evolutionTemplate?.type ?? pokemon.type,
         speed: Math.max(1, evolutionTemplate?.speed ?? pokemon.speed ?? 50),
         isShiny: pokemon.isShiny,
         ivs: resolvedPokemonIVs,
@@ -4339,19 +4156,12 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       newInventory[ballType] = Math.max(0, ownedBallCount - 1)
 
       const enemyData = wildPokemon[currentBattle.enemyName]
-      const battleWave = currentBattle.wave ?? getDisplayedWave(gameState.battles, true)
-      const rarity = getEnemyDisplayRarity(currentBattle.enemyName, battleWave, currentBattle.enemyIsBoss)
-      const isLegendaryBoss = rarity === "lendario" && Boolean(currentBattle.enemyIsBoss)
-      const isNonBossLegendary = rarity === "lendario" && !currentBattle.enemyIsBoss
+      const rarity = enemyData.rarity
+      const isLegendaryBoss = rarity === "lendario"
       const belowHalfHP = currentBattle.enemyHP <= Math.floor(currentBattle.enemyMaxHP / 2)
 
-      if (isNonBossLegendary) {
-        showScreenNotice("👑 Lendários só aparecem nas waves 100, 200, 300... e só podem ser capturados como boss nessas waves.")
-        return
-      }
-
       if (isLegendaryBoss && !belowHalfHP) {
-        showScreenNotice("👑 Lendários só podem ser capturados após perderem pelo menos metade do HP!")
+        showScreenNotice("👑 Chefes lendários só podem ser capturados após ficarem com metade da vida.")
         return
       }
 
@@ -4535,13 +4345,18 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return
     }
 
-    // Validate the offered move: just check it's not already known and level is valid
-    const offeredMoveKey = normalizeMoveNameKey(moveVendorOffer.moveName)
-    const alreadyKnown = Object.keys(pokemon.attacks).some(
-      (attackName) => normalizeMoveNameKey(attackName) === offeredMoveKey,
+    const learnableMoves = getLearnableMovesForPokemon(
+      moveVendorOffer.pokemonName,
+      pokemon.type,
+      pokemon.level,
+      Object.keys(pokemon.attacks),
     )
-    if (alreadyKnown) {
-      addLog("⚠️ Esse Pokémon já sabe este golpe.")
+    const offeredMoveStillValid = learnableMoves.some(
+      (move) => normalizeMoveNameKey(move.name) === normalizeMoveNameKey(moveVendorOffer.moveName),
+    )
+
+    if (!offeredMoveStillValid) {
+      addLog("⚠️ Oferta expirada. Esse Pokémon já não pode aprender este golpe agora.")
       setMoveVendorOffer(null)
       setMoveVendorReplaceAttack(null)
       setShowModal(null)
@@ -4772,15 +4587,9 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
             <div
               key={slot.id}
               onClick={() => {
-                const slotState = saveSlots[slot.id]?.gameState
                 loadSlotGame(slot.id)
-                if (slotState?.currentBattle) {
-                  setCurrentScreen("battle")
-                  addLog("🎮 Batalha restaurada! Continue lutando!")
-                } else {
-                  setCurrentScreen("menu")
-                  addLog("🎮 Jogo carregado! Bem-vindo de volta!")
-                }
+                setCurrentScreen("menu")
+                addLog("🎮 Jogo carregado! Bem-vindo de volta!")
                 setShowModal(null)
               }}
               className="cursor-pointer rounded-[16px] border-4 border-slate-800 bg-[linear-gradient(180deg,#f5f5f4_0%,#f5f5f4_55%,#e7e5e4_55%,#e7e5e4_100%)] p-4 text-slate-900 shadow-[5px_5px_0_rgba(15,23,42,0.3)] transition-all hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -5285,8 +5094,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           <div className={`grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 ${multiplayerRoom ? "xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"}`}>
             <div className="min-h-0 space-y-2 overflow-hidden sm:space-y-3">
               {!multiplayerJoinedRoomId ? (
-                <>
-                {multiplayerSection === "competitive" ? (
+                multiplayerSection === "competitive" ? (
                   <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                     <div className="flex items-center justify-between gap-2">
                       <div>
@@ -5470,13 +5278,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                       </section>
                     )}
                   </div>
-                )}
-                {multiplayerError && (
-                  <p className="rounded-2xl border-2 border-red-700 bg-red-100 px-4 py-2 text-xs font-semibold text-red-900 shadow-[4px_4px_0_rgba(185,28,28,0.14)] sm:py-3">
-                    {multiplayerError}
-                  </p>
-                )}
-                </>
+                )
               ) : (
                 <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                   <div className="mt-1 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3">
@@ -5956,11 +5758,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           playerName={gameState.activePokemon}
           playerPokemon={gameState.playerTeam[gameState.activePokemon]}
           battle={gameState.currentBattle}
-          enemyRarity={getEnemyDisplayRarity(
-            gameState.currentBattle.enemyDisplayName || gameState.currentBattle.enemyName,
-            gameState.currentBattle.wave ?? getDisplayedWave(gameState.battles, true),
-            gameState.currentBattle.enemyIsBoss,
-          )}
           environment={(gameState.currentEnvironment as BattleEnvironment) || "planicie"}
           attackAnimation={attackAnimation}
           className="flex-1 min-h-0"
@@ -6071,6 +5868,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
               if (success) {
                 addLog(`✅ Fugiu da batalha com sucesso! (${Math.floor(fleeChance * 100)}% chance)`)
+                updateGameState({ battles: Math.max(0, gameState.battles - 1) })
                 // Não decrementar as durações de status quando o jogador foge
                 endBattle(false, { advanceStatus: false })
               } else {
@@ -6424,13 +6222,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                 🧭 Ir Por Outro Caminho
               </Button>
 
-              {isLegendaryMilestoneWave(gameState.battles + 1) && (
-                <div className="rounded-xl border border-amber-300/50 bg-amber-500/15 p-3 text-center text-sm text-amber-100">
-                  👑 O próximo encontro é um Chefe Lendário de onda (1.5x HP e 1.5x dano).
-                </div>
-              )}
-
-              {nextEncounterPreview.isBoss && !isLegendaryMilestoneWave(gameState.battles + 1) && (
+              {nextEncounterPreview.isBoss && (
                 <div className="rounded-xl border border-rose-300/50 bg-rose-500/15 p-3 text-center text-sm text-rose-100">
                   👑 O próximo encontro é um BOSS de onda (1.5x HP e 1.5x dano).
                 </div>
@@ -6514,11 +6306,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           const teamSize = Object.keys(gameState.playerTeam).length
           const teamIsFull = teamSize >= MAX_TEAM_SIZE
           const isLegendaryBoss = gameState.currentBattle
-            ? getEnemyDisplayRarity(
-                gameState.currentBattle.enemyName,
-                gameState.currentBattle.wave ?? getDisplayedWave(gameState.battles, true),
-                gameState.currentBattle.enemyIsBoss,
-              ) === "lendario" && Boolean(gameState.currentBattle.enemyIsBoss)
+            ? wildPokemon[gameState.currentBattle.enemyName]?.rarity === "lendario"
             : false
           const legendaryCanCapture = gameState.currentBattle
             ? gameState.currentBattle.enemyHP <= Math.floor(gameState.currentBattle.enemyMaxHP / 2)
@@ -6612,7 +6400,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                 onClick={() => {
                   setCaptureCelebration(null)
                   setShowModal(null)
-                  completeCurrentWave()
                   endBattle()
                 }}
                 className="w-full bg-gradient-to-r from-emerald-500 to-green-600"
