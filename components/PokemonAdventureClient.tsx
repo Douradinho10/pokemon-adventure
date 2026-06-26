@@ -2055,91 +2055,48 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
   }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
 
   const handleAddBot = useCallback(async () => {
-
     if (!multiplayerJoinedRoomId || !accountUserId) return
-
     setMultiplayerBusy(true)
-
     try {
-
       // Local rooms (created as fallback when socket/Firebase is unavailable) exist
-
       // only in component state — the socket server has no knowledge of them.
-
       // Add the bot directly to the local room state instead of emitting to the server.
-
       if (multiplayerJoinedRoomId.startsWith(LOCAL_ROOM_PREFIX)) {
-
         setMultiplayerRoom((prev) => {
-
           if (!prev) return prev
-
           const currentPlayers = prev.players || {}
-
           const playerCount = Object.keys(currentPlayers).length
-
           if (playerCount >= prev.maxPlayers) {
-
             setMultiplayerError("Sala cheia")
-
             return prev
-
           }
-
           const botId = `BOT_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`
-
           return {
-
             ...prev,
-
             players: {
-
               ...currentPlayers,
-
               [botId]: {
-
                 userId: botId,
-
                 displayName: "Bot",
-
                 joinedAt: Date.now(),
-
                 bestWave: 0,
-
                 ready: true,
-
               },
-
             },
-
           }
-
         })
-
         return
-
       }
-
-
 
       const res = await addBotToRoom({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId, displayName: `Bot` })
-
       if (!res.ok) {
-
         setMultiplayerError(res.message || "Nao foi possivel adicionar bot")
-
       }
-
     } catch (err) {
-
       setMultiplayerError("Erro ao adicionar bot")
-
     } finally {
-
       setMultiplayerBusy(false)
-
     }
-
   }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom])
 
   const handleKickPlayer = useCallback(async (targetUserId: string) => {
