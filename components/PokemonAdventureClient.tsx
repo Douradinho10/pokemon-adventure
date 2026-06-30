@@ -1040,38 +1040,17 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         });
 
         if (!result.ok || !result.room) {
-          if (isInviteAutoJoin && pendingInviteRetryCountRef.current < maxInviteAttempts) {
-            pendingInviteRetryCountRef.current += 1
-            pendingInviteRetryTimeoutRef.current = window.setTimeout(() => {
-              void joinMultiplayerRoomByCode(normalizedRoomCode, { autoRetry: true })
-            }, 2000)
-            setMultiplayerBusy(false)
-            return false
-          }
-
-          setMultiplayerError(result.message || "Não foi possível entrar no grupo.")
-          setMultiplayerBusy(false)
-          return false
+          setMultiplayerError(result.message || "Não foi possível entrar no grupo.");
+          return false;
         }
-
-        clearPendingInviteJoin()
-
-        const room = result.room
-        setMultiplayerJoinedRoomId(room.id)
-        setMultiplayerRoom(room)
-        setMultiplayerRoomCodeInput(room.id)
-        setMultiplayerMode(false)
-        setMultiplayerIsCasual(room.mode === "casual")
-        setCasualLobbyVisibility((room.visibility as MultiplayerRoomVisibility) ?? "private")
-        setMultiplayerBusy(false)
-        return true
+        // ... (resto do código da função)
       } catch (error) {
-        setMultiplayerError(getMultiplayerErrorMessage(error, "Ocorreu um erro ao entrar no grupo."))
-        setMultiplayerBusy(false)
-        return false
+        setMultiplayerError("Ocorreu um erro ao entrar no grupo.");
+        setMultiplayerBusy(false);
+        return false;
       }
     },
-    [accountUserId, accountName, clearPendingInviteJoin, getMultiplayerErrorMessage, leaveCurrentMultiplayerRoomIfNeeded]
+    [accountUserId, accountName, leaveCurrentMultiplayerRoomIfNeeded, /* ... outras dependências ... */]
   );
 
   const handleShareMultiplayerInvite = useCallback(async () => {
@@ -1117,8 +1096,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
     if (!auth) {
       hasAutoRoutedAfterAuthRef.current = false
-      setAccountUserId("guest")
-      setAccountEmail("guest@local")
+      setAccountUserId(null)
+      setAccountEmail(null)
       setAccountName("Treinador")
       setIsAuthChecking(false)
       return
@@ -1127,8 +1106,8 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         hasAutoRoutedAfterAuthRef.current = false
-        setAccountUserId("guest")
-        setAccountEmail("guest@local")
+        setAccountUserId(null)
+        setAccountEmail(null)
         setAccountName("Treinador")
         setIsAuthChecking(false)
         return
@@ -1315,10 +1294,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       }
     }
   }, [])
-
-  useEffect(() => {
-    console.log("[MP] multiplayerJoinedRoomId changed →", multiplayerJoinedRoomId)
-  }, [multiplayerJoinedRoomId])
 
   useEffect(() => {
     if (!multiplayerJoinedRoomId) {
@@ -1509,7 +1484,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
 
   const handleCreateMultiplayerRoom = useCallback(
     async (maxPlayers: 2 | 3, visibility: MultiplayerRoomVisibility = "private") => {
-      console.log("[MP] handleCreateMultiplayerRoom", { maxPlayers, visibility, accountUserId })
       if (!accountUserId) {
         setMultiplayerError("Faz login para criar um grupo multiplayer.")
         return
@@ -1524,7 +1498,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       setMultiplayerError(null)
 
       try {
-        console.log("[MP] calling createMultiplayerRoom…")
         const room = await createMultiplayerRoom({
           hostUserId: accountUserId,
           hostDisplayName: accountName,
@@ -1533,7 +1506,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           visibility,
         })
 
-        console.log("[MP] room created ok:", room.id)
         setMultiplayerJoinedRoomId(room.id)
         setMultiplayerRoom(room)
         setMultiplayerRoomCodeInput(room.id)
@@ -1542,7 +1514,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         setCasualLobbyVisibility(visibility)
         showScreenNotice(`Grupo criado! Codigo: ${room.id}`)
       } catch (error) {
-        console.error("[MP] createMultiplayerRoom failed:", error)
         if (visibility === "public") {
           setMultiplayerError(getMultiplayerErrorMessage(error, "Nao foi possivel criar o grupo agora. Verifica o Firebase e tenta novamente."))
           return
@@ -1551,7 +1522,6 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
         const localCode = `${LOCAL_ROOM_PREFIX}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
         const createdAt = Date.now()
 
-        console.log("[MP] falling back to local room:", localCode)
         setMultiplayerJoinedRoomId(localCode)
         setMultiplayerRoom({
           id: localCode,
@@ -4505,13 +4475,18 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       return
     }
 
-    // Validate the offered move: just check it's not already known and level is valid
-    const offeredMoveKey = normalizeMoveNameKey(moveVendorOffer.moveName)
-    const alreadyKnown = Object.keys(pokemon.attacks).some(
-      (attackName) => normalizeMoveNameKey(attackName) === offeredMoveKey,
+    const learnableMoves = getLearnableMovesForPokemon(
+      moveVendorOffer.pokemonName,
+      pokemon.type,
+      pokemon.level,
+      Object.keys(pokemon.attacks),
     )
-    if (alreadyKnown) {
-      addLog("⚠️ Esse Pokémon já sabe este golpe.")
+    const offeredMoveStillValid = learnableMoves.some(
+      (move) => normalizeMoveNameKey(move.name) === normalizeMoveNameKey(moveVendorOffer.moveName),
+    )
+
+    if (!offeredMoveStillValid) {
+      addLog("⚠️ Oferta expirada. Esse Pokémon já não pode aprender este golpe agora.")
       setMoveVendorOffer(null)
       setMoveVendorReplaceAttack(null)
       setShowModal(null)
@@ -5255,8 +5230,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
           <div className={`grid min-h-0 gap-2 p-2 sm:gap-3 sm:p-3 ${multiplayerRoom ? "xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"}`}>
             <div className="min-h-0 space-y-2 overflow-hidden sm:space-y-3">
               {!multiplayerJoinedRoomId ? (
-                <>
-                {multiplayerSection === "competitive" ? (
+                multiplayerSection === "competitive" ? (
                   <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                     <div className="flex items-center justify-between gap-2">
                       <div>
@@ -5440,13 +5414,7 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                       </section>
                     )}
                   </div>
-                )}
-                {multiplayerError && (
-                  <p className="rounded-2xl border-2 border-red-700 bg-red-100 px-4 py-2 text-xs font-semibold text-red-900 shadow-[4px_4px_0_rgba(185,28,28,0.14)] sm:py-3">
-                    {multiplayerError}
-                  </p>
-                )}
-                </>
+                )
               ) : (
                 <section className="rounded-[24px] border-4 border-slate-900 bg-white p-3 shadow-[6px_6px_0_rgba(15,23,42,0.12)] sm:p-4">
                   <div className="mt-1 rounded-2xl border-2 border-slate-900 bg-slate-50 px-3 py-3">
