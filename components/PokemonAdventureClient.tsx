@@ -71,6 +71,7 @@ import {
   setMultiplayerPlayerReady,
   subscribeMultiplayerRoom,
   updateMultiplayerPlayerWave,
+  addBotToRoom,
   kickPlayerFromRoom,
   type MultiplayerRoom,
   type PublicCasualLobbySummary,
@@ -2094,6 +2095,21 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
       setMultiplayerBusy(false)
     }
   }, [accountUserId, multiplayerJoinedRoomId, multiplayerRoom, showScreenNotice])
+
+  const handleAddBot = useCallback(async () => {
+    if (!multiplayerJoinedRoomId || !accountUserId) return
+    setMultiplayerBusy(true)
+    try {
+      const res = await addBotToRoom({ roomId: multiplayerJoinedRoomId, hostUserId: accountUserId, displayName: `Bot` })
+      if (!res.ok) {
+        setMultiplayerError(res.message || "Nao foi possivel adicionar bot")
+      }
+    } catch (err) {
+      setMultiplayerError("Erro ao adicionar bot")
+    } finally {
+      setMultiplayerBusy(false)
+    }
+  }, [accountUserId, multiplayerJoinedRoomId])
 
   const handleKickPlayer = useCallback(async (targetUserId: string) => {
     if (!multiplayerJoinedRoomId || !accountUserId) return
@@ -4922,7 +4938,13 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                     Jogar Run Multiplayer
                   </Button>
                   {isHost && multiplayerRoom.status === "waiting" && (
-                    
+                    <Button
+                      onClick={handleAddBot}
+                      disabled={multiplayerBusy || Object.keys(multiplayerRoom.players || {}).length >= multiplayerRoom.maxPlayers}
+                      className="pixel-menu-button h-11 bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] text-[10px] leading-relaxed sm:text-xs"
+                    >
+                      Adicionar Bot
+                    </Button>
                   )}
                 </div>
               ) : (
@@ -5332,6 +5354,13 @@ function PokemonAdventureApp({ initialScreen = "main-menu" }: { initialScreen?: 
                       </Button>
                     )}
                     {activeRoom.status === "waiting" && activeRoom.mode === "casual" && isHost && (
+                      <Button
+                        onClick={handleAddBot}
+                        disabled={multiplayerBusy || Object.keys(activeRoom.players || {}).length >= activeRoom.maxPlayers}
+                        className="pixel-menu-button h-11 w-full bg-[linear-gradient(180deg,#8b5cf6_0%,#8b5cf6_50%,#6d28d9_50%,#6d28d9_100%),repeating-linear-gradient(90deg,rgba(255,255,255,0.16)_0_8px,rgba(0,0,0,0.06)_8px_16px)] px-2 text-[10px] leading-relaxed sm:px-3 sm:text-xs"
+                      >
+                        Adicionar Bot
+                      </Button>
                     )}
                   </div>
 
